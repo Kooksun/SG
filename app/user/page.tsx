@@ -1,13 +1,11 @@
+"use client";
+
 import UserDashboard from "@/components/UserDashboard";
+import { useSearchParams } from "next/navigation";
 
-interface UserPageProps {
-    searchParams: {
-        uid?: string;
-    };
-}
-
-export default function UserPage({ searchParams }: UserPageProps) {
-    const uid = typeof searchParams.uid === "string" ? searchParams.uid : "";
+export default function UserPage() {
+    const searchParams = useSearchParams();
+    const uid = searchParams?.get("uid") ?? "";
 
     if (!uid) {
         return (
