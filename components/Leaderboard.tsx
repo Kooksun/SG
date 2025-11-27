@@ -119,7 +119,10 @@ export default function Leaderboard() {
 
     const globalSlices = (() => {
         const entries = Object.entries(globalHoldings)
-            .map(([symbol, quantity]) => ({ symbol, quantity }))
+            .map(([symbol, quantity]) => {
+                const label = symbol === "기타" ? "기타" : (stocks[symbol]?.name || symbol);
+                return { symbol, quantity, label };
+            })
             .sort((a, b) => b.quantity - a.quantity);
 
         if (!entries.length) return [];
@@ -128,7 +131,7 @@ export default function Leaderboard() {
         const topSlices = entries.slice(0, maxSlices);
         if (entries.length > maxSlices) {
             const othersTotal = entries.slice(maxSlices).reduce((sum, item) => sum + item.quantity, 0);
-            topSlices.push({ symbol: "기타", quantity: othersTotal });
+            topSlices.push({ symbol: "기타", label: "기타", quantity: othersTotal });
         }
         return topSlices;
     })();
@@ -198,7 +201,7 @@ export default function Leaderboard() {
                                                 className="inline-block w-3 h-3 rounded-full"
                                                 style={{ backgroundColor: pieColors[idx % pieColors.length] }}
                                             ></span>
-                                            <span>{slice.symbol}</span>
+                                            <span>{slice.label}</span>
                                         </div>
                                         <div className="text-right">
                                             {slice.quantity.toLocaleString()}주 ({percent.toFixed(1)}%)
