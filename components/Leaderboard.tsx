@@ -107,7 +107,7 @@ export default function Leaderboard() {
                             <tr
                                 key={user.uid}
                                 className="border-b border-gray-700 hover:bg-gray-700 cursor-pointer"
-                                onClick={() => router.push(`/user/${user.uid}`)}
+                                onClick={() => router.push(`/user?uid=${user.uid}`)}
                             >
                                 <td className="py-2">{index + 1}</td>
                                 <td className="py-2">{user.displayName}</td>

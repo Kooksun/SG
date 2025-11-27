@@ -27,7 +27,7 @@ export default function Navbar() {
                     </Link>
                     {user ? (
                         <>
-                            <Link href={`/user/${user.uid}`} className="hover:text-gray-300">
+                        <Link href={`/user?uid=${user.uid}`} className="hover:text-gray-300">
                                 My Portfolio
                             </Link>
                             <button onClick={handleLogout} className="bg-red-600 px-3 py-1 rounded hover:bg-red-700">
