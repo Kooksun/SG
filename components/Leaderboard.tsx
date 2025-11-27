@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy, limit, updateDoc, doc } from "firebase/firestore";
+import type { CSSProperties } from "react";
+import { collection, onSnapshot, query, orderBy, limit, updateDoc, doc, collectionGroup } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { UserProfile, Stock } from "@/types";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ export default function Leaderboard() {
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
     const [portfolios, setPortfolios] = useState<Record<string, PortfolioItem[]>>({});
+    const [globalHoldings, setGlobalHoldings] = useState<Record<string, number>>({});
     const router = useRouter();
 
     useEffect(() => {
@@ -80,6 +82,21 @@ export default function Leaderboard() {
         };
     }, [users]);
 
+    useEffect(() => {
+        const unsubscribe = onSnapshot(collectionGroup(db, "portfolio"), (snapshot) => {
+            const quantityMap: Record<string, number> = {};
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                const symbol = data.symbol;
+                const quantity = data.quantity;
+                if (!symbol || typeof quantity !== "number" || quantity <= 0) return;
+                quantityMap[symbol] = (quantityMap[symbol] || 0) + quantity;
+            });
+            setGlobalHoldings(quantityMap);
+        });
+        return () => unsubscribe();
+    }, []);
+
     const leaderboardEntries = users
         .map((user) => {
             const holdings = portfolios[user.uid] || [];
@@ -99,6 +116,37 @@ export default function Leaderboard() {
             };
         })
         .sort((a, b) => b.computedTotalAssets - a.computedTotalAssets);
+
+    const globalSlices = (() => {
+        const entries = Object.entries(globalHoldings)
+            .map(([symbol, quantity]) => ({ symbol, quantity }))
+            .sort((a, b) => b.quantity - a.quantity);
+
+        if (!entries.length) return [];
+
+        const maxSlices = 8;
+        const topSlices = entries.slice(0, maxSlices);
+        if (entries.length > maxSlices) {
+            const othersTotal = entries.slice(maxSlices).reduce((sum, item) => sum + item.quantity, 0);
+            topSlices.push({ symbol: "기타", quantity: othersTotal });
+        }
+        return topSlices;
+    })();
+
+    const totalGlobalQuantity = globalSlices.reduce((sum, item) => sum + item.quantity, 0);
+    const pieColors = ["#FF6384", "#36A2EB", "#FFCE56", "#F472B6", "#34D399", "#A78BFA", "#FBBF24", "#60A5FA", "#F87171"];
+
+    let pieStyle: CSSProperties | undefined;
+    if (totalGlobalQuantity > 0 && globalSlices.length) {
+        let cumulative = 0;
+        const segments = globalSlices.map((slice, idx) => {
+            const start = (cumulative / totalGlobalQuantity) * 100;
+            cumulative += slice.quantity;
+            const end = (cumulative / totalGlobalQuantity) * 100;
+            return `${pieColors[idx % pieColors.length]} ${start}% ${end}%`;
+        });
+        pieStyle = { background: `conic-gradient(${segments.join(", ")})` };
+    }
 
     return (
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
@@ -131,6 +179,38 @@ export default function Leaderboard() {
                         ))}
                     </tbody>
                 </table>
+            </div>
+            <div className="mt-8">
+                <h3 className="text-xl font-semibold mb-4 text-white">전체 포트폴리오 비중</h3>
+                {totalGlobalQuantity > 0 ? (
+                    <div className="flex flex-col md:flex-row items-center gap-6">
+                        <div className="w-48 h-48 rounded-full border border-gray-700" style={pieStyle}></div>
+                        <div className="flex-1 space-y-2 w-full">
+                            {globalSlices.map((slice, idx) => {
+                                const percent = (slice.quantity / totalGlobalQuantity) * 100;
+                                return (
+                                    <div
+                                        key={`${slice.symbol}-${idx}`}
+                                        className="flex items-center justify-between text-sm text-gray-200 bg-gray-700/50 rounded px-3 py-2"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span
+                                                className="inline-block w-3 h-3 rounded-full"
+                                                style={{ backgroundColor: pieColors[idx % pieColors.length] }}
+                                            ></span>
+                                            <span>{slice.symbol}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            {slice.quantity.toLocaleString()}주 ({percent.toFixed(1)}%)
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : (
+                    <p className="text-gray-400 text-sm">집계된 포트폴리오 데이터가 없습니다.</p>
+                )}
             </div>
         </div>
     );
