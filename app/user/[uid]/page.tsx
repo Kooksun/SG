@@ -15,6 +15,11 @@ interface PortfolioItem {
     quantity: number;
 }
 
+// Needed so Next.js static export succeeds even though user pages are client-only routes.
+export async function generateStaticParams() {
+    return [];
+}
+
 export default function UserPage() {
     const params = useParams();
     const uid = params.uid as string;
