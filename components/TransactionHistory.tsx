@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Timestamp } from "firebase/firestore";
+import { Stock } from "@/types";
 
 interface Transaction {
     id: string;
     symbol: string;
+    name?: string;
     type: "BUY" | "SELL";
     price: number;
     quantity: number;
@@ -17,7 +19,13 @@ interface Transaction {
     timestamp: Timestamp;
 }
 
-export default function TransactionHistory({ uid }: { uid: string }) {
+export default function TransactionHistory({
+    uid,
+    stocks
+}: {
+    uid: string;
+    stocks?: Record<string, Stock>;
+}) {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
     useEffect(() => {
@@ -46,7 +54,7 @@ export default function TransactionHistory({ uid }: { uid: string }) {
                     <thead>
                         <tr className="border-b border-gray-700">
                             <th className="py-2">Time</th>
-                            <th className="py-2">Symbol</th>
+                            <th className="py-2">Symbol / Name</th>
                             <th className="py-2">Type</th>
                             <th className="py-2">Price</th>
                             <th className="py-2">Qty</th>
@@ -56,26 +64,35 @@ export default function TransactionHistory({ uid }: { uid: string }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {transactions.map((tx) => (
-                            <tr key={tx.id} className="border-b border-gray-700 hover:bg-gray-700">
-                                <td className="py-2">
-                                    {tx.timestamp?.toDate().toLocaleString()}
-                                </td>
-                                <td className="py-2">{tx.symbol}</td>
-                                <td className={`py-2 font-bold ${tx.type === "BUY" ? "text-red-400" : "text-blue-400"}`}>
-                                    {tx.type}
-                                </td>
-                                <td className="py-2">{tx.price.toLocaleString()}</td>
-                                <td className="py-2">{tx.quantity}</td>
-                                <td className="py-2">{tx.amount.toLocaleString()}</td>
-                                <td className="py-2 text-gray-400">
-                                    {tx.fee ? tx.fee.toLocaleString() : "0"}
-                                </td>
-                                <td className={`py-2 ${tx.profit && tx.profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
-                                    {tx.type === "SELL" && tx.profit !== undefined ? tx.profit.toLocaleString() : "-"}
-                                </td>
-                            </tr>
-                        ))}
+                        {transactions.map((tx) => {
+                            const stockName = stocks?.[tx.symbol]?.name || tx.name;
+
+                            return (
+                                <tr key={tx.id} className="border-b border-gray-700 hover:bg-gray-700">
+                                    <td className="py-2">
+                                        {tx.timestamp?.toDate().toLocaleString()}
+                                    </td>
+                                    <td className="py-2">
+                                        <div className="font-semibold text-white">{tx.symbol}</div>
+                                        {stockName && (
+                                            <div className="text-xs text-gray-400">{stockName}</div>
+                                        )}
+                                    </td>
+                                    <td className={`py-2 font-bold ${tx.type === "BUY" ? "text-red-400" : "text-blue-400"}`}>
+                                        {tx.type}
+                                    </td>
+                                    <td className="py-2">{tx.price.toLocaleString()}</td>
+                                    <td className="py-2">{tx.quantity}</td>
+                                    <td className="py-2">{tx.amount.toLocaleString()}</td>
+                                    <td className="py-2 text-gray-400">
+                                        {tx.fee ? tx.fee.toLocaleString() : "0"}
+                                    </td>
+                                    <td className={`py-2 ${tx.profit && tx.profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                                        {tx.type === "SELL" && tx.profit !== undefined ? tx.profit.toLocaleString() : "-"}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                         {transactions.length === 0 && (
                             <tr>
                                 <td colSpan={8} className="py-4 text-center text-gray-500">

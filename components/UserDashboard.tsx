@@ -101,7 +101,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                     isOwner={currentUser?.uid === uid}
                 />
 
-                <TransactionHistory uid={uid} />
+                <TransactionHistory uid={uid} stocks={stocks} />
             </div>
         </main>
     );

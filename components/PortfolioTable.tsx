@@ -40,7 +40,7 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false }:
                 <table className="w-full text-left text-gray-300">
                     <thead>
                         <tr className="border-b border-gray-700">
-                            <th className="py-2">Symbol</th>
+                            <th className="py-2">Symbol / Name</th>
                             <th className="py-2">Quantity</th>
                             <th className="py-2">Avg Price</th>
                             <th className="py-2">Cur Price</th>
@@ -51,9 +51,11 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false }:
                     <tbody>
                         {portfolio.map((item) => {
                             // Use realtime price if available, otherwise fallback to item.currentPrice (stale)
-                            const currentPrice = realtimeStocks && realtimeStocks[item.symbol]
-                                ? realtimeStocks[item.symbol].price
+                            const stockInfo = realtimeStocks && realtimeStocks[item.symbol];
+                            const currentPrice = stockInfo
+                                ? stockInfo.price
                                 : item.currentPrice;
+                            const displayName = stockInfo?.name || item.name;
 
                             const valuation = currentPrice * item.quantity;
                             const profit = valuation - (item.averagePrice * item.quantity);
@@ -77,7 +79,12 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false }:
                                         setIsModalOpen(true);
                                     }}
                                 >
-                                    <td className="py-2">{item.symbol}</td>
+                                    <td className="py-2">
+                                        <div className="font-semibold text-white">{item.symbol}</div>
+                                        {displayName && (
+                                            <div className="text-xs text-gray-400">{displayName}</div>
+                                        )}
+                                    </td>
                                     <td className="py-2">{item.quantity}</td>
                                     <td className="py-2">{item.averagePrice.toLocaleString()}</td>
                                     <td className="py-2">{currentPrice.toLocaleString()}</td>
