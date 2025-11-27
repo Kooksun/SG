@@ -1,5 +1,7 @@
 import UserDashboard from "@/components/UserDashboard";
 
+export const dynamicParams = false;
+
 export async function generateStaticParams() {
     return [];
 }
