@@ -2,8 +2,17 @@
 
 import UserDashboard from "@/components/UserDashboard";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 export default function UserPage() {
+    return (
+        <Suspense fallback={<UserPageFallback />}>
+            <UserPageContent />
+        </Suspense>
+    );
+}
+
+function UserPageContent() {
     const searchParams = useSearchParams();
     const uid = searchParams?.get("uid") ?? "";
 
@@ -19,4 +28,12 @@ export default function UserPage() {
     }
 
     return <UserDashboard uid={uid} />;
+}
+
+function UserPageFallback() {
+    return (
+        <main className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+            <p className="text-xl">사용자 정보를 불러오는 중...</p>
+        </main>
+    );
 }
