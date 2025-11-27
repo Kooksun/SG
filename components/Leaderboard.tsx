@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { UserProfile, Stock } from "@/types";
 import { useRouter } from "next/navigation";
@@ -22,8 +22,13 @@ export default function Leaderboard() {
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const userData: UserProfile[] = [];
-            snapshot.forEach((doc) => {
-                userData.push(doc.data() as UserProfile);
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data() as UserProfile;
+                if (typeof data.startingBalance !== "number") {
+                    void updateDoc(doc(db, "users", data.uid), { startingBalance: 100000000 });
+                    data.startingBalance = 100000000;
+                }
+                userData.push(data);
             });
             setUsers(userData);
         });
@@ -83,9 +88,14 @@ export default function Leaderboard() {
                 return total + (stock ? stock.price * item.quantity : 0);
             }, 0);
             const totalAssets = user.balance + holdingsValue;
+            const equity = totalAssets;
+            const startingBalance = typeof user.startingBalance === "number" ? user.startingBalance : 100000000;
+            const profit = equity - startingBalance;
+            const returnPct = startingBalance ? (profit / startingBalance) * 100 : 0;
             return {
                 ...user,
                 computedTotalAssets: totalAssets,
+                returnPct,
             };
         })
         .sort((a, b) => b.computedTotalAssets - a.computedTotalAssets);
@@ -100,6 +110,7 @@ export default function Leaderboard() {
                             <th className="py-2">Rank</th>
                             <th className="py-2">User</th>
                             <th className="py-2">Total Assets</th>
+                            <th className="py-2">Return</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -112,6 +123,10 @@ export default function Leaderboard() {
                                 <td className="py-2">{index + 1}</td>
                                 <td className="py-2">{user.displayName}</td>
                                 <td className="py-2">{user.computedTotalAssets.toLocaleString()} KRW</td>
+                                <td className={`py-2 ${user.returnPct >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                                    {user.returnPct >= 0 ? "+" : ""}
+                                    {user.returnPct.toFixed(2)}%
+                                </td>
                             </tr>
                         ))}
                     </tbody>

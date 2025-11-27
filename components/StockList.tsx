@@ -19,6 +19,7 @@ export default function StockList() {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState<'price' | 'change' | 'name'>('price');
     const [sortDesc, setSortDesc] = useState(true);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
 
 
@@ -35,10 +36,19 @@ export default function StockList() {
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const stockData: Stock[] = [];
+            let newest: Date | null = null;
             snapshot.forEach((doc) => {
-                stockData.push(doc.data() as Stock);
+                const data = doc.data() as Stock;
+                stockData.push(data);
+                if (data.updatedAt && typeof data.updatedAt.toDate === "function") {
+                    const updatedDate = data.updatedAt.toDate();
+                    if (!newest || updatedDate > newest) {
+                        newest = updatedDate;
+                    }
+                }
             });
             setStocks(stockData);
+            setLastUpdated(newest);
         });
 
         return () => unsubscribe();
@@ -85,15 +95,22 @@ export default function StockList() {
 
     return (
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-            {/* Controls: Search */}
-            <div className="mb-4">
+            {/* Controls: Search + Last updated */}
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <input
                     type="text"
                     placeholder="검색 (심볼·이름)"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="px-3 py-2 rounded bg-gray-700 text-white focus:outline-none"
+                    className="px-3 py-2 rounded bg-gray-700 text-white focus:outline-none flex-1"
                 />
+                <div className="text-sm text-gray-400 text-right sm:w-48">
+                    최종 갱신: {lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit"
+                    }) : "-"}
+                </div>
             </div>
 
             <div className="flex justify-between items-center mb-4">

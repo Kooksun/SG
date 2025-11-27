@@ -15,5 +15,6 @@ export interface UserProfile {
     displayName: string;
     balance: number;
     totalAssetValue: number;
+    startingBalance?: number;
     createdAt: Timestamp;
 }

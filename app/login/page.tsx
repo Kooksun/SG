@@ -42,6 +42,7 @@ export default function LoginPage() {
                     displayName: displayName || email.split("@")[0],
                     balance: 100000000, // 100 Million KRW
                     totalAssetValue: 100000000,
+                    startingBalance: 100000000,
                     createdAt: serverTimestamp(),
                 });
             } else {

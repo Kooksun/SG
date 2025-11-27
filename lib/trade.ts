@@ -17,6 +17,11 @@ export async function buyStock(uid: string, symbol: string, name: string, price:
         if (!userDoc.exists()) throw new Error("User does not exist");
 
         const userData = userDoc.data();
+        if (typeof userData.startingBalance !== "number") {
+            transaction.update(userRef, {
+                startingBalance: 100000000,
+            });
+        }
         if (userData.balance < cost) throw new Error("Insufficient funds");
 
         // WRITES
@@ -76,8 +81,17 @@ export async function sellStock(uid: string, symbol: string, price: number, quan
         const portfolioRef = doc(db, "users", uid, "portfolio", symbol);
 
         // READS FIRST
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User does not exist");
         const portfolioDoc = await transaction.get(portfolioRef);
         if (!portfolioDoc.exists()) throw new Error("You do not own this stock");
+
+        const userData = userDoc.data();
+        if (typeof userData.startingBalance !== "number") {
+            transaction.update(userRef, {
+                startingBalance: 100000000,
+            });
+        }
 
         const currentQty = portfolioDoc.data().quantity;
         const averagePrice = portfolioDoc.data().averagePrice; // Get average price

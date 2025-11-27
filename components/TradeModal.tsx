@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Stock } from "@/types";
 import { buyStock, sellStock } from "@/lib/trade";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -17,6 +17,12 @@ export default function TradeModal({ isOpen, onClose, stock }: TradeModalProps) 
     const [mode, setMode] = useState<"BUY" | "SELL">("BUY");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (isOpen) {
+            setQuantity(1);
+        }
+    }, [isOpen, stock.symbol]);
 
     if (!isOpen) return null;
 
