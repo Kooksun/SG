@@ -31,5 +31,5 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 1. Push the project to GitHub (this repo is configured for `main`).
 2. Make sure GitHub Pages is set to use the "GitHub Actions" source in the repository settings.
-3. The included workflow `.github/workflows/deploy.yml` automatically builds with `npm run build && npm run export` and publishes the static site from the `out/` directory.
-4. If you need to build locally, run `npm run deploy:pages` and serve the generated `out/` folder with any static file server.
+3. The included workflow `.github/workflows/deploy.yml` automatically runs `npm run build` (which generates `out/` because `output: "export"` is set) and publishes that folder.
+4. If you need to build locally, run `npm run deploy:pages`; then serve the generated `out/` folder with any static file server.
