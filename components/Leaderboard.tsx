@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { collection, onSnapshot, query, orderBy, limit, updateDoc, doc, collectionGroup } from "firebase/firestore";
 import { ref, onValue } from "firebase/database";
@@ -18,6 +18,7 @@ export default function Leaderboard() {
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
     const [portfolios, setPortfolios] = useState<Record<string, PortfolioItem[]>>({});
     const [globalHoldings, setGlobalHoldings] = useState<Record<string, number>>({});
+    const [globalChartMetric, setGlobalChartMetric] = useState<"value" | "quantity">("value");
     const router = useRouter();
 
     useEffect(() => {
@@ -121,35 +122,43 @@ export default function Leaderboard() {
         })
         .sort((a, b) => b.computedTotalAssets - a.computedTotalAssets);
 
-    const globalSlices = (() => {
+    const globalSlices = useMemo(() => {
         const entries = Object.entries(globalHoldings)
             .map(([symbol, quantity]) => {
+                const price = stocks[symbol]?.price;
+                const value = price ? Math.max(0, quantity * price) : Math.max(0, quantity);
                 const label = symbol === "기타" ? "기타" : (stocks[symbol]?.name || symbol);
-                return { symbol, quantity, label };
+                return { symbol, quantity, value, label };
             })
-            .sort((a, b) => b.quantity - a.quantity);
+            .filter((item) => item.value > 0 || item.quantity > 0)
+            .sort((a, b) => {
+                const aKey = globalChartMetric === "value" ? a.value : a.quantity;
+                const bKey = globalChartMetric === "value" ? b.value : b.quantity;
+                return bKey - aKey;
+            });
 
         if (!entries.length) return [];
 
         const maxSlices = 9;
         const topSlices = entries.slice(0, maxSlices);
         if (entries.length > maxSlices) {
-            const othersTotal = entries.slice(maxSlices).reduce((sum, item) => sum + item.quantity, 0);
-            topSlices.push({ symbol: "기타", label: "기타", quantity: othersTotal });
+            const othersTotal = entries.slice(maxSlices).reduce((sum, item) => sum + (globalChartMetric === "value" ? item.value : item.quantity), 0);
+            topSlices.push({ symbol: "기타", label: "기타", quantity: globalChartMetric === "quantity" ? othersTotal : 0, value: globalChartMetric === "value" ? othersTotal : 0 });
         }
         return topSlices;
-    })();
+    }, [globalHoldings, stocks, globalChartMetric]);
 
-    const totalGlobalQuantity = globalSlices.reduce((sum, item) => sum + item.quantity, 0);
+    const totalGlobalAmount = globalSlices.reduce((sum, item) => sum + (globalChartMetric === "value" ? item.value : item.quantity), 0);
     const pieColors = ["#FF6384", "#36A2EB", "#FFCE56", "#F472B6", "#34D399", "#A78BFA", "#FBBF24", "#60A5FA", "#cdf871ff", "#8c85eeff"];
 
     let pieStyle: CSSProperties | undefined;
-    if (totalGlobalQuantity > 0 && globalSlices.length) {
+    if (totalGlobalAmount > 0 && globalSlices.length) {
         let cumulative = 0;
         const segments = globalSlices.map((slice, idx) => {
-            const start = (cumulative / totalGlobalQuantity) * 100;
-            cumulative += slice.quantity;
-            const end = (cumulative / totalGlobalQuantity) * 100;
+            const sliceAmount = globalChartMetric === "value" ? slice.value : slice.quantity;
+            const start = (cumulative / totalGlobalAmount) * 100;
+            cumulative += sliceAmount;
+            const end = (cumulative / totalGlobalAmount) * 100;
             return `${pieColors[idx % pieColors.length]} ${start}% ${end}%`;
         });
         pieStyle = { background: `conic-gradient(${segments.join(", ")})` };
@@ -189,12 +198,27 @@ export default function Leaderboard() {
             </div>
             <div className="mt-8">
                 <h3 className="text-xl font-semibold mb-4 text-white">전체 포트폴리오 비중</h3>
-                {totalGlobalQuantity > 0 ? (
+                {totalGlobalAmount > 0 ? (
                     <div className="flex flex-col md:flex-row items-center gap-6">
+                        <div className="flex items-center gap-3 mb-2 md:mb-0">
+                            <button
+                                onClick={() => setGlobalChartMetric("value")}
+                                className={`px-3 py-1 rounded text-sm ${globalChartMetric === "value" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300"}`}
+                            >
+                                가치 기준
+                            </button>
+                            <button
+                                onClick={() => setGlobalChartMetric("quantity")}
+                                className={`px-3 py-1 rounded text-sm ${globalChartMetric === "quantity" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300"}`}
+                            >
+                                수량 기준
+                            </button>
+                        </div>
                         <div className="w-48 h-48 rounded-full border border-gray-700" style={pieStyle}></div>
                         <div className="flex-1 space-y-2 w-full">
                             {globalSlices.map((slice, idx) => {
-                                const percent = (slice.quantity / totalGlobalQuantity) * 100;
+                                const sliceAmount = globalChartMetric === "value" ? slice.value : slice.quantity;
+                                const percent = (sliceAmount / totalGlobalAmount) * 100;
                                 return (
                                     <div
                                         key={`${slice.symbol}-${idx}`}
@@ -208,7 +232,10 @@ export default function Leaderboard() {
                                             <span>{slice.label}</span>
                                         </div>
                                         <div className="text-right">
-                                            {slice.quantity.toLocaleString()}주 ({percent.toFixed(1)}%)
+                                            {globalChartMetric === "value"
+                                                ? `${Math.floor(slice.value).toLocaleString()} KRW`
+                                                : `${Math.floor(slice.quantity).toLocaleString()}주`}
+                                            {` (${percent.toFixed(1)}%)`}
                                         </div>
                                     </div>
                                 );
