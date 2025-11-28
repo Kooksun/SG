@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, collection } from "firebase/firestore";
 import { ref, onValue } from "firebase/database";
 import { db, rtdb } from "@/lib/firebase";
 import { Stock } from "@/types";
@@ -17,6 +17,7 @@ export default function StockList() {
     const [watchlist, setWatchlist] = useState<string[]>([]);
     const [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
     const [userBalance, setUserBalance] = useState(0);
+    const [portfolio, setPortfolio] = useState<Record<string, number>>({});
     // New UI states
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState<'price' | 'change' | 'name'>('price');
@@ -76,6 +77,7 @@ export default function StockList() {
     useEffect(() => {
         if (!user) {
             setUserBalance(0);
+            setPortfolio({});
             return;
         }
         const unsubscribe = onSnapshot(doc(db, "users", user.uid), (doc) => {
@@ -84,6 +86,22 @@ export default function StockList() {
                 setWatchlist(data.watchlist || []);
                 setUserBalance(data.balance || 0);
             }
+        });
+        return () => unsubscribe();
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) {
+            setPortfolio({});
+            return;
+        }
+        const unsubscribe = onSnapshot(collection(db, "users", user.uid, "portfolio"), (snapshot) => {
+            const portfolioMap: Record<string, number> = {};
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                portfolioMap[data.symbol] = data.quantity;
+            });
+            setPortfolio(portfolioMap);
         });
         return () => unsubscribe();
     }, [user]);
@@ -199,7 +217,7 @@ export default function StockList() {
                     onClose={() => setIsModalOpen(false)}
                     stock={selectedStock}
                     balance={userBalance}
-                    holdingQuantity={0}
+                    holdingQuantity={portfolio[selectedStock.symbol] || 0}
                 />
             )}
         </div >
