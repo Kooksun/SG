@@ -16,7 +16,7 @@ interface PortfolioItem {
     valuation: number;
 }
 
-export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, balance = 0 }: { uid: string, realtimeStocks?: Record<string, Stock>, isOwner?: boolean, balance?: number }) {
+export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, balance = 0, creditLimit = 0, usedCredit = 0 }: { uid: string, realtimeStocks?: Record<string, Stock>, isOwner?: boolean, balance?: number, creditLimit?: number, usedCredit?: number }) {
     const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [selectedQuantity, setSelectedQuantity] = useState<number>(0);
@@ -112,6 +112,8 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, b
                     onClose={() => setIsModalOpen(false)}
                     stock={selectedStock}
                     balance={balance}
+                    creditLimit={creditLimit}
+                    usedCredit={usedCredit}
                     holdingQuantity={selectedQuantity}
                 />
             )}

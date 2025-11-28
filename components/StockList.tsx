@@ -17,6 +17,8 @@ export default function StockList() {
     const [watchlist, setWatchlist] = useState<string[]>([]);
     const [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
     const [userBalance, setUserBalance] = useState(0);
+    const [userCreditLimit, setUserCreditLimit] = useState(0);
+    const [userUsedCredit, setUserUsedCredit] = useState(0);
     const [portfolio, setPortfolio] = useState<Record<string, number>>({});
     // New UI states
     const [searchTerm, setSearchTerm] = useState('');
@@ -77,6 +79,8 @@ export default function StockList() {
     useEffect(() => {
         if (!user) {
             setUserBalance(0);
+            setUserCreditLimit(0);
+            setUserUsedCredit(0);
             setPortfolio({});
             return;
         }
@@ -85,6 +89,8 @@ export default function StockList() {
                 const data = doc.data();
                 setWatchlist(data.watchlist || []);
                 setUserBalance(data.balance || 0);
+                setUserCreditLimit(data.creditLimit || 0);
+                setUserUsedCredit(data.usedCredit || 0);
             }
         });
         return () => unsubscribe();
@@ -217,6 +223,8 @@ export default function StockList() {
                     onClose={() => setIsModalOpen(false)}
                     stock={selectedStock}
                     balance={userBalance}
+                    creditLimit={userCreditLimit}
+                    usedCredit={userUsedCredit}
                     holdingQuantity={portfolio[selectedStock.symbol] || 0}
                 />
             )}

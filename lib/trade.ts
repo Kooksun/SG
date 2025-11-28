@@ -17,17 +17,46 @@ export async function buyStock(uid: string, symbol: string, name: string, price:
         if (!userDoc.exists()) throw new Error("User does not exist");
 
         const userData = userDoc.data();
+
+        // Initialize missing fields for legacy users
         if (typeof userData.startingBalance !== "number") {
             transaction.update(userRef, {
                 startingBalance: 100000000,
             });
         }
-        if (userData.balance < cost) throw new Error("Insufficient funds");
+        if (typeof userData.creditLimit !== "number") {
+            transaction.update(userRef, {
+                creditLimit: 50000000,
+                usedCredit: 0,
+            });
+        }
+
+        const balance = userData.balance || 0;
+        const creditLimit = userData.creditLimit || 0;
+        const usedCredit = userData.usedCredit || 0;
+        const availableCredit = creditLimit - usedCredit;
+        const totalAvailable = balance + availableCredit;
+
+        // Check if user has enough funds (cash + available credit)
+        if (totalAvailable < cost) {
+            throw new Error("Insufficient funds (including credit limit)");
+        }
+
+        // Calculate how much credit to use
+        let creditToUse = 0;
+        let cashToUse = cost;
+
+        if (balance < cost) {
+            // Need to use credit
+            creditToUse = cost - balance;
+            cashToUse = balance;
+        }
 
         // WRITES
-        // Deduct balance
+        // Update balance and credit
         transaction.update(userRef, {
-            balance: increment(-cost)
+            balance: increment(-cashToUse),
+            usedCredit: increment(creditToUse)
         });
 
         // Update Portfolio
@@ -64,6 +93,7 @@ export async function buyStock(uid: string, symbol: string, name: string, price:
             quantity: quantity,
             amount: cost,
             fee: 0,
+            creditUsed: creditToUse,
             timestamp: serverTimestamp()
         });
     });
@@ -87,24 +117,45 @@ export async function sellStock(uid: string, symbol: string, price: number, quan
         if (!portfolioDoc.exists()) throw new Error("You do not own this stock");
 
         const userData = userDoc.data();
+
+        // Initialize missing fields for legacy users
         if (typeof userData.startingBalance !== "number") {
             transaction.update(userRef, {
                 startingBalance: 100000000,
             });
         }
+        if (typeof userData.creditLimit !== "number") {
+            transaction.update(userRef, {
+                creditLimit: 50000000,
+                usedCredit: 0,
+            });
+        }
 
         const currentQty = portfolioDoc.data().quantity;
-        const averagePrice = portfolioDoc.data().averagePrice; // Get average price
+        const averagePrice = portfolioDoc.data().averagePrice;
         if (currentQty < quantity) throw new Error("Insufficient quantity");
 
         // Calculate Profit
         const costBasis = Math.floor(averagePrice * quantity);
         const profit = proceeds - costBasis; // Net profit after fee
 
+        const usedCredit = userData.usedCredit || 0;
+
+        // Calculate credit repayment
+        let creditRepayment = 0;
+        let cashIncrease = proceeds;
+
+        if (usedCredit > 0) {
+            // Repay credit first
+            creditRepayment = Math.min(usedCredit, proceeds);
+            cashIncrease = proceeds - creditRepayment;
+        }
+
         // WRITES
-        // Update Balance
+        // Update Balance and Credit
         transaction.update(userRef, {
-            balance: increment(proceeds)
+            balance: increment(cashIncrease),
+            usedCredit: increment(-creditRepayment)
         });
 
         // Update Portfolio
@@ -129,7 +180,8 @@ export async function sellStock(uid: string, symbol: string, price: number, quan
             quantity: quantity,
             amount: amount,
             fee: fee,
-            profit: profit, // Store profit
+            profit: profit,
+            creditRepaid: creditRepayment,
             timestamp: serverTimestamp()
         });
     });

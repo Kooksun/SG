@@ -131,7 +131,7 @@ export default function Leaderboard() {
 
         if (!entries.length) return [];
 
-        const maxSlices = 8;
+        const maxSlices = 9;
         const topSlices = entries.slice(0, maxSlices);
         if (entries.length > maxSlices) {
             const othersTotal = entries.slice(maxSlices).reduce((sum, item) => sum + item.quantity, 0);
@@ -141,7 +141,7 @@ export default function Leaderboard() {
     })();
 
     const totalGlobalQuantity = globalSlices.reduce((sum, item) => sum + item.quantity, 0);
-    const pieColors = ["#FF6384", "#36A2EB", "#FFCE56", "#F472B6", "#34D399", "#A78BFA", "#FBBF24", "#60A5FA", "#F87171"];
+    const pieColors = ["#FF6384", "#36A2EB", "#FFCE56", "#F472B6", "#34D399", "#A78BFA", "#FBBF24", "#60A5FA", "#cdf871ff", "#8c85eeff"];
 
     let pieStyle: CSSProperties | undefined;
     if (totalGlobalQuantity > 0 && globalSlices.length) {
