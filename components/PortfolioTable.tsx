@@ -16,9 +16,10 @@ interface PortfolioItem {
     valuation: number;
 }
 
-export default function PortfolioTable({ uid, realtimeStocks, isOwner = false }: { uid: string, realtimeStocks?: Record<string, Stock>, isOwner?: boolean }) {
+export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, balance = 0 }: { uid: string, realtimeStocks?: Record<string, Stock>, isOwner?: boolean, balance?: number }) {
     const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+    const [selectedQuantity, setSelectedQuantity] = useState<number>(0);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     useEffect(() => {
@@ -61,6 +62,12 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false }:
                             const profit = valuation - (item.averagePrice * item.quantity);
                             const profitPercent = (profit / (item.averagePrice * item.quantity)) * 100;
 
+                            // Color logic
+                            // Price color based on daily change (stockInfo.change)
+                            // Valuation color based on total profit (profit)
+                            const priceColor = stockInfo && stockInfo.change > 0 ? "text-red-400" : (stockInfo && stockInfo.change < 0 ? "text-blue-400" : "text-white");
+                            const valuationColor = profit > 0 ? "text-red-400" : (profit < 0 ? "text-blue-400" : "text-white");
+
                             return (
                                 <tr
                                     key={item.symbol}
@@ -71,11 +78,12 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false }:
                                             symbol: item.symbol,
                                             name: item.name || item.symbol,
                                             price: currentPrice,
-                                            change: 0,
-                                            change_percent: 0,
+                                            change: stockInfo?.change || 0,
+                                            change_percent: stockInfo?.change_percent || 0,
                                             updatedAt: Timestamp.now()
                                         };
                                         setSelectedStock(stock);
+                                        setSelectedQuantity(item.quantity);
                                         setIsModalOpen(true);
                                     }}
                                 >
@@ -87,8 +95,8 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false }:
                                     </td>
                                     <td className="py-2">{item.quantity}</td>
                                     <td className="py-2">{item.averagePrice.toLocaleString()}</td>
-                                    <td className="py-2">{currentPrice.toLocaleString()}</td>
-                                    <td className="py-2">{valuation.toLocaleString()}</td>
+                                    <td className={`py-2 ${priceColor}`}>{currentPrice.toLocaleString()}</td>
+                                    <td className={`py-2 ${valuationColor}`}>{valuation.toLocaleString()}</td>
                                     <td className={`py-2 ${profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
                                         {profit.toLocaleString()} ({profitPercent.toFixed(2)}%)
                                     </td>
@@ -103,6 +111,8 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false }:
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
                     stock={selectedStock}
+                    balance={balance}
+                    holdingQuantity={selectedQuantity}
                 />
             )}
         </div>

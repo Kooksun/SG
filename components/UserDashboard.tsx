@@ -102,6 +102,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                     uid={uid}
                     realtimeStocks={stocks}
                     isOwner={currentUser?.uid === uid}
+                    balance={userProfile.balance}
                 />
 
                 <TransactionHistory uid={uid} stocks={stocks} />
