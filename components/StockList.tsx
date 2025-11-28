@@ -16,6 +16,7 @@ export default function StockList() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [watchlist, setWatchlist] = useState<string[]>([]);
     const [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
+    const [userBalance, setUserBalance] = useState(0);
     // New UI states
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState<'price' | 'change' | 'name'>('price');
@@ -73,10 +74,15 @@ export default function StockList() {
     }, [sortField, sortDesc]);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user) {
+            setUserBalance(0);
+            return;
+        }
         const unsubscribe = onSnapshot(doc(db, "users", user.uid), (doc) => {
             if (doc.exists()) {
-                setWatchlist(doc.data().watchlist || []);
+                const data = doc.data();
+                setWatchlist(data.watchlist || []);
+                setUserBalance(data.balance || 0);
             }
         });
         return () => unsubscribe();
@@ -162,6 +168,7 @@ export default function StockList() {
                     <tbody>
                         {filteredStocks.map((stock) => (
                             <tr key={stock.symbol} className="border-b border-gray-700 hover:bg-gray-700 cursor-pointer" onClick={() => {
+                                if (!user) return; // Don't open modal if not logged in
                                 setSelectedStock(stock);
                                 setIsModalOpen(true);
                             }}>
@@ -191,6 +198,8 @@ export default function StockList() {
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
                     stock={selectedStock}
+                    balance={userBalance}
+                    holdingQuantity={0}
                 />
             )}
         </div >
