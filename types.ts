@@ -14,6 +14,9 @@ export interface UserProfile {
     email: string;
     displayName: string;
     balance: number;
+    creditLimit: number;
+    usedCredit: number;
+    lastInterestDate?: string;
     totalAssetValue: number;
     startingBalance?: number;
     createdAt: Timestamp;

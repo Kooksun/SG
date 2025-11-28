@@ -107,8 +107,9 @@ export default function Leaderboard() {
                 const stock = stocks[item.symbol];
                 return total + (stock ? stock.price * item.quantity : 0);
             }, 0);
+            const usedCredit = typeof user.usedCredit === "number" ? user.usedCredit : 0;
             const totalAssets = user.balance + holdingsValue;
-            const equity = totalAssets;
+            const equity = totalAssets - usedCredit; // net assets after accounting for borrowed credit
             const startingBalance = typeof user.startingBalance === "number" ? user.startingBalance : 100000000;
             const profit = equity - startingBalance;
             const returnPct = startingBalance ? (profit / startingBalance) * 100 : 0;

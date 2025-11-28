@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { doc, onSnapshot, collection } from "firebase/firestore";
 import { ref, onValue } from "firebase/database";
 import { db, rtdb } from "@/lib/firebase";
@@ -9,6 +9,7 @@ import PortfolioTable from "@/components/PortfolioTable";
 import TransactionHistory from "@/components/TransactionHistory";
 import { UserProfile, Stock } from "@/types";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { applyDailyInterestAndAutoLiquidate } from "@/lib/credit";
 
 interface PortfolioItem {
     symbol: string;
@@ -24,6 +25,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
+    const interestAppliedRef = useRef(false);
 
     useEffect(() => {
         if (!uid) return;
@@ -34,6 +36,21 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
         });
         return () => unsubscribe();
     }, [uid]);
+
+    useEffect(() => {
+        if (!uid || !currentUser || currentUser.uid !== uid) return;
+        if (interestAppliedRef.current) return;
+        interestAppliedRef.current = true;
+
+        const priceMap: Record<string, number> = {};
+        Object.entries(stocks).forEach(([symbol, stock]) => {
+            if (typeof stock.price === "number") {
+                priceMap[symbol] = stock.price;
+            }
+        });
+
+        void applyDailyInterestAndAutoLiquidate(uid, { priceMap });
+    }, [uid, currentUser, stocks]);
 
     useEffect(() => {
         if (!uid) return;
@@ -96,6 +113,39 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                             <div className="text-2xl font-bold">{stockValue.toLocaleString()} KRW</div>
                         </div>
                     </div>
+
+                    {/* Credit Information */}
+                    <div className="mt-6 bg-gradient-to-r from-blue-900 to-purple-900 p-4 rounded-lg border border-blue-700">
+                        <h2 className="text-xl font-bold mb-3 flex items-center">
+                            💳 Credit Information
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div>
+                                <div className="text-gray-300 text-sm">Credit Limit</div>
+                                <div className="text-lg font-bold text-blue-300">
+                                    {(userProfile.creditLimit || 0).toLocaleString()} KRW
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-gray-300 text-sm">Used Credit</div>
+                                <div className="text-lg font-bold text-red-300">
+                                    {(userProfile.usedCredit || 0).toLocaleString()} KRW
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-gray-300 text-sm">Available Credit</div>
+                                <div className="text-lg font-bold text-green-300">
+                                    {((userProfile.creditLimit || 0) - (userProfile.usedCredit || 0)).toLocaleString()} KRW
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-gray-300 text-sm">Total Buying Power</div>
+                                <div className="text-lg font-bold text-yellow-300">
+                                    {(userProfile.balance + (userProfile.creditLimit || 0) - (userProfile.usedCredit || 0)).toLocaleString()} KRW
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <PortfolioTable
@@ -103,6 +153,8 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                     realtimeStocks={stocks}
                     isOwner={currentUser?.uid === uid}
                     balance={userProfile.balance}
+                    creditLimit={userProfile.creditLimit || 0}
+                    usedCredit={userProfile.usedCredit || 0}
                 />
 
                 <TransactionHistory uid={uid} stocks={stocks} />

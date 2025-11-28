@@ -9,6 +9,7 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
+import { applyDailyInterestAndAutoLiquidate } from "@/lib/credit";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -41,16 +42,55 @@ export default function LoginPage() {
                     email: user.email,
                     displayName: displayName || email.split("@")[0],
                     balance: 100000000, // 100 Million KRW
+                    creditLimit: 50000000, // 50 Million KRW Credit Limit
+                    usedCredit: 0, // No credit used initially
+                    lastInterestDate: new Date().toISOString().slice(0, 10),
                     totalAssetValue: 100000000,
                     startingBalance: 100000000,
                     createdAt: serverTimestamp(),
                 });
             } else {
                 // Login
-                await signInWithEmailAndPassword(auth, email, password);
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
 
-                // Check if user doc exists (legacy check or manual cleanup handling)
-                // Ideally it should exist if they signed up properly.
+                // Check if user has credit fields, if not, initialize them
+                const userDocRef = doc(db, "users", user.uid);
+                const userDoc = await getDoc(userDocRef);
+
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    const updates: any = {};
+
+                    // Initialize missing credit fields for legacy users
+                    if (typeof userData.creditLimit !== "number") {
+                        updates.creditLimit = 50000000;
+                    }
+                    if (typeof userData.usedCredit !== "number") {
+                        updates.usedCredit = 0;
+                    }
+                    if (typeof userData.startingBalance !== "number") {
+                        updates.startingBalance = 100000000;
+                    }
+                    if (!userData.lastInterestDate) {
+                        updates.lastInterestDate = new Date().toISOString().slice(0, 10);
+                    }
+
+                    // Update if there are any missing fields
+                    if (Object.keys(updates).length > 0) {
+                        await setDoc(userDocRef, updates, { merge: true });
+                    }
+                }
+            }
+
+            // Apply deferred daily interest and enforce credit limit at login time
+            const currentUid = auth.currentUser?.uid;
+            if (currentUid) {
+                try {
+                    await applyDailyInterestAndAutoLiquidate(currentUid);
+                } catch (interestErr) {
+                    console.warn("Interest accrual failed at login", interestErr);
+                }
             }
 
             router.push("/");

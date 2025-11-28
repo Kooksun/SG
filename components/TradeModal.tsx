@@ -10,10 +10,12 @@ interface TradeModalProps {
     onClose: () => void;
     stock: Stock;
     balance?: number;
+    creditLimit?: number;
+    usedCredit?: number;
     holdingQuantity?: number;
 }
 
-export default function TradeModal({ isOpen, onClose, stock, balance = 0, holdingQuantity = 0 }: TradeModalProps) {
+export default function TradeModal({ isOpen, onClose, stock, balance = 0, creditLimit = 0, usedCredit = 0, holdingQuantity = 0 }: TradeModalProps) {
     const { user } = useAuth();
     const [quantity, setQuantity] = useState(1);
     const [mode, setMode] = useState<"BUY" | "SELL">("BUY");
@@ -21,8 +23,10 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, holdin
     const [error, setError] = useState("");
 
     // Calculate max quantity based on mode
+    const availableCredit = Math.max(0, creditLimit - usedCredit);
+    const totalBuyingPower = balance + availableCredit;
     const maxQuantity = mode === "BUY"
-        ? Math.floor(balance / stock.price)
+        ? Math.floor(totalBuyingPower / stock.price)
         : holdingQuantity;
 
     useEffect(() => {
@@ -51,7 +55,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, holdin
         setError("");
         try {
             if (mode === "BUY") {
-                if (amount > balance) {
+                if (amount > totalBuyingPower) {
                     throw new Error("Insufficient funds");
                 }
                 await buyStock(user.uid, stock.symbol, stock.name, price, quantity);
@@ -139,10 +143,15 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, holdin
                             <span>Available</span>
                             <span>
                                 {mode === "BUY"
-                                    ? `${balance.toLocaleString()} KRW`
+                                    ? `${balance.toLocaleString()} KRW (Cash) + ${availableCredit.toLocaleString()} KRW (Credit)`
                                     : `${holdingQuantity} Shares`}
                             </span>
                         </div>
+                        {mode === "BUY" && amount > balance && (
+                            <div className="mt-2 p-2 bg-yellow-900 border border-yellow-600 rounded text-sm text-yellow-200">
+                                ⚠️ Credit will be used: {(amount - balance).toLocaleString()} KRW
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -157,7 +166,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, holdin
                     </button>
                     <button
                         onClick={handleTrade}
-                        disabled={loading || quantity <= 0 || (mode === "BUY" && amount > balance) || (mode === "SELL" && quantity > holdingQuantity)}
+                        disabled={loading || quantity <= 0 || (mode === "BUY" && amount > totalBuyingPower) || (mode === "SELL" && quantity > holdingQuantity)}
                         className={`flex-1 py-2 rounded ${mode === "BUY" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"} disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                         {loading ? "Processing..." : mode}
