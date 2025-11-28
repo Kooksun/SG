@@ -25,7 +25,17 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
+    const [exchangeRate, setExchangeRate] = useState(1400);
     const interestAppliedRef = useRef(false);
+
+    useEffect(() => {
+        const rateRef = ref(rtdb, 'system/exchange_rate');
+        const unsubscribe = onValue(rateRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) setExchangeRate(data);
+        });
+        return () => unsubscribe();
+    }, []);
 
     useEffect(() => {
         if (!uid) return;
@@ -87,7 +97,8 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     portfolio.forEach((item) => {
         const stock = stocks[item.symbol];
         if (stock) {
-            stockValue += item.quantity * stock.price;
+            const price = stock.currency === 'USD' ? stock.price * exchangeRate : stock.price;
+            stockValue += item.quantity * price;
         }
     });
 

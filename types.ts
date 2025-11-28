@@ -7,6 +7,7 @@ export interface Stock {
     change: number;
     change_percent: number;
     updatedAt: Timestamp | string;
+    currency?: string;
 }
 
 export interface UserProfile {

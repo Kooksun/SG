@@ -112,6 +112,10 @@ export default function StockList() {
         return () => unsubscribe();
     }, [user]);
 
+    const [activeTab, setActiveTab] = useState<'domestic' | 'overseas'>('domestic');
+
+    // ... (existing effects)
+
     const toggleWatchlist = async (e: React.MouseEvent, symbol: string) => {
         e.stopPropagation();
         if (!user) return;
@@ -123,9 +127,18 @@ export default function StockList() {
         }
     };
 
-    const displayedStocks = showWatchlistOnly
-        ? stocks.filter(s => watchlist.includes(s.symbol))
-        : stocks;
+    const displayedStocks = stocks.filter(s => {
+        // Filter by Tab
+        const isUS = s.currency === 'USD';
+        if (activeTab === 'domestic' && isUS) return false;
+        if (activeTab === 'overseas' && !isUS) return false;
+
+        // Filter by Watchlist
+        if (showWatchlistOnly && !watchlist.includes(s.symbol)) return false;
+
+        return true;
+    });
+
     // Apply search filter (case‑insensitive)
     const filteredStocks = displayedStocks.filter(s =>
         s.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -145,12 +158,26 @@ export default function StockList() {
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
             {/* Controls: Search + Last updated */}
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setActiveTab('domestic')}
+                        className={`px-4 py-2 rounded font-bold ${activeTab === 'domestic' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}
+                    >
+                        국내
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('overseas')}
+                        className={`px-4 py-2 rounded font-bold ${activeTab === 'overseas' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'}`}
+                    >
+                        해외
+                    </button>
+                </div>
                 <input
                     type="text"
                     placeholder="검색 (심볼·이름)"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="px-3 py-2 rounded bg-gray-700 text-white focus:outline-none flex-1"
+                    className="px-3 py-2 rounded bg-gray-700 text-white focus:outline-none flex-1 sm:max-w-xs"
                 />
                 <div className="text-sm text-gray-400 text-right sm:w-48">
                     최종 갱신: {lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR", {
@@ -162,7 +189,7 @@ export default function StockList() {
             </div>
 
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-white">Market Watch</h2>
+                <h2 className="text-2xl font-bold text-white">Market Watch ({activeTab === 'domestic' ? 'KOSPI/KOSDAQ' : 'US Stocks'})</h2>
                 {user && (
                     <button
                         onClick={() => setShowWatchlistOnly(!showWatchlistOnly)}
@@ -190,30 +217,37 @@ export default function StockList() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredStocks.map((stock) => (
-                            <tr key={stock.symbol} className="border-b border-gray-700 hover:bg-gray-700 cursor-pointer" onClick={() => {
-                                if (!user) return; // Don't open modal if not logged in
-                                setSelectedStock(stock);
-                                setIsModalOpen(true);
-                            }}>
-                                <td className="py-2 text-center">
-                                    {user && (
-                                        <button
-                                            onClick={(e) => toggleWatchlist(e, stock.symbol)}
-                                            className={`text-xl ${watchlist.includes(stock.symbol) ? "text-yellow-400" : "text-gray-600 hover:text-yellow-400"}`}
-                                        >
-                                            ★
-                                        </button>
-                                    )}
-                                </td>
-                                <td className="py-2">{stock.symbol}</td>
-                                <td className="py-2">{stock.name}</td>
-                                <td className="py-2">{stock.price.toLocaleString()} KRW</td>
-                                <td className={`py-2 ${stock.change >= 0 ? "text-red-400" : "text-blue-400"}`}>
-                                    {stock.change > 0 ? "+" : ""}{stock.change.toLocaleString()} ({stock.change_percent.toFixed(2)}%)
-                                </td>
-                            </tr>
-                        ))}
+                        {filteredStocks.map((stock) => {
+                            const isUS = stock.currency === 'USD';
+                            const priceDisplay = isUS
+                                ? `$${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                : `${stock.price.toLocaleString()} KRW`;
+
+                            return (
+                                <tr key={stock.symbol} className="border-b border-gray-700 hover:bg-gray-700 cursor-pointer" onClick={() => {
+                                    if (!user) return; // Don't open modal if not logged in
+                                    setSelectedStock(stock);
+                                    setIsModalOpen(true);
+                                }}>
+                                    <td className="py-2 text-center">
+                                        {user && (
+                                            <button
+                                                onClick={(e) => toggleWatchlist(e, stock.symbol)}
+                                                className={`text-xl ${watchlist.includes(stock.symbol) ? "text-yellow-400" : "text-gray-600 hover:text-yellow-400"}`}
+                                            >
+                                                ★
+                                            </button>
+                                        )}
+                                    </td>
+                                    <td className="py-2">{stock.symbol}</td>
+                                    <td className="py-2">{stock.name}</td>
+                                    <td className="py-2">{priceDisplay}</td>
+                                    <td className={`py-2 ${stock.change >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                                        {stock.change > 0 ? "+" : ""}{stock.change.toLocaleString(undefined, { minimumFractionDigits: isUS ? 2 : 0, maximumFractionDigits: isUS ? 2 : 0 })} ({stock.change_percent.toFixed(2)}%)
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, rtdb } from "@/lib/firebase";
 import { Stock } from "@/types";
 import TradeModal from "./TradeModal";
 import { Timestamp } from "firebase/firestore";
+import { ref, onValue } from "firebase/database";
 
 interface PortfolioItem {
     symbol: string;
@@ -21,6 +22,16 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, b
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [selectedQuantity, setSelectedQuantity] = useState<number>(0);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [exchangeRate, setExchangeRate] = useState(1400);
+
+    useEffect(() => {
+        const rateRef = ref(rtdb, 'system/exchange_rate');
+        const unsubscribe = onValue(rateRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) setExchangeRate(data);
+        });
+        return () => unsubscribe();
+    }, []);
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, "users", uid, "portfolio"), (snapshot) => {
@@ -53,18 +64,28 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, b
                         {portfolio.map((item) => {
                             // Use realtime price if available, otherwise fallback to item.currentPrice (stale)
                             const stockInfo = realtimeStocks && realtimeStocks[item.symbol];
-                            const currentPrice = stockInfo
-                                ? stockInfo.price
-                                : item.currentPrice;
+                            const isUS = stockInfo?.currency === 'USD';
+
+                            let currentPriceKRW = item.currentPrice; // Default to stored KRW price
+                            let displayPrice = item.currentPrice.toLocaleString();
+
+                            if (stockInfo) {
+                                if (isUS) {
+                                    currentPriceKRW = Math.floor(stockInfo.price * exchangeRate);
+                                    displayPrice = `$${stockInfo.price.toLocaleString(undefined, { minimumFractionDigits: 2 })} (≈${currentPriceKRW.toLocaleString()})`;
+                                } else {
+                                    currentPriceKRW = stockInfo.price;
+                                    displayPrice = stockInfo.price.toLocaleString();
+                                }
+                            }
+
                             const displayName = stockInfo?.name || item.name;
 
-                            const valuation = currentPrice * item.quantity;
+                            const valuation = currentPriceKRW * item.quantity;
                             const profit = valuation - (item.averagePrice * item.quantity);
                             const profitPercent = (profit / (item.averagePrice * item.quantity)) * 100;
 
                             // Color logic
-                            // Price color based on daily change (stockInfo.change)
-                            // Valuation color based on total profit (profit)
                             const priceColor = stockInfo && stockInfo.change > 0 ? "text-red-400" : (stockInfo && stockInfo.change < 0 ? "text-blue-400" : "text-white");
                             const valuationColor = profit > 0 ? "text-red-400" : (profit < 0 ? "text-blue-400" : "text-white");
 
@@ -77,10 +98,11 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, b
                                         const stock: Stock = {
                                             symbol: item.symbol,
                                             name: item.name || item.symbol,
-                                            price: currentPrice,
+                                            price: stockInfo?.price || item.currentPrice, // Pass raw price (USD if US)
                                             change: stockInfo?.change || 0,
                                             change_percent: stockInfo?.change_percent || 0,
-                                            updatedAt: Timestamp.now()
+                                            updatedAt: Timestamp.now(),
+                                            currency: stockInfo?.currency
                                         };
                                         setSelectedStock(stock);
                                         setSelectedQuantity(item.quantity);
@@ -95,7 +117,7 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, b
                                     </td>
                                     <td className="py-2">{item.quantity}</td>
                                     <td className="py-2">{item.averagePrice.toLocaleString()}</td>
-                                    <td className={`py-2 ${priceColor}`}>{currentPrice.toLocaleString()}</td>
+                                    <td className={`py-2 ${priceColor}`}>{displayPrice}</td>
                                     <td className={`py-2 ${valuationColor}`}>{valuation.toLocaleString()}</td>
                                     <td className={`py-2 ${profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
                                         {profit.toLocaleString()} ({profitPercent.toFixed(2)}%)

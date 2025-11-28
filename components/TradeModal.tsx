@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Stock } from "@/types";
 import { buyStock, sellStock } from "@/lib/trade";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { ref, onValue } from "firebase/database";
+import { rtdb } from "@/lib/firebase";
 
 interface TradeModalProps {
     isOpen: boolean;
@@ -21,12 +23,26 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     const [mode, setMode] = useState<"BUY" | "SELL">("BUY");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [exchangeRate, setExchangeRate] = useState(1400);
+
+    useEffect(() => {
+        const rateRef = ref(rtdb, 'system/exchange_rate');
+        const unsubscribe = onValue(rateRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) setExchangeRate(data);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const isUS = stock.currency === 'USD';
+    // Effective price in KRW. For US stocks, convert and floor. For KR stocks, use as is.
+    const effectivePrice = isUS ? Math.floor(stock.price * exchangeRate) : stock.price;
 
     // Calculate max quantity based on mode
     const availableCredit = Math.max(0, creditLimit - usedCredit);
     const totalBuyingPower = balance + availableCredit;
     const maxQuantity = mode === "BUY"
-        ? Math.floor(totalBuyingPower / stock.price)
+        ? Math.floor(totalBuyingPower / effectivePrice)
         : holdingQuantity;
 
     useEffect(() => {
@@ -44,8 +60,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
     if (!isOpen) return null;
 
-    const price = stock.price;
-    const amount = price * quantity;
+    const amount = effectivePrice * quantity;
     const fee = mode === "SELL" ? Math.floor(amount * 0.0005) : 0;
     const total = mode === "BUY" ? amount : amount - fee;
 
@@ -58,12 +73,14 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                 if (amount > totalBuyingPower) {
                     throw new Error("Insufficient funds");
                 }
-                await buyStock(user.uid, stock.symbol, stock.name, price, quantity);
+                // Pass effectivePrice (KRW) to buyStock
+                await buyStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity);
             } else {
                 if (quantity > holdingQuantity) {
                     throw new Error("Insufficient shares");
                 }
-                await sellStock(user.uid, stock.symbol, price, quantity);
+                // Pass effectivePrice (KRW) to sellStock
+                await sellStock(user.uid, stock.symbol, effectivePrice, quantity);
             }
             onClose();
         } catch (err: any) {
@@ -95,7 +112,23 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm text-gray-400">Price</label>
-                        <div className="text-lg font-bold">{price.toLocaleString()} KRW</div>
+                        <div className="text-lg font-bold">
+                            {isUS ? (
+                                <>
+                                    ${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    <span className="text-sm text-gray-400 ml-2">
+                                        (≈ {effectivePrice.toLocaleString()} KRW)
+                                    </span>
+                                </>
+                            ) : (
+                                `${stock.price.toLocaleString()} KRW`
+                            )}
+                        </div>
+                        {isUS && (
+                            <div className="text-xs text-gray-500">
+                                Exchange Rate: 1 USD = {exchangeRate.toLocaleString()} KRW
+                            </div>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm text-gray-400">Quantity</label>
