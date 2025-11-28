@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy, limit, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import { ref, onValue } from "firebase/database";
+import { db, rtdb } from "@/lib/firebase";
 import { Stock } from "@/types";
 import TradeModal from "./TradeModal";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -24,29 +25,46 @@ export default function StockList() {
 
 
     useEffect(() => {
-        // Build query based on sort options and increased limit
-        const orderDirection = sortDesc ? "desc" : "asc";
-        const q = query(
-            collection(db, "stocks"),
-            orderBy(sortField, orderDirection),
-            limit(200)
-        ); // Show up to 200 stocks based on selected sort
-        // User said "Main screen shows major stocks".
-        // Updated to allow sorting and larger result set.
+        const stocksRef = ref(rtdb, 'stocks');
+        const unsubscribe = onValue(stocksRef, (snapshot) => {
+            const data = snapshot.val();
+            if (!data) {
+                setStocks([]);
+                return;
+            }
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const stockData: Stock[] = [];
+            const stockData: Stock[] = Object.values(data);
+
+            // Client-side sorting
+            stockData.sort((a, b) => {
+                let valA = a[sortField];
+                let valB = b[sortField];
+
+                if (typeof valA === 'string') valA = valA.toLowerCase();
+                if (typeof valB === 'string') valB = valB.toLowerCase();
+
+                if (valA < valB) return sortDesc ? 1 : -1;
+                if (valA > valB) return sortDesc ? -1 : 1;
+                return 0;
+            });
+
+            // Determine newest update time
             let newest: Date | null = null;
-            snapshot.forEach((doc) => {
-                const data = doc.data() as Stock;
-                stockData.push(data);
-                if (data.updatedAt && typeof data.updatedAt.toDate === "function") {
-                    const updatedDate = data.updatedAt.toDate();
-                    if (!newest || updatedDate > newest) {
-                        newest = updatedDate;
+            stockData.forEach(stock => {
+                let stockDate: Date | null = null;
+                if (stock.updatedAt) {
+                    if (typeof stock.updatedAt === 'string') {
+                        stockDate = new Date(stock.updatedAt);
+                    } else if (typeof stock.updatedAt.toDate === 'function') {
+                        stockDate = stock.updatedAt.toDate();
                     }
                 }
+
+                if (stockDate && (!newest || stockDate > newest)) {
+                    newest = stockDate;
+                }
             });
+
             setStocks(stockData);
             setLastUpdated(newest);
         });
