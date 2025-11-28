@@ -197,23 +197,25 @@ export default function Leaderboard() {
                 </table>
             </div>
             <div className="mt-8">
-                <h3 className="text-xl font-semibold mb-4 text-white">전체 포트폴리오 비중</h3>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-semibold text-white">전체 포트폴리오 비중</h3>
+                    <div className="flex gap-2 text-sm">
+                        <button
+                            onClick={() => setGlobalChartMetric("value")}
+                            className={`px-3 py-1 rounded border ${globalChartMetric === "value" ? "bg-blue-600 text-white border-blue-500" : "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"}`}
+                        >
+                            가치 기준
+                        </button>
+                        <button
+                            onClick={() => setGlobalChartMetric("quantity")}
+                            className={`px-3 py-1 rounded border ${globalChartMetric === "quantity" ? "bg-blue-600 text-white border-blue-500" : "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"}`}
+                        >
+                            수량 기준
+                        </button>
+                    </div>
+                </div>
                 {totalGlobalAmount > 0 ? (
                     <div className="flex flex-col md:flex-row items-center gap-6">
-                        <div className="flex items-center gap-3 mb-2 md:mb-0">
-                            <button
-                                onClick={() => setGlobalChartMetric("value")}
-                                className={`px-3 py-1 rounded text-sm ${globalChartMetric === "value" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300"}`}
-                            >
-                                가치 기준
-                            </button>
-                            <button
-                                onClick={() => setGlobalChartMetric("quantity")}
-                                className={`px-3 py-1 rounded text-sm ${globalChartMetric === "quantity" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-300"}`}
-                            >
-                                수량 기준
-                            </button>
-                        </div>
                         <div className="w-48 h-48 rounded-full border border-gray-700" style={pieStyle}></div>
                         <div className="flex-1 space-y-2 w-full">
                             {globalSlices.map((slice, idx) => {
