@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { collection, onSnapshot, query, orderBy, limit, updateDoc, doc, collectionGroup } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { ref, onValue } from "firebase/database";
+import { db, rtdb } from "@/lib/firebase";
 import { UserProfile, Stock } from "@/types";
 import { useRouter } from "next/navigation";
 
@@ -39,12 +40,14 @@ export default function Leaderboard() {
     }, []);
 
     useEffect(() => {
-        const unsubscribe = onSnapshot(collection(db, "stocks"), (snapshot) => {
-            const stockMap: Record<string, Stock> = {};
-            snapshot.forEach((doc) => {
-                stockMap[doc.id] = doc.data() as Stock;
-            });
-            setStocks(stockMap);
+        const stocksRef = ref(rtdb, 'stocks');
+        const unsubscribe = onValue(stocksRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                setStocks(data);
+            } else {
+                setStocks({});
+            }
         });
         return () => unsubscribe();
     }, []);

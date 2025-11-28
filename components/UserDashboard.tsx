@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { doc, onSnapshot, collection } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { ref, onValue } from "firebase/database";
+import { db, rtdb } from "@/lib/firebase";
 import Navbar from "@/components/Navbar";
 import PortfolioTable from "@/components/PortfolioTable";
 import TransactionHistory from "@/components/TransactionHistory";
@@ -51,12 +52,14 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     }, [uid]);
 
     useEffect(() => {
-        const unsubscribe = onSnapshot(collection(db, "stocks"), (snapshot) => {
-            const stockMap: Record<string, Stock> = {};
-            snapshot.forEach((docSnapshot) => {
-                stockMap[docSnapshot.id] = docSnapshot.data() as Stock;
-            });
-            setStocks(stockMap);
+        const stocksRef = ref(rtdb, 'stocks');
+        const unsubscribe = onValue(stocksRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                setStocks(data);
+            } else {
+                setStocks({});
+            }
         });
         return () => unsubscribe();
     }, []);
