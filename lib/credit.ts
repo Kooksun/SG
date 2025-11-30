@@ -88,7 +88,14 @@ export async function applyDailyInterestAndAutoLiquidate(uid: string, options?: 
 
     if (usedCreditAfterInterest <= creditLimit) return;
 
-    // Step 2: enforce credit limit by liquidating most recent buys (1 share each) until back under limit
+    // Step 2: enforce credit limit by liquidating most recent buys until back under limit
+    let currentUsedCredit = usedCreditAfterInterest;
+    let excessCredit = currentUsedCredit - creditLimit;
+
+    if (excessCredit <= 0) return;
+
+    console.log(`[Auto-Liquidation] User ${uid} is over limit by ${excessCredit}. Starting liquidation...`);
+
     // Build current portfolio map
     const portfolioSnap = await getDocs(collection(db, "users", uid, "portfolio"));
     const portfolioMap: Record<string, PortfolioItem> = {};
@@ -102,7 +109,7 @@ export async function applyDailyInterestAndAutoLiquidate(uid: string, options?: 
         };
     });
 
-    // Load buy transactions (latest first)
+    // Load buy transactions (latest first) to implement LIFO-like liquidation
     const buyQuery = query(
         collection(db, "transactions"),
         where("uid", "==", uid),
@@ -113,32 +120,85 @@ export async function applyDailyInterestAndAutoLiquidate(uid: string, options?: 
     const buySnap = await getDocs(buyQuery);
 
     const priceCache: Record<string, number> = {};
-    let currentUsedCredit = usedCreditAfterInterest;
     let sellsExecuted = 0;
 
     for (const docSnap of buySnap.docs) {
-        if (currentUsedCredit <= creditLimit) break;
+        if (excessCredit <= 0) break;
+
         const data = docSnap.data();
         const symbol = data.symbol as string;
+
+        // Skip if we don't own this stock anymore
         if (!symbol || !portfolioMap[symbol] || portfolioMap[symbol].quantity <= 0) continue;
 
         const sellPrice = await fetchPrice(symbol, portfolioMap, options, priceCache);
         if (!sellPrice || sellPrice <= 0) continue;
 
+        // Calculate how many shares we need to sell to cover the excess credit
+        // We add a buffer of 1 share to be safe due to price fluctuations or fees
+        // Fee is 0.05%, so net proceeds = price * 0.9995
+        const netPricePerShare = sellPrice * 0.9995;
+        const sharesNeeded = Math.ceil(excessCredit / netPricePerShare);
+
+        // We can only sell what we have
+        const sharesToSell = Math.min(sharesNeeded, portfolioMap[symbol].quantity);
+
+        if (sharesToSell <= 0) continue;
+
         try {
-            await sellStock(uid, symbol, sellPrice, 1);
-            portfolioMap[symbol].quantity -= 1;
+            console.log(`[Auto-Liquidation] Selling ${sharesToSell} of ${symbol} @ ${sellPrice} to cover ${excessCredit}`);
+            await sellStock(uid, symbol, sellPrice, sharesToSell);
+
+            portfolioMap[symbol].quantity -= sharesToSell;
             sellsExecuted += 1;
 
-            // Refresh usedCredit after each sale to know if we can stop
-            const refreshed = await getDoc(userRef);
-            if (refreshed.exists()) {
-                currentUsedCredit = refreshed.data().usedCredit || 0;
-            }
+            // Estimate the reduction in used credit
+            // The actual reduction happens in sellStock transaction, but we estimate here to break the loop
+            // In sellStock: creditRepayment = Math.min(usedCredit, proceeds)
+            const proceeds = Math.floor(sellPrice * sharesToSell * 0.9995);
+            const repaid = Math.min(currentUsedCredit, proceeds);
+
+            currentUsedCredit -= repaid;
+            excessCredit = currentUsedCredit - creditLimit;
+
         } catch (err) {
             console.error("Auto-liquidation failed for", symbol, err);
         }
 
         if (sellsExecuted >= 50) break; // safety guard
+    }
+
+    // Fallback: If we still have excess credit (maybe because recent buys didn't cover it, or portfolio is from legacy buys)
+    // iterate through remaining portfolio items
+    if (excessCredit > 0) {
+        console.log(`[Auto-Liquidation] Still over limit by ${excessCredit} after checking recent buys. Checking remaining portfolio...`);
+        for (const symbol in portfolioMap) {
+            if (excessCredit <= 0) break;
+            const item = portfolioMap[symbol];
+            if (item.quantity <= 0) continue;
+
+            const sellPrice = await fetchPrice(symbol, portfolioMap, options, priceCache);
+            if (!sellPrice || sellPrice <= 0) continue;
+
+            const netPricePerShare = sellPrice * 0.9995;
+            const sharesNeeded = Math.ceil(excessCredit / netPricePerShare);
+            const sharesToSell = Math.min(sharesNeeded, item.quantity);
+
+            if (sharesToSell <= 0) continue;
+
+            try {
+                console.log(`[Auto-Liquidation] Fallback Selling ${sharesToSell} of ${symbol} @ ${sellPrice}`);
+                await sellStock(uid, symbol, sellPrice, sharesToSell);
+
+                item.quantity -= sharesToSell;
+
+                const proceeds = Math.floor(sellPrice * sharesToSell * 0.9995);
+                const repaid = Math.min(currentUsedCredit, proceeds);
+                currentUsedCredit -= repaid;
+                excessCredit = currentUsedCredit - creditLimit;
+            } catch (err) {
+                console.error("Auto-liquidation fallback failed for", symbol, err);
+            }
+        }
     }
 }

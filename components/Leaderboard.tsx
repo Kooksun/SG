@@ -19,6 +19,7 @@ export default function Leaderboard() {
     const [portfolios, setPortfolios] = useState<Record<string, PortfolioItem[]>>({});
     const [globalHoldings, setGlobalHoldings] = useState<Record<string, number>>({});
     const [globalChartMetric, setGlobalChartMetric] = useState<"value" | "quantity">("value");
+    const [exchangeRate, setExchangeRate] = useState(1400);
     const router = useRouter();
 
     useEffect(() => {
@@ -49,6 +50,15 @@ export default function Leaderboard() {
             } else {
                 setStocks({});
             }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        const rateRef = ref(rtdb, 'system/exchange_rate');
+        const unsubscribe = onValue(rateRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) setExchangeRate(data);
         });
         return () => unsubscribe();
     }, []);
@@ -106,7 +116,9 @@ export default function Leaderboard() {
             const holdings = portfolios[user.uid] || [];
             const holdingsValue = holdings.reduce((total, item) => {
                 const stock = stocks[item.symbol];
-                return total + (stock ? stock.price * item.quantity : 0);
+                if (!stock) return total;
+                const price = stock.currency === 'USD' ? stock.price * exchangeRate : stock.price;
+                return total + price * item.quantity;
             }, 0);
             const usedCredit = typeof user.usedCredit === "number" ? user.usedCredit : 0;
             const totalAssets = user.balance + holdingsValue;
@@ -125,7 +137,9 @@ export default function Leaderboard() {
     const globalSlices = useMemo(() => {
         const entries = Object.entries(globalHoldings)
             .map(([symbol, quantity]) => {
-                const price = stocks[symbol]?.price;
+                const stock = stocks[symbol];
+                const rawPrice = stock?.price;
+                const price = (stock?.currency === 'USD' && rawPrice) ? rawPrice * exchangeRate : rawPrice;
                 const value = price ? Math.max(0, quantity * price) : Math.max(0, quantity);
                 const label = symbol === "기타" ? "기타" : (stocks[symbol]?.name || symbol);
                 return { symbol, quantity, value, label };
