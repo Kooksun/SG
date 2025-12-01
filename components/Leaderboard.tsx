@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { collection, onSnapshot, query, orderBy, limit, updateDoc, doc, collectionGroup } from "firebase/firestore";
+import { collection, onSnapshot, updateDoc, doc, collectionGroup } from "firebase/firestore";
 import { ref, onValue } from "firebase/database";
 import { db, rtdb } from "@/lib/firebase";
 import { UserProfile, Stock } from "@/types";
@@ -23,9 +23,7 @@ export default function Leaderboard() {
     const router = useRouter();
 
     useEffect(() => {
-        const q = query(collection(db, "users"), orderBy("totalAssetValue", "desc"), limit(10));
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
             const userData: UserProfile[] = [];
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data() as UserProfile;
@@ -128,11 +126,13 @@ export default function Leaderboard() {
             const returnPct = startingBalance ? (profit / startingBalance) * 100 : 0;
             return {
                 ...user,
-                computedTotalAssets: totalAssets,
+                totalAssets,
+                equity,
                 returnPct,
             };
         })
-        .sort((a, b) => b.computedTotalAssets - a.computedTotalAssets);
+        .sort((a, b) => b.equity - a.equity)
+        .slice(0, 10);
 
     const globalSlices = useMemo(() => {
         const entries = Object.entries(globalHoldings)
@@ -187,7 +187,7 @@ export default function Leaderboard() {
                         <tr className="border-b border-gray-700">
                             <th className="py-2">Rank</th>
                             <th className="py-2">User</th>
-                            <th className="py-2">Total Assets</th>
+                            <th className="py-2">Net Assets</th>
                             <th className="py-2">Return</th>
                         </tr>
                     </thead>
@@ -201,15 +201,17 @@ export default function Leaderboard() {
                                 <td className="py-2">{index + 1}</td>
                                 <td className="py-2">{user.displayName}</td>
                                 <td className="py-2">
-                                    {user.computedTotalAssets.toLocaleString()} KRW
-                                    {user.usedCredit > 0 && (
-                                        <span
-                                            className="ml-2 cursor-help"
-                                            title={`사용 중인 신용: ${user.usedCredit.toLocaleString()} KRW`}
-                                        >
-                                            💳
-                                        </span>
-                                    )}
+                                    <div className="flex flex-col">
+                                        <span>{user.equity.toLocaleString()} KRW</span>
+                                        {user.totalAssets !== user.equity && (
+                                            <span
+                                                className="text-xs text-gray-400"
+                                                title={user.usedCredit > 0 ? `사용 중인 신용: ${user.usedCredit.toLocaleString()} KRW` : undefined}
+                                            >
+                                                총자산 {user.totalAssets.toLocaleString()} KRW
+                                            </span>
+                                        )}
+                                    </div>
                                 </td>
                                 <td className={`py-2 ${user.returnPct >= 0 ? "text-red-400" : "text-blue-400"}`}>
                                     {user.returnPct >= 0 ? "+" : ""}
