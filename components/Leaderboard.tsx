@@ -200,7 +200,17 @@ export default function Leaderboard() {
                             >
                                 <td className="py-2">{index + 1}</td>
                                 <td className="py-2">{user.displayName}</td>
-                                <td className="py-2">{user.computedTotalAssets.toLocaleString()} KRW</td>
+                                <td className="py-2">
+                                    {user.computedTotalAssets.toLocaleString()} KRW
+                                    {user.usedCredit > 0 && (
+                                        <span
+                                            className="ml-2 cursor-help"
+                                            title={`사용 중인 신용: ${user.usedCredit.toLocaleString()} KRW`}
+                                        >
+                                            💳
+                                        </span>
+                                    )}
+                                </td>
                                 <td className={`py-2 ${user.returnPct >= 0 ? "text-red-400" : "text-blue-400"}`}>
                                     {user.returnPct >= 0 ? "+" : ""}
                                     {user.returnPct.toFixed(2)}%
