@@ -84,14 +84,15 @@ export default function LoginPage() {
             }
 
             // Apply deferred daily interest and enforce credit limit at login time
-            const currentUid = auth.currentUser?.uid;
-            if (currentUid) {
-                try {
-                    await applyDailyInterestAndAutoLiquidate(currentUid);
-                } catch (interestErr) {
-                    console.warn("Interest accrual failed at login", interestErr);
-                }
-            }
+            // Logic moved to backend scheduler
+            // const currentUid = auth.currentUser?.uid;
+            // if (currentUid) {
+            //     try {
+            //         await applyDailyInterestAndAutoLiquidate(currentUid);
+            //     } catch (interestErr) {
+            //         console.warn("Interest accrual failed at login", interestErr);
+            //     }
+            // }
 
             router.push("/");
         } catch (err: any) {
