@@ -142,6 +142,11 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                                 <div className="text-lg font-bold text-red-300">
                                     {(userProfile.usedCredit || 0).toLocaleString()} KRW
                                 </div>
+                                {(userProfile.usedCredit || 0) > 0 && (
+                                    <div className="text-xs text-red-400 mt-1">
+                                        (Est. Daily Interest: {Math.floor((userProfile.usedCredit || 0) * 0.001).toLocaleString()} KRW)
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <div className="text-gray-300 text-sm">Available Credit</div>
