@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { doc, onSnapshot, collection } from "firebase/firestore";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, set } from "firebase/database";
 import { db, rtdb } from "@/lib/firebase";
 import Navbar from "@/components/Navbar";
 import PortfolioTable from "@/components/PortfolioTable";
@@ -26,6 +26,9 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
     const [exchangeRate, setExchangeRate] = useState(1400);
+    const [aiStatus, setAiStatus] = useState<'idle' | 'pending' | 'completed'>('idle');
+    const [aiResult, setAiResult] = useState<string | null>(null);
+    const [aiTimestamp, setAiTimestamp] = useState<string | null>(null);
     const interestAppliedRef = useRef(false);
 
     useEffect(() => {
@@ -36,6 +39,27 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
         });
         return () => unsubscribe();
     }, []);
+
+    // Listen for AI Analysis Request Status
+    useEffect(() => {
+        if (!uid) return;
+        const aiRef = ref(rtdb, `ai_requests/${uid}`);
+        const unsubscribe = onValue(aiRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                setAiStatus(data.status);
+                if (data.status === 'completed' && data.result) {
+                    setAiResult(data.result);
+                    setAiTimestamp(data.completedAt); // Set timestamp
+                }
+            } else {
+                setAiStatus('idle');
+                setAiResult(null);
+                setAiTimestamp(null);
+            }
+        });
+        return () => unsubscribe();
+    }, [uid]);
 
     useEffect(() => {
         if (!uid) return;
@@ -90,6 +114,19 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
         });
         return () => unsubscribe();
     }, []);
+
+    const handleRequestAiAnalysis = async () => {
+        if (!uid) return;
+        try {
+            await set(ref(rtdb, `ai_requests/${uid}`), {
+                status: 'pending',
+                timestamp: Date.now()
+            });
+        } catch (error) {
+            console.error("Failed to request AI analysis:", error);
+            alert("분석 요청 중 오류가 발생했습니다.");
+        }
+    };
 
     if (!userProfile) return <div className="text-white p-8">Loading...</div>;
 
@@ -161,6 +198,49 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* AI Portfolio Analysis */}
+                    <div className="mt-6 bg-gradient-to-r from-green-900 to-teal-900 p-4 rounded-lg border border-green-700">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h2 className="text-xl font-bold mb-2 flex items-center">
+                                    🤖 AI Portfolio Coach
+                                </h2>
+                                <p className="text-gray-300 text-sm mb-4">
+                                    Get personalized advice on your portfolio from AI.
+                                </p>
+                            </div>
+                            {aiStatus !== 'pending' && (
+                                <button
+                                    onClick={handleRequestAiAnalysis}
+                                    className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded shadow transition"
+                                >
+                                    {aiStatus === 'completed' ? 'Re-analyze' : 'Analyze Portfolio'}
+                                </button>
+                            )}
+                        </div>
+
+                        {aiStatus === 'pending' && (
+                            <div className="flex items-center space-x-2 text-green-200 animate-pulse">
+                                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>AI is analyzing your portfolio...</span>
+                            </div>
+                        )}
+
+                        {aiStatus === 'completed' && aiResult && (
+                            <div className="bg-black bg-opacity-30 p-4 rounded text-green-100 whitespace-pre-wrap leading-relaxed border border-green-800">
+                                {aiResult}
+                                {aiTimestamp && (
+                                    <div className="text-xs text-green-400 mt-4 text-right">
+                                        Analysed at: {new Date(aiTimestamp).toLocaleString()}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
