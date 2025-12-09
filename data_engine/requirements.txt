@@ -1,0 +1,4 @@
+finance-datareader
+firebase-admin
+pandas
+schedule
