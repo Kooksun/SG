@@ -93,7 +93,17 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-gray-800 p-6 rounded-lg w-96 text-white">
-                <h2 className="text-xl font-bold mb-4">{stock.name} ({stock.symbol})</h2>
+                <h2 className="text-xl font-bold mb-4 flex items-center">
+                    {stock.name} ({stock.symbol})
+                    <a
+                        href={`https://www.google.com/finance/quote/${stock.symbol}:${isUS ? "NASDAQ" : "KRX"}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-3 px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm text-blue-400 font-normal transition-colors"
+                    >
+                        Info
+                    </a>
+                </h2>
                 <div className="flex gap-2 mb-4">
                     <button
                         onClick={() => setMode("BUY")}
