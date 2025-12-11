@@ -13,6 +13,10 @@ from models import Stock
 import firestore_client  # Initializes Firebase app
 from firestore_client import db as firestore_db
 from trade_executor import sell_stock
+from dotenv import load_dotenv
+
+# Load environment variables from .env file in the same directory
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 MARKET_TZ = ZoneInfo("Asia/Seoul")
 FETCH_INTERVAL_MINUTES = 1
@@ -393,7 +397,10 @@ def start_scheduler():
 import google.generativeai as genai
 
 # Configure Gemini API
-genai.configure(api_key="AIzaSyBhuHhc4MHSVNlazZCQ44kibmzjpW-M0e0")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY environment variable is not set")
+genai.configure(api_key=GEMINI_API_KEY)
 
 def process_ai_requests():
     """

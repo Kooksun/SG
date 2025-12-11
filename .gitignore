@@ -1,6 +1,8 @@
 # General
 .DS_Store
 .env*
+!.env.example
+!**/.env.example
 
 # Python / Data Engine
 __pycache__/

@@ -2,3 +2,6 @@ finance-datareader
 firebase-admin
 pandas
 schedule
+yfinance
+google-generativeai
+python-dotenv
