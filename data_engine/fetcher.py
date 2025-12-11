@@ -4,7 +4,7 @@ import yfinance as yf
 from bs4 import BeautifulSoup
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Iterable
 import pandas as pd
 
 from models import Stock
