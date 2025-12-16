@@ -17,10 +17,13 @@ def _to_float(value) -> float:
     if isinstance(value, str):
         if value == '-':
             return 0.0
-    if pd.isna(value):
+    if pd.isna(value) or value != value: # value != value checks for NaN
         return 0.0
     try:
-        return float(value)
+        val = float(value)
+        if val != val: # check NaN again after conversion
+            return 0.0
+        return val
     except (ValueError, TypeError):
         return 0.0
 

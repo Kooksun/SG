@@ -70,6 +70,29 @@ def fetch_job(force: bool = False):
 
     print(f"[{now_kst()}] Total stocks fetched: {len(latest_snapshot)}. Exchange Rate: {latest_exchange_rate}")
 
+import math
+import numpy as np
+
+def sanitize_for_firebase(data):
+    """
+    Recursively sanitize data to remove NaN and Infinite values,
+    replacing them with 0 (or None) to make it JSON compliant for Firebase.
+    """
+    if isinstance(data, dict):
+        return {k: sanitize_for_firebase(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [sanitize_for_firebase(v) for v in data]
+    elif isinstance(data, float):
+        if math.isnan(data) or math.isinf(data):
+            return 0.0
+    elif isinstance(data, (np.generic, np.float64, np.float32)): # Handle numpy types explicitly if needed
+        # Convert to python native type first
+        val = data.item()
+        if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+             return 0.0
+        return val
+    return data
+
 def sync_job(force: bool = False):
     global last_written_snapshot
     if not latest_snapshot:
@@ -88,8 +111,12 @@ def sync_job(force: bool = False):
     # Sync Stocks
     if changed:
         for symbol, stock in changed.items():
-            updates[symbol] = stock.to_dict()
-            updates[symbol]['updatedAt'] = stock.updated_at.isoformat()
+            stock_dict = stock.to_dict()
+            stock_dict['updatedAt'] = stock.updated_at.isoformat()
+            updates[symbol] = stock_dict
+        
+        # Sanitize entire updates dict before sending to Firebase
+        updates = sanitize_for_firebase(updates)
         
         ref.update(updates)
         print(f"[{now_kst()}] Updated {len(updates)} stocks in RTDB.")
@@ -147,6 +174,9 @@ def sync_job(force: bool = False):
                     # Fix: Handle datetime serialization
                     stock_dict = new_stock.to_dict()
                     stock_dict['updatedAt'] = new_stock.updated_at.isoformat()
+                    
+                    # Sanitize before set
+                    stock_dict = sanitize_for_firebase(stock_dict)
                     
                     rtdb_admin.reference(f'stocks/{symbol}').set(stock_dict)
                     # Also update last_written so next sync doesn't think it changed again immediately
@@ -516,7 +546,8 @@ def history_job(force: bool = False):
             
         history_data = fetch_stock_history(symbol)
         if history_data:
-            history_ref.child(symbol).set(history_data)
+            sanitized_history = sanitize_for_firebase(history_data)
+            history_ref.child(symbol).set(sanitized_history)
             success_count += 1
             
         # Small sleep to be nice to yfinance/upstream if needed? 
