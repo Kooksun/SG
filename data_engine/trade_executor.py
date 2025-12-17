@@ -4,7 +4,7 @@ from firebase_admin import firestore
 from google.cloud.firestore_v1.base_transaction import BaseTransaction
 from firestore_client import db
 
-def sell_stock(uid: str, symbol: string, price: float, quantity: int):
+def sell_stock(uid: str, symbol: str, price: float, quantity: int):
     """
     Executes a sell order for a user.
     Replicates the logic from frontend/lib/trade.ts
