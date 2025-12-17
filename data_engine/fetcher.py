@@ -13,6 +13,22 @@ from firestore_client import get_db
 db = get_db()
 MARKET_TZ = ZoneInfo("Asia/Seoul")
 
+US_TICKER_MAP = {
+    'AAPL': '애플', 'MSFT': '마이크로소프트', 'GOOGL': '알파벳(구글)', 'AMZN': '아마존', 
+    'TSLA': '테슬라', 'NVDA': '엔비디아', 'META': '메타', 'NFLX': '넷플릭스', 
+    'AMD': 'AMD', 'INTC': '인텔', 'QQQ': 'QQQ (나스닥100)', 'SPY': 'SPY (S&P500)', 
+    'SOXL': 'SOXL (반도체3X)', 'TQQQ': 'TQQQ (나스닥3X)', 'PLTR': '팔란티어', 
+    'COIN': '코인베이스', 'HOOD': '로빈후드', 'MSTR': '마이크로스트레티지', 'IONQ': '아이온큐', 
+    'RIVN': '리비안', 'AVGO': '브로드컴', 'ORCL': '오라클', 'CRM': '세일즈포스', 
+    'ADBE': '어도비', 'CSCO': '시스코', 'PEP': '펩시코', 'KO': '코카콜라', 
+    'COST': '코스트코', 'WMT': '월마트', 'DIS': '디즈니', 'NKE': '나이키', 
+    'SBUX': '스타벅스', 'MCD': '맥도날드', 'JPM': 'JP모건', 'BAC': '뱅크오브아메리카', 
+    'V': '비자', 'MA': '마스터카드', 'PYPL': '페이팔', 
+    'UBER': '우버', 'ABNB': '에어비앤비', 'LCID': '루시드', 'U': '유니티', 
+    'RBLX': '로블록스', 'OPEN': '오픈도어', 'SOFI': '소파이', 'AFRM': '어펌', 
+    'UPST': '업스타트', 'DKNG': '드래프트킹스', 'AI': 'C3 AI'
+}
+
 def _to_float(value) -> float:
     if isinstance(value, str):
         if value == '-':
@@ -93,27 +109,11 @@ def fetch_us_stocks() -> Dict[str, Stock]:
     """
     Fetch a snapshot of selected US stocks.
     """
-    # Map Ticker to Korean Name
-    us_ticker_map = {
-        'AAPL': '애플', 'MSFT': '마이크로소프트', 'GOOGL': '알파벳(구글)', 'AMZN': '아마존', 
-        'TSLA': '테슬라', 'NVDA': '엔비디아', 'META': '메타', 'NFLX': '넷플릭스', 
-        'AMD': 'AMD', 'INTC': '인텔', 'QQQ': 'QQQ (나스닥100)', 'SPY': 'SPY (S&P500)', 
-        'SOXL': 'SOXL (반도체3X)', 'TQQQ': 'TQQQ (나스닥3X)', 'PLTR': '팔란티어', 
-        'COIN': '코인베이스', 'HOOD': '로빈후드', 'MSTR': '마이크로스트레티지', 'IONQ': '아이온큐', 
-        'RIVN': '리비안', 'AVGO': '브로드컴', 'ORCL': '오라클', 'CRM': '세일즈포스', 
-        'ADBE': '어도비', 'CSCO': '시스코', 'PEP': '펩시코', 'KO': '코카콜라', 
-        'COST': '코스트코', 'WMT': '월마트', 'DIS': '디즈니', 'NKE': '나이키', 
-        'SBUX': '스타벅스', 'MCD': '맥도날드', 'JPM': 'JP모건', 'BAC': '뱅크오브아메리카', 
-        'V': '비자', 'MA': '마스터카드', 'PYPL': '페이팔', 
-        'UBER': '우버', 'ABNB': '에어비앤비', 'LCID': '루시드', 'U': '유니티', 
-        'RBLX': '로블록스', 'OPEN': '오픈도어', 'SOFI': '소파이', 'AFRM': '어펌', 
-        'UPST': '업스타트', 'DKNG': '드래프트킹스', 'AI': 'C3 AI'
-    }
-    
-    print(f"Fetching latest US snapshot ({len(us_ticker_map)} tickers)...")
+    # Use global map
+    print(f"Fetching latest US snapshot ({len(US_TICKER_MAP)} tickers)...")
     snapshot: Dict[str, Stock] = {}
     
-    for ticker, kor_name in us_ticker_map.items():
+    for ticker, kor_name in US_TICKER_MAP.items():
         try:
             # Always fetch a few days of history to ensure we have data and can calc change
             # Fetching just 'today' often fails with KeyError if market is closed or data not ready
@@ -166,25 +166,8 @@ def fetch_single_stock(symbol: str) -> Optional[Stock]:
     Fetch data for a single stock (KR or US).
     Identifies if it's a US stock by checking the US ticker map.
     """
-    # Check if it's in our US ticker map
-    us_ticker_map = {
-        'AAPL': '애플', 'MSFT': '마이크로소프트', 'GOOGL': '알파벳(구글)', 'AMZN': '아마존', 
-        'TSLA': '테슬라', 'NVDA': '엔비디아', 'META': '메타', 'NFLX': '넷플릭스', 
-        'AMD': 'AMD', 'INTC': '인텔', 'QQQ': 'QQQ (나스닥100)', 'SPY': 'SPY (S&P500)', 
-        'SOXL': 'SOXL (반도체3X)', 'TQQQ': 'TQQQ (나스닥3X)', 'PLTR': '팔란티어', 
-        'COIN': '코인베이스', 'HOOD': '로빈후드', 'MSTR': '마이크로스트레티지', 'IONQ': '아이온큐', 
-        'RIVN': '리비안', 'AVGO': '브로드컴', 'ORCL': '오라클', 'CRM': '세일즈포스', 
-        'ADBE': '어도비', 'CSCO': '시스코', 'PEP': '펩시코', 'KO': '코카콜라', 
-        'COST': '코스트코', 'WMT': '월마트', 'DIS': '디즈니', 'NKE': '나이키', 
-        'SBUX': '스타벅스', 'MCD': '맥도날드', 'JPM': 'JP모건', 'BAC': '뱅크오브아메리카', 
-        'V': '비자', 'MA': '마스터카드', 'PYPL': '페이팔', 
-        'UBER': '우버', 'ABNB': '에어비앤비', 'LCID': '루시드', 'U': '유니티', 
-        'RBLX': '로블록스', 'OPEN': '오픈도어', 'SOFI': '소파이', 'AFRM': '어펌', 
-        'UPST': '업스타트', 'DKNG': '드래프트킹스', 'AI': 'C3 AI'
-    }
-    
-    is_us = symbol in us_ticker_map
-    name = us_ticker_map.get(symbol, symbol) # default to symbol if not found (will fix later if KR)
+    is_us = symbol in US_TICKER_MAP
+    name = US_TICKER_MAP.get(symbol, symbol) # default to symbol if not found (will fix later if KR)
     currency = 'USD' if is_us else 'KRW'
     
     try:
@@ -289,8 +272,12 @@ def fetch_stock_history(symbol: str, days: int = 90) -> List[Dict]:
     [{ 'time': '2023-01-01', 'open': 100, 'high': 110, 'low': 90, 'close': 105 }, ...]
     """
     yf_symbol = symbol
-    # Simple heuristic for KR stocks: if all digits, append .KS (KOSPI) or try finding it.
-    if symbol.isdigit():
+    
+    # Identify if it should be treated as KR
+    # If it is NOT in our US map, we treat it as KR (KOSPI first)
+    is_known_us = symbol in US_TICKER_MAP
+    
+    if not is_known_us:
         yf_symbol = f"{symbol}.KS"
     
     print(f"Fetching history for {yf_symbol}...")
@@ -299,8 +286,8 @@ def fetch_stock_history(symbol: str, days: int = 90) -> List[Dict]:
         # Fetch slightly more than needed to ensure we have enough trading days
         hist = ticker.history(period="3mo", interval="1d")
         
-        if hist.empty and symbol.isdigit():
-             # Fallback to KQ if KS failed
+        if hist.empty and not is_known_us:
+             # Fallback to KQ if KS failed (only for implicit KR stocks)
              yf_symbol = f"{symbol}.KQ"
              print(f"Retrying with {yf_symbol}...")
              ticker = yf.Ticker(yf_symbol)
