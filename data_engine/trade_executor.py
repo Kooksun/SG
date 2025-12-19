@@ -30,7 +30,7 @@ def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int):
         user_data = user_snap.to_dict()
         
         balance = user_data.get("balance", 0)
-        credit_limit = user_data.get("creditLimit", 50000000)
+        credit_limit = user_data.get("creditLimit", 500000000)
         used_credit = user_data.get("usedCredit", 0)
         
         current_qty = 0
@@ -157,7 +157,7 @@ def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int):
             current_qty = portfolio_data.get("quantity", 0)
             current_avg = portfolio_data.get("averagePrice", 0)
 
-        credit_limit = user_data.get("creditLimit", 50000000)
+        credit_limit = user_data.get("creditLimit", 500000000)
         used_credit = user_data.get("usedCredit", 0)
 
         # Logic for Short Selling vs Normal Sell

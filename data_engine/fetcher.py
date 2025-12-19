@@ -51,6 +51,10 @@ def _build_stock_from_row(row, currency='KRW') -> Stock:
     # This function is primarily for the KRX listing format.
     symbol = str(row['Code'])
     name = row['Name']
+    # Market: KOSPI -> KRX, KOSDAQ/KOSDAQ GLOBAL -> KOSDAQ
+    raw_market = row.get('Market', 'KRX')
+    market = 'KOSDAQ' if 'KOSDAQ' in raw_market else 'KRX'
+    
     # KR stocks are usually integer prices, but let's use float to be safe and consistent
     price = _to_float(row['Close'])
     change = _to_float(row['Changes'])
@@ -63,7 +67,8 @@ def _build_stock_from_row(row, currency='KRW') -> Stock:
         change=change,
         change_percent=change_percent,
         updated_at=datetime.now(MARKET_TZ),
-        currency=currency
+        currency=currency,
+        market=market
     )
 
 def fetch_top_stocks(limit: int = 100, additional_symbols: Iterable[str] = ()) -> Dict[str, Stock]:
@@ -143,7 +148,8 @@ def fetch_us_stocks() -> Dict[str, Stock]:
                 change=change,
                 change_percent=change_percent,
                 updated_at=datetime.now(MARKET_TZ),
-                currency='USD'
+                currency='USD',
+                market='NASDAQ'
             )
             snapshot[stock.symbol] = stock
             
@@ -207,7 +213,8 @@ def fetch_single_stock(symbol: str) -> Optional[Stock]:
             change=change,
             change_percent=change_percent,
             updated_at=datetime.now(MARKET_TZ),
-            currency=currency
+            currency=currency,
+            market='NASDAQ' if is_us else 'KRX' # simplistic fallback for KRX
         )
     except Exception as e:
         print(f"Error fetching single stock {symbol}: {e}")

@@ -694,7 +694,7 @@ def update_single_stock_history(symbol: str) -> bool:
         
         try:
             # Upsert to prevent duplicate errors
-            supabase.table("stock_history").upsert(rows).execute()
+            supabase.table("stock_history").upsert(rows, on_conflict="symbol,time").execute()
             return True
         except Exception as e:
             print(f"Error saving history for {symbol} to Supabase: {e}")

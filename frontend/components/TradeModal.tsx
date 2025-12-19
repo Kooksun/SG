@@ -361,7 +361,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                 <h2 className="text-xl font-bold mb-4 flex items-center border-b border-gray-700 pb-4 shrink-0">
                     {stock.name} <span className="text-gray-400 text-sm ml-2 font-normal">({stock.symbol})</span>
                     <a
-                        href={`https://www.google.com/finance/quote/${stock.symbol}:${isUS ? "NASDAQ" : "KRX"}`}
+                        href={`https://www.google.com/finance/quote/${stock.symbol}:${stock.market || (isUS ? "NASDAQ" : "KRX")}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="ml-auto px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm text-blue-400 font-normal transition-colors"

@@ -20,11 +20,11 @@ export async function buyStock(uid: string, symbol: string, name: string, price:
 
         // Initialize missing fields for legacy users
         if (typeof userData.startingBalance !== "number") {
-            transaction.update(userRef, { startingBalance: 100000000 });
+            transaction.update(userRef, { startingBalance: 500000000 });
         }
         if (typeof userData.creditLimit !== "number") {
             transaction.update(userRef, {
-                creditLimit: 50000000,
+                creditLimit: 500000000,
                 usedCredit: 0,
             });
         }
@@ -142,16 +142,16 @@ export async function sellStock(uid: string, symbol: string, name: string, price
 
         // Initialize missing fields for legacy users
         if (typeof userData.startingBalance !== "number") {
-            transaction.update(userRef, { startingBalance: 100000000 });
+            transaction.update(userRef, { startingBalance: 500000000 });
         }
         if (typeof userData.creditLimit !== "number") {
             transaction.update(userRef, {
-                creditLimit: 50000000,
+                creditLimit: 500000000,
                 usedCredit: 0,
             });
         }
 
-        const creditLimit = userData.creditLimit || 50000000;
+        const creditLimit = userData.creditLimit || 500000000;
         const usedCredit = userData.usedCredit || 0;
 
         // Logic for Short Selling vs Normal Sell

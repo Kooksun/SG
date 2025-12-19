@@ -19,7 +19,7 @@ export default function Navbar() {
         <nav className="bg-gray-800 text-white p-4">
             <div className="container mx-auto flex justify-between items-center">
                 <Link href="/" className="text-xl font-bold">
-                    Stock Game
+                    Stock Game v2
                 </Link>
                 <div className="flex gap-4 items-center">
                     <Link href="/" className="hover:text-gray-300">
@@ -27,8 +27,8 @@ export default function Navbar() {
                     </Link>
                     {user ? (
                         <>
-                        <Link href={`/user?uid=${user.uid}`} className="hover:text-gray-300">
-                                My Portfolio
+                            <Link href={`/user?uid=${user.uid}`} className="hover:text-gray-300">
+                                My Page
                             </Link>
                             <button onClick={handleLogout} className="bg-red-600 px-3 py-1 rounded hover:bg-red-700">
                                 Logout
