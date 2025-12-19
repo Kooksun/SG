@@ -114,7 +114,44 @@ export default function StockList() {
 
     const [activeTab, setActiveTab] = useState<'domestic' | 'overseas'>('domestic');
 
-    // ... (existing effects)
+    // --- Search & Custom Symbol Features ---
+    const [isSearchingServer, setIsSearchingServer] = useState(false);
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+
+    // Listen for search results from server
+    useEffect(() => {
+        if (!user) return;
+        const resultRef = ref(rtdb, `search_results/${user.uid}`);
+        const unsubscribe = onValue(resultRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data && data.query === searchTerm) {
+                setSearchResults(data.results || []);
+                setIsSearchingServer(false);
+            }
+        });
+        return () => unsubscribe();
+    }, [user, searchTerm]);
+
+    const triggerServerSearch = async () => {
+        if (!user || !searchTerm.trim()) return;
+        setIsSearchingServer(true);
+        const requestRef = ref(rtdb, `search_requests/${user.uid}`);
+        const { set } = await import("firebase/database");
+        await set(requestRef, {
+            query: searchTerm,
+            status: 'pending',
+            requestedAt: new Date().toISOString()
+        });
+    };
+
+    const handleAddCustomSymbol = async (symbol: string) => {
+        if (!user) return;
+        const customRef = ref(rtdb, `custom_symbols/${symbol}`);
+        const { set } = await import("firebase/database");
+        await set(customRef, true);
+        alert(`${symbol} 종목이 추가되었습니다. 서버 동기화 주기에 따라 약 5분 뒤부터 리스트에 나타납니다.`);
+    };
+    // ----------------------------------------
 
     const toggleWatchlist = async (e: React.MouseEvent, symbol: string) => {
         e.stopPropagation();
@@ -172,15 +209,31 @@ export default function StockList() {
                         해외
                     </button>
                 </div>
-                <input
-                    type="text"
-                    placeholder="검색 (심볼·이름)"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="px-3 py-2 rounded bg-gray-700 text-white focus:outline-none flex-1 sm:max-w-xs"
-                />
-                <div className="text-sm text-gray-400 text-right sm:w-48">
-                    최종 갱신: {lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR", {
+                <div className="flex flex-1 sm:max-w-md gap-2">
+                    <input
+                        type="text"
+                        placeholder="검색 (심볼·이름)"
+                        value={searchTerm}
+                        onChange={e => {
+                            setSearchTerm(e.target.value);
+                            setSearchResults([]); // Reset results on new search
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') triggerServerSearch();
+                        }}
+                        className="px-3 py-2 rounded bg-gray-700 text-white focus:outline-none flex-1"
+                    />
+                    <button
+                        onClick={triggerServerSearch}
+                        disabled={isSearchingServer || !searchTerm.trim()}
+                        className="bg-blue-600 px-4 py-2 rounded font-semibold disabled:bg-gray-600 hover:bg-blue-700 transition"
+                    >
+                        {isSearchingServer ? "..." : "검색"}
+                    </button>
+                </div>
+                <div className="text-sm text-gray-400 text-right sm:w-24 leading-tight">
+                    최종 갱신:<br />
+                    {lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR", {
                         hour: "2-digit",
                         minute: "2-digit",
                         second: "2-digit"
@@ -188,17 +241,73 @@ export default function StockList() {
                 </div>
             </div>
 
+            {/* Server Search Results Section */}
+            {searchTerm.trim() !== "" && (searchResults.length > 0 || isSearchingServer) && (
+                <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-blue-900">
+                    <h3 className="text-blue-400 font-bold mb-3 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                        전체 종목 검색 결과
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {searchResults.map((res: any) => {
+                            const isAlreadyTracked = stocks.some(s => s.symbol === res.symbol);
+                            return (
+                                <div key={res.symbol} className="bg-gray-800 p-3 rounded flex justify-between items-center border border-gray-700 hover:border-blue-500 transition">
+                                    <div className="overflow-hidden">
+                                        <div className="text-sm font-bold text-white truncate">{res.name}</div>
+                                        <div className="text-xs text-gray-500 flex gap-2">
+                                            <span>{res.symbol}</span>
+                                            <span className="text-blue-700">{res.market}</span>
+                                        </div>
+                                    </div>
+                                    {isAlreadyTracked ? (
+                                        <span className="text-xs text-green-500 font-semibold px-2">추적중</span>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleAddCustomSymbol(res.symbol)}
+                                            className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded font-bold"
+                                        >
+                                            추가
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {searchResults.length === 0 && isSearchingServer && (
+                        <div className="text-gray-500 text-center py-4">검색중...</div>
+                    )}
+                    {searchResults.length === 0 && !isSearchingServer && (
+                        <div className="text-gray-500 text-center py-4 text-sm">
+                            "{searchTerm}"에 대한 검색 결과가 없습니다. 심볼을 정확히 입력해 보세요.
+                        </div>
+                    )}
+                </div>
+            )}
+
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-white">Market Watch ({activeTab === 'domestic' ? 'KOSPI/KOSDAQ' : 'US Stocks'})</h2>
-                {user && (
-                    <button
-                        onClick={() => setShowWatchlistOnly(!showWatchlistOnly)}
-                        className={`px-3 py-1 rounded text-sm ${showWatchlistOnly ? "bg-yellow-600 text-white" : "bg-gray-700 text-gray-300"}`}
-                    >
-                        {showWatchlistOnly ? "Show All" : "Show Watchlist"}
-                    </button>
-                )}
+                <div className="flex gap-2">
+                    {user && (
+                        <button
+                            onClick={() => setShowWatchlistOnly(!showWatchlistOnly)}
+                            className={`px-3 py-1 rounded text-sm ${showWatchlistOnly ? "bg-yellow-600 text-white" : "bg-gray-700 text-gray-300"}`}
+                        >
+                            {showWatchlistOnly ? "Show All" : "Show Watchlist"}
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {/* Empty Result Helper */}
+            {filteredStocks.length === 0 && searchTerm && !isSearchingServer && searchResults.length === 0 && (
+                <div className="text-center py-12 bg-gray-900/50 rounded-xl mb-6">
+                    <div className="text-4xl mb-4">🔍</div>
+                    <div className="text-gray-300 font-semibold mb-2">찾으시는 종목이 목록에 없나요?</div>
+                    <p className="text-gray-500 text-sm mb-4">상단 검색 버튼을 눌러 전체 시장에서 검색해 보세요.</p>
+                </div>
+            )}
+
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-gray-300">
                     <thead>
@@ -262,6 +371,6 @@ export default function StockList() {
                     holdingQuantity={portfolio[selectedStock.symbol] || 0}
                 />
             )}
-        </div >
+        </div>
     );
 }

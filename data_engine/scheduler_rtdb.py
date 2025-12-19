@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from typing import Dict, Optional
 from firebase_admin import db as rtdb_admin
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from fetcher import fetch_top_stocks, fetch_us_stocks, fetch_exchange_rate, fetch_single_stock, fetch_stock_history
 from models import Stock
@@ -222,7 +223,7 @@ def process_daily_interest_and_liquidation():
     
     # Query users with usedCredit > 0
     users_ref = firestore_db.collection("users")
-    query = users_ref.where("usedCredit", ">", 0)
+    query = users_ref.where(filter=FieldFilter("usedCredit", ">", 0))
     docs = query.stream()
     
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -276,7 +277,7 @@ def process_daily_interest_and_liquidation():
             
             # Fetch recent BUY transactions for LIFO
             tx_ref = firestore_db.collection("transactions")
-            buy_txs = tx_ref.where("uid", "==", uid).where("type", "==", "BUY").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(50).stream()
+            buy_txs = tx_ref.where(filter=FieldFilter("uid", "==", uid)).where(filter=FieldFilter("type", "==", "BUY")).order_by("timestamp", direction=firestore.Query.DESCENDING).limit(50).stream()
             
             portfolio_map = {d.id: d.to_dict() for d in portfolio_docs}
             
@@ -420,6 +421,25 @@ def refresh_held_stocks():
             except Exception as e:
                 print(f"Error reading reserved_symbols.txt: {e}")
 
+        # 3. Load from RTDB custom_symbols
+        try:
+            custom_ref = rtdb_admin.reference('custom_symbols')
+            custom_data = custom_ref.get()
+            if custom_data and isinstance(custom_data, dict):
+                for symbol, active in custom_data.items():
+                    if active:
+                        new_cache.add(symbol)
+                print(f"[{now_kst()}] Loaded custom symbols from RTDB.")
+        except Exception as e:
+            print(f"Error loading custom symbols from RTDB: {e}")
+
+        # 4. Fetch initial history for NEW symbols
+        new_symbols = new_cache - held_stocks_cache
+        if new_symbols:
+            print(f"[{now_kst()}] New symbols detected: {new_symbols}. Fetching initial history...")
+            for symbol in new_symbols:
+                update_single_stock_history(symbol)
+
         held_stocks_cache = new_cache
         print(f"[{now_kst()}] Held stocks cache refreshed. Count: {len(held_stocks_cache)} (Held + Reserved)")
         print(f"DEBUG: Current Held Stocks Cache: {held_stocks_cache}")
@@ -436,7 +456,7 @@ def process_limit_orders():
     print(f"[{now_kst()}] Checking pending limit orders...")
     try:
         orders_ref = firestore_db.collection("active_orders")
-        pending_orders = orders_ref.where("status", "==", "PENDING").stream()
+        pending_orders = orders_ref.where(filter=FieldFilter("status", "==", "PENDING")).stream()
         
         for order_doc in pending_orders:
             order_data = order_doc.to_dict()
@@ -502,6 +522,9 @@ def start_scheduler():
     schedule.every(5).minutes.do(refresh_held_stocks)
     
     schedule.every(1).minutes.do(process_limit_orders)
+
+    # Schedule search requests processing every 5 seconds (not use schedule for high frequency)
+    # Actually we'll call it in the loop
     
     # Schedule history job at 06:00 KST (after US market close)
     schedule.every().day.at("06:00").do(history_job)
@@ -512,8 +535,9 @@ def start_scheduler():
         # Check AI requests and Limit Orders more frequently
         try:
             process_ai_requests()
+            process_search_requests()
         except Exception as e:
-            print(f"Error in process_ai_requests: {e}")
+            print(f"Error in background processing: {e}")
             
         time.sleep(2)
 
@@ -629,43 +653,130 @@ def history_job(force: bool = False):
     stocks_to_process = list(latest_snapshot.keys())
     print(f"Fetching history for {len(stocks_to_process)} stocks...")
     
-    supabase = get_supabase()
-    if not supabase:
-        print("Supabase client not initialized. Skipping history job.")
-        return
-
     success_count = 0
     for i, symbol in enumerate(stocks_to_process):
         # Rate limit friendly logging
         if i % 10 == 0:
             print(f"Processing {i}/{len(stocks_to_process)}...")
             
-        history_data = fetch_stock_history(symbol)
-        if history_data:
-            # Prepare rows for Supabase insertion
-            rows = []
-            for item in history_data:
-                rows.append({
-                    "symbol": symbol,
-                    "time": item["time"],
-                    "open": item["open"],
-                    "high": item["high"],
-                    "low": item["low"],
-                    "close": item["close"]
-                })
-            
-            try:
-                # Upsert to prevent duplicate errors if unique(symbol, time) is set
-                # Supabase Python client uses 'upsert'
-                supabase.table("stock_history").upsert(rows).execute()
-                success_count += 1
-            except Exception as e:
-                print(f"Error saving history for {symbol} to Supabase: {e}")
+        if update_single_stock_history(symbol):
+            success_count += 1
             
         # Small sleep to be nice to yfinance/upstream
         time.sleep(0.5)
         
     print(f"[{now_kst()}] History Job Completed. Updated {success_count}/{len(stocks_to_process)} stocks in Supabase.")
+
+def update_single_stock_history(symbol: str) -> bool:
+    """
+    Fetch and store historical data for a single stock to Supabase.
+    Returns True if success, False otherwise.
+    """
+    from supabase_client import get_supabase
+    supabase = get_supabase()
+    if not supabase:
+        return False
+
+    history_data = fetch_stock_history(symbol)
+    if history_data:
+        # Prepare rows for Supabase insertion
+        rows = []
+        for item in history_data:
+            rows.append({
+                "symbol": symbol,
+                "time": item["time"],
+                "open": item["open"],
+                "high": item["high"],
+                "low": item["low"],
+                "close": item["close"],
+                "volume": item.get("volume", 0)
+            })
+        
+        try:
+            # Upsert to prevent duplicate errors
+            supabase.table("stock_history").upsert(rows).execute()
+            return True
+        except Exception as e:
+            print(f"Error saving history for {symbol} to Supabase: {e}")
+            return False
+    return False
+
+def process_search_requests():
+    """
+    Check RTDB for pending search requests.
+    path: search_requests/{uid}
+    """
+    ref = rtdb_admin.reference('search_requests')
+    requests = ref.get()
+    
+    if not requests:
+        return
+
+    # Cache for fdr listing to avoid redundant calls within one poll
+    _cached_listing = None
+
+    for uid, data in requests.items():
+        if isinstance(data, dict) and data.get('status') == 'pending':
+            query = data.get('query', '').strip()
+            print(f"[{now_kst()}] Processing Search request for user {uid}: query='{query}'")
+            
+            try:
+                results = []
+                if query:
+                    # 1. KR Stocks Search
+                    if _cached_listing is None:
+                        import FinanceDataReader as fdr
+                        _cached_listing = fdr.StockListing('KRX')
+                        _cached_listing['Code'] = _cached_listing['Code'].astype(str)
+                    
+                    # Filter by Symbol or Name
+                    mask = (
+                        _cached_listing['Code'].str.contains(query, case=False) |
+                        _cached_listing['Name'].str.contains(query, case=False)
+                    )
+                    matches = _cached_listing[mask].sort_values(by='Marcap', ascending=False).head(15)
+                    
+                    for _, row in matches.iterrows():
+                        results.append({
+                            'symbol': row['Code'],
+                            'name': row['Name'],
+                            'market': row['Market'],
+                            'type': 'KR'
+                        })
+                    
+                    # 2. US Stocks Search (Simple match from US_TICKER_MAP)
+                    from fetcher import US_TICKER_MAP
+                    us_matches = []
+                    for ticker, kor_name in US_TICKER_MAP.items():
+                        if query.lower() in ticker.lower() or query in kor_name:
+                            us_matches.append({
+                                'symbol': ticker,
+                                'name': kor_name,
+                                'market': 'US',
+                                'type': 'US'
+                            })
+                    
+                    # Combine results, prioritizing US if explicitly searched by ticker
+                    results = us_matches + results
+                    results = results[:20] # Limit total results
+
+                # Update Results and Status
+                rtdb_admin.reference(f'search_results/{uid}').set({
+                    'results': results,
+                    'query': query,
+                    'updatedAt': now_kst().isoformat()
+                })
+                ref.child(uid).update({
+                    'status': 'completed',
+                    'completedAt': now_kst().isoformat()
+                })
+                
+            except Exception as e:
+                print(f"Error processing Search request for {uid}: {e}")
+                ref.child(uid).update({
+                    'status': 'error',
+                    'error': str(e)
+                })
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Stock updater scheduler for RTDB")

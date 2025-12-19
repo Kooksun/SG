@@ -312,7 +312,8 @@ def fetch_stock_history(symbol: str, days: int = 90) -> List[Dict]:
                 'open': float(row['Open']),
                 'high': float(row['High']),
                 'low': float(row['Low']),
-                'close': float(row['Close'])
+                'close': float(row['Close']),
+                'volume': float(row['Volume'])
             })
             
         return formatted_data
