@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useRef } from "react";
 import { Stock } from "@/types";
-import { buyStock, sellStock } from "@/lib/trade";
+import { buyStock, sellStock, placeLimitOrder } from "@/lib/trade";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { ref, onValue, get, child } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickSeries } from 'lightweight-charts';
 
 interface TradeModalProps {
@@ -25,6 +26,8 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [exchangeRate, setExchangeRate] = useState(1400);
+    const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">("MARKET");
+    const [limitPrice, setLimitPrice] = useState(0);
 
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
@@ -45,17 +48,19 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
         const fetchHistory = async () => {
             try {
-                const snapshot = await get(child(ref(rtdb), `stock_history/${stock.symbol}`));
-                if (snapshot.exists()) {
-                    const data = snapshot.val();
-                    if (Array.isArray(data) && chartRef.current && seriesRef.current) {
-                        // Sort just in case
-                        const sortedData = data.sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime());
-                        seriesRef.current.setData(sortedData);
-                    }
+                const { data, error } = await supabase
+                    .from('stock_history')
+                    .select('time, open, high, low, close')
+                    .eq('symbol', stock.symbol)
+                    .order('time', { ascending: true });
+
+                if (error) throw error;
+
+                if (data && data.length > 0 && chartRef.current && seriesRef.current) {
+                    seriesRef.current.setData(data);
                 }
             } catch (e) {
-                console.error("Failed to fetch history:", e);
+                console.error("Failed to fetch history from Supabase:", e);
             }
         };
 
@@ -155,15 +160,23 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     // Calculate max quantity based on mode
     const availableCredit = Math.max(0, creditLimit - usedCredit);
     const totalBuyingPower = balance + availableCredit;
+
+    // For selling/shorting: you can sell what you own + what you can short with credit
+    const maxShortable = Math.floor(availableCredit / effectivePrice);
+    const maxSellQuantity = Math.max(0, holdingQuantity) + maxShortable;
+
     const maxQuantity = mode === "BUY"
         ? Math.floor(totalBuyingPower / effectivePrice)
-        : holdingQuantity;
+        : maxSellQuantity;
 
     useEffect(() => {
         if (isOpen) {
             setQuantity(1);
+            setOrderType("MARKET");
         }
     }, [isOpen, stock.symbol]);
+
+
 
     // Ensure quantity doesn't exceed max when switching modes
     useEffect(() => {
@@ -178,23 +191,22 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     const fee = mode === "SELL" ? Math.floor(amount * 0.0005) : 0;
     const total = mode === "BUY" ? amount : amount - fee;
 
+    const isShorting = mode === "SELL" && quantity > Math.max(0, holdingQuantity);
+    const isCovering = mode === "BUY" && holdingQuantity < 0;
+
     const handleTrade = async () => {
         if (!user) return;
         setLoading(true);
         setError("");
         try {
-            if (mode === "BUY") {
-                if (amount > totalBuyingPower) {
-                    throw new Error("Insufficient funds");
+            if (orderType === "MARKET") {
+                if (mode === "BUY") {
+                    await buyStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity);
+                } else {
+                    await sellStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity);
                 }
-                // Pass effectivePrice (KRW) to buyStock
-                await buyStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity);
             } else {
-                if (quantity > holdingQuantity) {
-                    throw new Error("Insufficient shares");
-                }
-                // Pass effectivePrice (KRW) to sellStock
-                await sellStock(user.uid, stock.symbol, effectivePrice, quantity);
+                await placeLimitOrder(user.uid, stock.symbol, stock.name, mode, limitPrice, quantity);
             }
             onClose();
         } catch (err: any) {
@@ -242,22 +254,57 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                             </button>
                         </div>
 
+                        <div className="flex gap-2 mb-4 bg-gray-900 p-1 rounded">
+                            <button
+                                onClick={() => setOrderType("MARKET")}
+                                className={`flex-1 py-1 text-sm rounded ${orderType === "MARKET" ? "bg-gray-700 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                            >
+                                Market
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setOrderType("LIMIT");
+                                    setLimitPrice(effectivePrice);
+                                }}
+                                className={`flex-1 py-1 text-sm rounded ${orderType === "LIMIT" ? "bg-gray-700 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                            >
+                                Limit
+                            </button>
+                        </div>
+
                         <div className="space-y-4 flex-1">
                             <div>
-                                <label className="block text-sm text-gray-400">Price</label>
-                                <div className="text-lg font-bold">
-                                    {isUS ? (
-                                        <>
-                                            ${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            <span className="text-sm text-gray-400 ml-2">
-                                                (≈ {effectivePrice.toLocaleString()} KRW)
-                                            </span>
-                                        </>
-                                    ) : (
-                                        `${stock.price.toLocaleString()} KRW`
-                                    )}
-                                </div>
-                                {isUS && (
+                                <label className="block text-sm text-gray-400">{orderType === "MARKET" ? "Current Price" : "Target Price"}</label>
+                                {orderType === "MARKET" ? (
+                                    <div className="text-lg font-bold">
+                                        {isUS ? (
+                                            <>
+                                                ${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                <span className="text-sm text-gray-400 ml-2">
+                                                    (≈ {effectivePrice.toLocaleString()} KRW)
+                                                </span>
+                                            </>
+                                        ) : (
+                                            `${stock.price.toLocaleString()} KRW`
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-1 mt-1">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                value={limitPrice}
+                                                onChange={(e) => setLimitPrice(parseInt(e.target.value) || 0)}
+                                                className="w-full bg-gray-700 rounded p-2 text-white font-bold"
+                                            />
+                                            <span className="text-sm">KRW</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            Current: {effectivePrice.toLocaleString()} KRW
+                                        </div>
+                                    </div>
+                                )}
+                                {isUS && orderType === "MARKET" && (
                                     <div className="text-xs text-gray-500">
                                         Exchange Rate: 1 USD = {exchangeRate.toLocaleString()} KRW
                                     </div>
@@ -310,14 +357,35 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                                     <span>
                                         {mode === "BUY"
                                             ? `${balance.toLocaleString()} KRW (Cash) + ${availableCredit.toLocaleString()} KRW (Credit)`
-                                            : `${holdingQuantity} Shares`}
+                                            : holdingQuantity > 0
+                                                ? `${holdingQuantity} Shares owned + ${maxShortable} Shortable`
+                                                : holdingQuantity < 0
+                                                    ? `Shorting ${Math.abs(holdingQuantity)} Shares + ${maxShortable} Shortable`
+                                                    : `${maxShortable} Shortable`}
                                     </span>
                                 </div>
-                                {mode === "BUY" && amount > balance && (
+                                {mode === "BUY" && isCovering && (
+                                    <div className="mt-2 p-2 bg-blue-900 border border-blue-600 rounded text-sm text-blue-200">
+                                        ℹ️ This will cover your short position.
+                                    </div>
+                                )}
+                                {mode === "BUY" && !isCovering && amount > balance && (
                                     <div className="mt-2 p-2 bg-yellow-900 border border-yellow-600 rounded text-sm text-yellow-200">
                                         ⚠️ Credit will be used: {(amount - balance).toLocaleString()} KRW
                                     </div>
                                 )}
+                                {mode === "SELL" && isShorting && (
+                                    <div className="mt-2 p-2 bg-purple-900 border border-purple-600 rounded text-sm text-purple-200">
+                                        ⚠️ This is a short sell. Margin will be used: {amount.toLocaleString()} KRW
+                                    </div>
+                                )}
+                                {orderType === "LIMIT" && (
+                                    (mode === "BUY" && limitPrice >= effectivePrice) || (mode === "SELL" && limitPrice <= effectivePrice)
+                                ) && (
+                                        <div className="mt-2 p-2 bg-orange-900 border border-orange-600 rounded text-sm text-orange-200">
+                                            ⚠️ Current price satisfies your limit. This order will likely execute immediately.
+                                        </div>
+                                    )}
                             </div>
                         </div>
 
@@ -332,10 +400,10 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                             </button>
                             <button
                                 onClick={handleTrade}
-                                disabled={loading || quantity <= 0 || (mode === "BUY" && amount > totalBuyingPower) || (mode === "SELL" && quantity > holdingQuantity)}
+                                disabled={loading || quantity <= 0 || (mode === "BUY" && amount > totalBuyingPower) || (mode === "SELL" && quantity > maxSellQuantity)}
                                 className={`flex-1 py-2 rounded ${mode === "BUY" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"} disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
-                                {loading ? "Processing..." : mode}
+                                {loading ? "Processing..." : orderType === "LIMIT" ? "Limit Order" : isShorting ? "Short" : isCovering ? "Buy to Cover" : mode}
                             </button>
                         </div>
                     </div>

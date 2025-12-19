@@ -10,7 +10,7 @@ interface Transaction {
     id: string;
     symbol: string;
     name?: string;
-    type: "BUY" | "SELL";
+    type: "BUY" | "SELL" | "SHORT" | "COVER";
     price: number;
     quantity: number;
     amount: number;
@@ -78,7 +78,11 @@ export default function TransactionHistory({
                                             <div className="text-xs text-gray-400">{stockName}</div>
                                         )}
                                     </td>
-                                    <td className={`py-2 font-bold ${tx.type === "BUY" ? "text-red-400" : "text-blue-400"}`}>
+                                    <td className={`py-2 font-bold ${tx.type === "BUY" ? "text-red-400" :
+                                        tx.type === "SHORT" ? "text-purple-400" :
+                                            tx.type === "COVER" ? "text-orange-400" :
+                                                "text-blue-400" // SELL
+                                        }`}>
                                         {tx.type}
                                     </td>
                                     <td className="py-2">{tx.price.toLocaleString()}</td>
@@ -87,8 +91,8 @@ export default function TransactionHistory({
                                     <td className="py-2 text-gray-400">
                                         {tx.fee ? tx.fee.toLocaleString() : "0"}
                                     </td>
-                                    <td className={`py-2 ${tx.profit && tx.profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
-                                        {tx.type === "SELL" && tx.profit !== undefined ? tx.profit.toLocaleString() : "-"}
+                                    <td className={`py-2 ${tx.profit && tx.profit > 0 ? "text-red-400" : tx.profit && tx.profit < 0 ? "text-blue-400" : "text-gray-500"}`}>
+                                        {tx.profit !== undefined && tx.profit !== 0 ? tx.profit.toLocaleString() : "-"}
                                     </td>
                                 </tr>
                             );

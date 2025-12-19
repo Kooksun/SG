@@ -12,7 +12,8 @@ from fetcher import fetch_top_stocks, fetch_us_stocks, fetch_exchange_rate, fetc
 from models import Stock
 import firestore_client  # Initializes Firebase app
 from firestore_client import db as firestore_db
-from trade_executor import sell_stock
+from trade_executor import buy_stock, sell_stock
+from supabase_client import get_supabase
 from dotenv import load_dotenv
 
 # Load environment variables from .env file in the same directory
@@ -155,7 +156,10 @@ def sync_job(force: bool = False):
             portfolios = firestore_db.collection_group("portfolio").stream()
             for doc in portfolios:
                 # doc.id is usually the symbol in our design (users/{uid}/portfolio/{symbol})
-                held_stocks.add(doc.id)
+                data = doc.to_dict()
+                qty = data.get('quantity', 0)
+                if qty != 0:
+                    held_stocks.add(doc.id)
         except Exception as e:
             print(f"Error fetching held stocks: {e}")
         
@@ -309,7 +313,7 @@ def process_daily_interest_and_liquidation():
                 
                 try:
                     print(f"  -> Selling {shares_to_sell} of {symbol} @ {current_price}")
-                    proceeds = sell_stock(uid, symbol, current_price, shares_to_sell)
+                    proceeds = sell_stock(uid, symbol, stock_info.name, current_price, shares_to_sell)
                     
                     # Update local tracking
                     liquidated_amount += proceeds
@@ -326,24 +330,52 @@ def process_daily_interest_and_liquidation():
                         break
                     
                     qty = item.get("quantity", 0)
-                    if qty <= 0: continue
+                    if qty == 0: continue
                     
                     stock_info = latest_snapshot.get(symbol)
                     if not stock_info: continue
                     
                     current_price = stock_info.price
                     remaining_excess = excess_credit - liquidated_amount
-                    net_price = current_price * 0.9995
-                    shares_needed = int(remaining_excess / net_price) + 1
-                    shares_to_sell = min(shares_needed, qty)
-                    
-                    try:
-                        print(f"  -> [Fallback] Selling {shares_to_sell} of {symbol} @ {current_price}")
-                        proceeds = sell_stock(uid, symbol, current_price, shares_to_sell)
-                        liquidated_amount += proceeds
-                        count_liquidated += 1
-                    except Exception as e:
-                        print(f"  -> Failed to liquidate {symbol}: {e}")
+
+                    if qty > 0:
+                        # Long position
+                        net_price = current_price * 0.9995
+                        shares_needed = int(remaining_excess / net_price) + 1
+                        shares_to_sell = min(shares_needed, qty)
+                        
+                        try:
+                            print(f"  -> [Fallback] Selling {shares_to_sell} of {symbol} @ {current_price}")
+                            proceeds = sell_stock(uid, symbol, stock_info.name, current_price, shares_to_sell)
+                            liquidated_amount += proceeds
+                            count_liquidated += 1
+                        except Exception as e:
+                            print(f"  -> Failed to liquidate long {symbol}: {e}")
+                    else:
+                        # Short position (qty < 0)
+                        abs_qty = abs(qty)
+                        avg_sell_price = item.get("averagePrice", 0)
+                        
+                        # Covering releases original sell price from usedCredit
+                        # But it costs current_price * shares to cover
+                        # The net impact on 'usedCredit - credit_limit' (excess) is reduction by avg_sell_price per share?
+                        # Actually the current liquidation check is 'used_credit > creditLimit'.
+                        # used_credit decreases by avg_sell_price * shares.
+                        shares_needed = int(remaining_excess / avg_sell_price) + 1
+                        shares_to_cover = min(shares_needed, abs_qty)
+                        
+                        # Safety check: do we have enough balance to cover?
+                        # If not, we might be stuck, but let's try.
+                        try:
+                            print(f"  -> [Fallback] Covering {shares_to_cover} of short {symbol} @ {current_price}")
+                            buy_stock(uid, symbol, stock_info.name, current_price, shares_to_cover)
+                            
+                            # Release the margin from our local tracking
+                            released = avg_sell_price * shares_to_cover
+                            liquidated_amount += released
+                            count_liquidated += 1
+                        except Exception as e:
+                            print(f"  -> Failed to liquidate short {symbol}: {e}")
 
     print(f"[{now_kst()}] Daily Job Completed. Interest applied to {count_interest} users. Liquidated trades: {count_liquidated}")
 
@@ -369,7 +401,10 @@ def refresh_held_stocks():
         new_cache = set()
         for doc in docs:
             # doc.id is the symbol in our data model: users/{uid}/portfolio/{symbol}
-            new_cache.add(doc.id)
+            data = doc.to_dict()
+            qty = data.get('quantity', 0)
+            if qty != 0:
+                new_cache.add(doc.id)
         
         # 2. Load from Configuration File
         reserved_file = os.path.join(os.path.dirname(__file__), 'reserved_symbols.txt')
@@ -391,6 +426,62 @@ def refresh_held_stocks():
     except Exception as e:
         print(f"Error refreshing held stocks: {e}")
 
+def process_limit_orders():
+    """
+    Check Firestore for pending limit orders and execute them if conditions are met.
+    """
+    if not latest_snapshot:
+        return
+
+    print(f"[{now_kst()}] Checking pending limit orders...")
+    try:
+        orders_ref = firestore_db.collection("active_orders")
+        pending_orders = orders_ref.where("status", "==", "PENDING").stream()
+        
+        for order_doc in pending_orders:
+            order_data = order_doc.to_dict()
+            uid = order_data.get("uid")
+            symbol = order_data.get("symbol")
+            name = order_data.get("name", symbol)
+            target_price = order_data.get("targetPrice")
+            quantity = order_data.get("quantity")
+            order_type = order_data.get("type") # BUY or SELL
+            
+            stock_info = latest_snapshot.get(symbol)
+            if not stock_info:
+                continue
+                
+            current_price = stock_info.price
+            
+            execute = False
+            if order_type == "BUY" and current_price <= target_price:
+                execute = True
+            elif order_type == "SELL" and current_price >= target_price:
+                execute = True
+                
+            if execute:
+                try:
+                    print(f"  -> Executing LIMIT {order_type} for user {uid}: {symbol} @ {current_price} (Target: {target_price})")
+                    if order_type == "BUY":
+                        buy_stock(uid, symbol, name, current_price, quantity)
+                    else:
+                        sell_stock(uid, symbol, name, current_price, quantity)
+                    
+                    orders_ref.document(order_doc.id).update({
+                        "status": "COMPLETED",
+                        "executedPrice": current_price,
+                        "executedAt": firestore.SERVER_TIMESTAMP
+                    })
+                except Exception as e:
+                    print(f"  -> ERROR executing limit order {order_doc.id}: {e}")
+                    orders_ref.document(order_doc.id).update({
+                        "status": "FAILED",
+                        "errorMessage": str(e)
+                    })
+    except Exception as e:
+        print(f"Error in process_limit_orders: {e}")
+
+
 def start_scheduler():
     print("RTDB Scheduler started. Fetch every "
           f"{FETCH_INTERVAL_MINUTES} min, sync every {SYNC_INTERVAL_MINUTES} min (24/7).")
@@ -410,13 +501,15 @@ def start_scheduler():
     # Schedule held stocks refresh every 5 minutes
     schedule.every(5).minutes.do(refresh_held_stocks)
     
+    schedule.every(1).minutes.do(process_limit_orders)
+    
     # Schedule history job at 06:00 KST (after US market close)
     schedule.every().day.at("06:00").do(history_job)
 
     while True:
         schedule.run_pending()
         
-        # Check AI requests more frequently (every 2 seconds)
+        # Check AI requests and Limit Orders more frequently
         try:
             process_ai_requests()
         except Exception as e:
@@ -536,8 +629,11 @@ def history_job(force: bool = False):
     stocks_to_process = list(latest_snapshot.keys())
     print(f"Fetching history for {len(stocks_to_process)} stocks...")
     
-    history_ref = rtdb_admin.reference('stock_history')
-    
+    supabase = get_supabase()
+    if not supabase:
+        print("Supabase client not initialized. Skipping history job.")
+        return
+
     success_count = 0
     for i, symbol in enumerate(stocks_to_process):
         # Rate limit friendly logging
@@ -546,15 +642,30 @@ def history_job(force: bool = False):
             
         history_data = fetch_stock_history(symbol)
         if history_data:
-            sanitized_history = sanitize_for_firebase(history_data)
-            history_ref.child(symbol).set(sanitized_history)
-            success_count += 1
+            # Prepare rows for Supabase insertion
+            rows = []
+            for item in history_data:
+                rows.append({
+                    "symbol": symbol,
+                    "time": item["time"],
+                    "open": item["open"],
+                    "high": item["high"],
+                    "low": item["low"],
+                    "close": item["close"]
+                })
             
-        # Small sleep to be nice to yfinance/upstream if needed? 
-        # yfinance usually handles rate limits well, but let's be safe.
+            try:
+                # Upsert to prevent duplicate errors if unique(symbol, time) is set
+                # Supabase Python client uses 'upsert'
+                supabase.table("stock_history").upsert(rows).execute()
+                success_count += 1
+            except Exception as e:
+                print(f"Error saving history for {symbol} to Supabase: {e}")
+            
+        # Small sleep to be nice to yfinance/upstream
         time.sleep(0.5)
         
-    print(f"[{now_kst()}] History Job Completed. Updated {success_count}/{len(stocks_to_process)} stocks.")
+    print(f"[{now_kst()}] History Job Completed. Updated {success_count}/{len(stocks_to_process)} stocks in Supabase.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Stock updater scheduler for RTDB")

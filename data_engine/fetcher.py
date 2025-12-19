@@ -26,7 +26,9 @@ US_TICKER_MAP = {
     'V': '비자', 'MA': '마스터카드', 'PYPL': '페이팔', 
     'UBER': '우버', 'ABNB': '에어비앤비', 'LCID': '루시드', 'U': '유니티', 
     'RBLX': '로블록스', 'OPEN': '오픈도어', 'SOFI': '소파이', 'AFRM': '어펌', 
-    'UPST': '업스타트', 'DKNG': '드래프트킹스', 'AI': 'C3 AI'
+    'UPST': '업스타트', 'DKNG': '드래프트킹스', 'AI': 'C3 AI',
+    'SQQQ': 'SQQQ (나스닥 3배 인버스)', 'SOXS': 'SOXS (반도체 3배 인버스)',
+    'BITI': 'BITI (비트코인 인버스)', 'PSQ': 'PSQ (나스닥 1배 인버스)'
 }
 
 def _to_float(value) -> float:
@@ -284,14 +286,14 @@ def fetch_stock_history(symbol: str, days: int = 90) -> List[Dict]:
     try:
         ticker = yf.Ticker(yf_symbol)
         # Fetch slightly more than needed to ensure we have enough trading days
-        hist = ticker.history(period="3mo", interval="1d")
+        hist = ticker.history(period="1y", interval="1d")
         
         if hist.empty and not is_known_us:
              # Fallback to KQ if KS failed (only for implicit KR stocks)
              yf_symbol = f"{symbol}.KQ"
              print(f"Retrying with {yf_symbol}...")
              ticker = yf.Ticker(yf_symbol)
-             hist = ticker.history(period="3mo", interval="1d")
+             hist = ticker.history(period="1y", interval="1d")
         
         if hist.empty:
             print(f"No history found for {symbol}")

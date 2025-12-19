@@ -8,6 +8,8 @@ import TradeModal from "./TradeModal";
 import { Timestamp } from "firebase/firestore";
 import { ref, onValue } from "firebase/database";
 
+import { Clock } from "lucide-react";
+
 interface PortfolioItem {
     symbol: string;
     name?: string;
@@ -17,7 +19,25 @@ interface PortfolioItem {
     valuation: number;
 }
 
-export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, balance = 0, creditLimit = 0, usedCredit = 0 }: { uid: string, realtimeStocks?: Record<string, Stock>, isOwner?: boolean, balance?: number, creditLimit?: number, usedCredit?: number }) {
+export default function PortfolioTable({
+    uid,
+    realtimeStocks,
+    isOwner = false,
+    balance = 0,
+    creditLimit = 0,
+    usedCredit = 0,
+    pendingSymbols = new Set(),
+    onTabChange
+}: {
+    uid: string,
+    realtimeStocks?: Record<string, Stock>,
+    isOwner?: boolean,
+    balance?: number,
+    creditLimit?: number,
+    usedCredit?: number,
+    pendingSymbols?: Set<string>,
+    onTabChange?: (tab: 'overview' | 'portfolio' | 'history' | 'orders') => void
+}) {
     const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [selectedQuantity, setSelectedQuantity] = useState<number>(0);
@@ -37,7 +57,9 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, b
         const unsubscribe = onSnapshot(collection(db, "users", uid, "portfolio"), (snapshot) => {
             const items: PortfolioItem[] = [];
             snapshot.forEach((doc) => {
-                items.push(doc.data() as PortfolioItem);
+                const data = doc.data() as PortfolioItem;
+                if (!data.symbol) data.symbol = doc.id;
+                items.push(data);
             });
             setPortfolio(items);
         });
@@ -83,7 +105,7 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, b
 
                             const valuation = currentPriceKRW * item.quantity;
                             const profit = valuation - (item.averagePrice * item.quantity);
-                            const profitPercent = (profit / (item.averagePrice * item.quantity)) * 100;
+                            const profitPercent = (profit / Math.abs(item.averagePrice * item.quantity)) * 100;
 
                             // Color logic
                             const priceColor = stockInfo && stockInfo.change > 0 ? "text-red-400" : (stockInfo && stockInfo.change < 0 ? "text-blue-400" : "text-white");
@@ -110,7 +132,30 @@ export default function PortfolioTable({ uid, realtimeStocks, isOwner = false, b
                                     }}
                                 >
                                     <td className="py-2">
-                                        <div className="font-semibold text-white">{item.symbol}</div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="font-semibold text-white">{item.symbol}</div>
+                                            {pendingSymbols.has(item.symbol) && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onTabChange?.('orders');
+                                                    }}
+                                                    className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[10px] font-bold hover:bg-blue-500/30 transition-colors"
+                                                    title="Pending Limit Order"
+                                                >
+                                                    <Clock size={10} />
+                                                    <span>PENDING</span>
+                                                </button>
+                                            )}
+                                            {item.quantity < 0 && (
+                                                <div
+                                                    className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px] font-bold"
+                                                    title="Short Position"
+                                                >
+                                                    <span>SHORT</span>
+                                                </div>
+                                            )}
+                                        </div>
                                         {displayName && (
                                             <div className="text-xs text-gray-400">{displayName}</div>
                                         )}
