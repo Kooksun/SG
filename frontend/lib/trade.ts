@@ -124,7 +124,7 @@ export async function sellStock(uid: string, symbol: string, name: string, price
     if (quantity <= 0) throw new Error("Quantity must be positive");
 
     const amount = Math.floor(price * quantity);
-    const fee = Math.floor(amount * 0.0005); // 0.05% fee
+    const fee = Math.floor(amount * 0.001); // 0.1% fee
     const proceeds = amount - fee;
 
     await runTransaction(db, async (transaction) => {

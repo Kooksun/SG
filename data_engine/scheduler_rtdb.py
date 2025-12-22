@@ -308,7 +308,7 @@ def process_daily_interest_and_liquidation():
                 
                 # Calculate how much to sell
                 remaining_excess = excess_credit - liquidated_amount
-                net_price = current_price * 0.9995
+                net_price = current_price * 0.999 # 0.1% fee
                 shares_needed = int(remaining_excess / net_price) + 1
                 shares_to_sell = min(shares_needed, owned_qty)
                 
@@ -341,7 +341,7 @@ def process_daily_interest_and_liquidation():
 
                     if qty > 0:
                         # Long position
-                        net_price = current_price * 0.9995
+                        net_price = current_price * 0.999 # 0.1% fee
                         shares_needed = int(remaining_excess / net_price) + 1
                         shares_to_sell = min(shares_needed, qty)
                         

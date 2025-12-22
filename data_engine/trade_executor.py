@@ -131,7 +131,7 @@ def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int):
         raise ValueError("Quantity must be positive")
 
     amount = math.floor(price * quantity)
-    fee = math.floor(amount * 0.0005) # 0.05% fee
+    fee = math.floor(amount * 0.001) # 0.1% fee
     proceeds = amount - fee
 
     transaction = db.transaction()
