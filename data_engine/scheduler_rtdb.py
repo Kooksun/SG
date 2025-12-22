@@ -14,6 +14,7 @@ from models import Stock
 import firestore_client  # Initializes Firebase app
 from firestore_client import db as firestore_db
 from trade_executor import buy_stock, sell_stock
+import mission_manager
 from supabase_client import get_supabase
 from dotenv import load_dotenv
 
@@ -380,6 +381,32 @@ def process_daily_interest_and_liquidation():
 
     print(f"[{now_kst()}] Daily Job Completed. Interest applied to {count_interest} users. Liquidated trades: {count_liquidated}")
 
+def process_missions_daily():
+    print(f"[{now_kst()}] Starting Daily Mission Generation Job...")
+    try:
+        users_ref = firestore_db.collection("users")
+        docs = users_ref.stream()
+        count = 0
+        for doc in docs:
+            mission_manager.generate_daily_missions(doc.id)
+            count += 1
+        print(f"[{now_kst()}] Daily Mission Generation Completed for {count} users.")
+    except Exception as e:
+        print(f"Error generating daily missions: {e}")
+
+def update_all_mission_progress():
+    print(f"[{now_kst()}] Updating all users' mission progress...")
+    try:
+        users_ref = firestore_db.collection("users")
+        docs = users_ref.stream()
+        count = 0
+        for doc in docs:
+            mission_manager.update_mission_progress(doc.id)
+            count += 1
+        print(f"[{now_kst()}] Mission progress updated for {count} users.")
+    except Exception as e:
+        print(f"Error updating mission progress: {e}")
+
 def run_once_force():
     print("Force mode: fetching and syncing once.")
     fetch_job(force=True)
@@ -522,6 +549,10 @@ def start_scheduler():
     schedule.every(5).minutes.do(refresh_held_stocks)
     
     schedule.every(1).minutes.do(process_limit_orders)
+    
+    # Schedule missions
+    schedule.every().day.at("00:00").do(process_missions_daily)
+    schedule.every(2).minutes.do(update_all_mission_progress)
 
     # Schedule search requests processing every 5 seconds (not use schedule for high frequency)
     # Actually we'll call it in the loop
@@ -631,17 +662,31 @@ def process_ai_requests():
                     model = genai.GenerativeModel('gemini-3-pro-preview')
                     response = model.generate_content(prompt)
                     result_text = response.text
+
+                    # 5. Generate Portfolio Signature for Change Detection
+                    # Format: symbol:qty|symbol:qty (sorted)
+                    items_for_sig = []
+                    for doc in firestore_db.collection("users").document(uid).collection("portfolio").stream():
+                        d = doc.to_dict()
+                        items_for_sig.append(f"{d.get('symbol')}:{d.get('quantity')}")
+                    items_for_sig.sort()
+                    portfolio_signature = "|".join(items_for_sig)
             
             except Exception as e:
                 print(f"Error processing AI request for {uid}: {e}")
                 result_text = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+                portfolio_signature = None
 
-            # 4. Update RTDB
-            ref.child(uid).update({
+            # 6. Update RTDB
+            update_payload = {
                 'status': 'completed',
                 'result': result_text,
                 'completedAt': now_kst().isoformat()
-            })
+            }
+            if portfolio_signature:
+                update_payload['portfolioSignature'] = portfolio_signature
+                
+            ref.child(uid).update(update_payload)
             print(f"[{now_kst()}] Completed AI request for user {uid}.")
 
 def history_job(force: bool = False):

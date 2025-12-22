@@ -12,7 +12,7 @@ import ActiveOrders from "@/components/ActiveOrders";
 import { UserProfile, Stock } from "@/types";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { applyDailyInterestAndAutoLiquidate } from "@/lib/credit";
-import { LayoutDashboard, PieChart, History } from "lucide-react";
+import { LayoutDashboard, PieChart, History, Coins } from "lucide-react";
 
 interface PortfolioItem {
     symbol: string;
@@ -49,6 +49,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     }, []);
 
     // Listen for AI Analysis Request Status
+    const [aiSignature, setAiSignature] = useState<string | null>(null);
     useEffect(() => {
         if (!uid) return;
         const aiRef = ref(rtdb, `ai_requests/${uid}`);
@@ -56,6 +57,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
             const data = snapshot.val();
             if (data) {
                 setAiStatus(data.status);
+                setAiSignature(data.portfolioSignature || null);
                 if (data.status === 'completed' && data.result) {
                     setAiResult(data.result);
                     setAiTimestamp(data.completedAt);
@@ -64,6 +66,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                 setAiStatus('idle');
                 setAiResult(null);
                 setAiTimestamp(null);
+                setAiSignature(null);
             }
         });
         return () => unsubscribe();
@@ -145,16 +148,39 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
         return () => unsubscribe();
     }, []);
 
+    // Automated AI Refresh Trigger
+    useEffect(() => {
+        if (!uid || aiStatus === 'pending' || portfolio.length === 0) return;
+
+        const currentSignature = [...portfolio]
+            .sort((a, b) => a.symbol.localeCompare(b.symbol))
+            .map(item => `${item.symbol}:${item.quantity}`)
+            .join('|');
+
+        const lastUpdateTime = aiTimestamp ? new Date(aiTimestamp).getTime() : 0;
+        const oneHourAgo = Date.now() - 3600000;
+
+        // Auto request if:
+        // 1. Signature changed (Portfolio changed)
+        // 2. AND Last report is older than 1 hour
+        // 3. ANDaiStatus is not pending
+        if (currentSignature !== aiSignature && lastUpdateTime < oneHourAgo) {
+            console.log("Automated AI Analysis Refresh triggered.");
+            void handleRequestAiAnalysis();
+        }
+    }, [uid, portfolio, aiSignature, aiTimestamp, aiStatus]);
+
     const handleRequestAiAnalysis = async () => {
         if (!uid) return;
         try {
-            await set(ref(rtdb, `ai_requests/${uid}`), {
+            // Use IMPORT update directly to avoid name collision or misunderstanding
+            const { update: rtdbUpdate } = await import("firebase/database");
+            await rtdbUpdate(ref(rtdb, `ai_requests/${uid}`), {
                 status: 'pending',
                 timestamp: Date.now()
             });
         } catch (error) {
             console.error("Failed to request AI analysis:", error);
-            alert("분석 요청 중 오류가 발생했습니다.");
         }
     };
 
@@ -233,6 +259,19 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                                     Orders
                                 </button>
                             )}
+                        </div>
+                    </div>
+
+                    {/* Point Display - Far Right */}
+                    <div className="px-6 py-2 bg-gray-900/40 rounded-lg border border-gray-700/50 flex items-center gap-3 mr-2">
+                        <div className="p-1.5 bg-yellow-500/10 rounded-md">
+                            <Coins size={16} className="text-yellow-500" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-none">My Points</span>
+                            <span className="text-sm font-black text-yellow-400 leading-tight">
+                                {(userProfile.points || 0).toLocaleString()} <span className="text-[10px] font-normal text-gray-400">P</span>
+                            </span>
                         </div>
                     </div>
                 </div>

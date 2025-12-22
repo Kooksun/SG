@@ -11,7 +11,7 @@
     - UI for placing limit buy/sell orders.
 
 ## 2. Gamification & Content (게임화 및 콘텐츠)
-- [ ] **Daily Missions (일일 미션)**
+- [x] **Daily Missions (일일 미션)**
     - System to generate daily random missions (e.g., "Buy 3 different stocks", "Achieve +5% profit").
     - Reward system (bonus seed money or EXP).
 - [ ] **Achievements (업적)**

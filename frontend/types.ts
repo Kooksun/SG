@@ -16,6 +16,7 @@ export interface UserProfile {
     email: string;
     displayName: string;
     balance: number;
+    points?: number;
     creditLimit: number;
     usedCredit: number;
     lastInterestDate?: string;

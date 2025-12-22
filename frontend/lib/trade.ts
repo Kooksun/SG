@@ -262,3 +262,49 @@ export async function placeLimitOrder(uid: string, symbol: string, name: string,
         timestamp: serverTimestamp()
     });
 }
+
+export async function claimMissionReward(uid: string, missionId: string) {
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }); // YYYY-MM-DD
+    const missionRef = doc(db, "users", uid, "missions", today);
+
+    await runTransaction(db, async (transaction) => {
+        const missionDoc = await transaction.get(missionRef);
+        if (!missionDoc.exists()) throw new Error("오늘의 미션 정보를 찾을 수 없습니다.");
+
+        const data = missionDoc.data();
+        const missions = data.missions || [];
+        const index = missions.findIndex((m: any) => m.id === missionId);
+
+        if (index === -1) throw new Error("미션을 찾을 수 없습니다.");
+        const mission = missions[index];
+
+        if (mission.status !== "COMPLETED") {
+            throw new Error("미션이 완료되지 않았거나 이미 보상을 받았습니다.");
+        }
+
+        const reward = mission.reward || 0;
+        const userRef = doc(db, "users", uid);
+
+        // Update User Points
+        transaction.update(userRef, {
+            points: increment(reward)
+        });
+
+        // Update Mission Status
+        missions[index].status = "CLAIMED";
+        transaction.update(missionRef, {
+            missions: missions,
+            updatedAt: serverTimestamp()
+        });
+
+        // Record Reward Transaction
+        const txRef = doc(collection(db, "transactions"));
+        transaction.set(txRef, {
+            uid: uid,
+            type: "REWARD",
+            points: reward,
+            name: `미션 보상: ${mission.title}`,
+            timestamp: serverTimestamp()
+        });
+    });
+}

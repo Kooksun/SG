@@ -193,13 +193,19 @@ export default function DashboardOverview({
                         </div>
 
                         <div className="flex-grow bg-black/20 rounded-lg p-4 border border-white/5 min-h-[300px]">
-                            {aiStatus === 'pending' ? (
+                            {aiStatus === 'pending' && !aiResult ? (
                                 <div className="h-full flex flex-col items-center justify-center text-green-300 space-y-4">
                                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-400"></div>
                                     <span className="animate-pulse font-medium">Analyzing market data & your portfolio...</span>
                                 </div>
                             ) : aiResult ? (
-                                <div className="h-full flex flex-col">
+                                <div className="h-full flex flex-col relative">
+                                    {aiStatus === 'pending' && (
+                                        <div className="absolute top-0 right-0 flex items-center gap-2 bg-green-900/40 px-2 py-1 rounded text-[10px] text-green-400 border border-green-700/50 animate-pulse">
+                                            <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping"></div>
+                                            Updating...
+                                        </div>
+                                    )}
                                     <div className="flex-grow overflow-y-auto leading-relaxed text-green-50 font-light text-base p-2">
                                         <ReactMarkdown
                                             components={{
