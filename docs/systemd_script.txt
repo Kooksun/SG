@@ -1,0 +1,36 @@
+[Unit]
+Description=Stock Game Data Engine
+After=network.target
+
+[Service]
+User=opc
+WorkingDirectory=/home/opc/stockgame/data_engine
+ExecStart=/home/opc/stockgame/venv_new/bin/python /home/opc/stockgame/data_engine/scheduler_rtdb.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+(base) [opc@instance-20251209-1527 ~]$ cat /etc/systemd/system/stock.service 
+[Unit]
+Description=Firebase RTDB Updater Script
+After=network.target
+
+[Service]
+# VM 접속 시 사용하는 사용자 계정으로 설정 (보통 opc)
+User=opc 
+Group=opc
+# 스크립트가 위치한 디렉토리의 절대 경로
+WorkingDirectory=/opt/stockgame
+
+# 🚨 이 부분을 확인된 절대 경로로 수정하세요! 🚨
+# 예시: Miniconda 환경 경로를 사용한 경우
+ExecStart=/opt/miniconda3/envs/myenv/bin/python /opt/stockgame/data_engine/scheduler_rtdb.py
+
+# 스크립트가 종료되었을 때 재시작하도록 설정
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target
