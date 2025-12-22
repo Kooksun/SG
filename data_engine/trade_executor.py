@@ -4,7 +4,7 @@ from firebase_admin import firestore
 from google.cloud.firestore_v1.base_transaction import BaseTransaction
 from firestore_client import db
 
-def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int, order_type: str = "MARKET"):
+def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int, order_type: str = "MARKET", market: str = None):
     """
     Executes a buy order for a user.
     Replicates the logic from frontend/lib/trade.ts
@@ -116,6 +116,7 @@ def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int, ord
             "creditReleased": credit_to_release,
             "profit": profit,
             "orderType": order_type,
+            "market": market,
             "timestamp": firestore.SERVER_TIMESTAMP
         })
         
@@ -123,7 +124,7 @@ def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int, ord
 
     return update_in_transaction(transaction)
 
-def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int, order_type: str = "MARKET"):
+def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int, order_type: str = "MARKET", market: str = None):
     """
     Executes a sell order for a user.
     Replicates the logic from frontend/lib/trade.ts
@@ -249,6 +250,7 @@ def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int, or
             "fee": fee,
             "profit": profit,
             "orderType": order_type,
+            "market": market,
             "creditUsed": credit_to_use,
             "creditRepaid": credit_repayment,
             "timestamp": firestore.SERVER_TIMESTAMP

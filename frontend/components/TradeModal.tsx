@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Stock } from "@/types";
 import { buyStock, sellStock, placeLimitOrder } from "@/lib/trade";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { ref, onValue, get, child } from "firebase/database";
+import { ref, onValue, get, child, set } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { supabase } from "@/lib/supabase";
 import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts';
@@ -28,6 +28,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     const [exchangeRate, setExchangeRate] = useState(1400);
     const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">("MARKET");
     const [limitPrice, setLimitPrice] = useState(0);
+    const [chartLoading, setChartLoading] = useState(false);
 
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartInfoRef = useRef<HTMLDivElement>(null);
@@ -51,6 +52,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
         if (!isOpen || !stock.symbol) return;
 
         const fetchHistory = async () => {
+            setChartLoading(true);
             try {
                 const { data, error } = await supabase
                     .from('stock_history')
@@ -58,9 +60,13 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                     .eq('symbol', stock.symbol)
                     .order('time', { ascending: true });
 
-                if (error) throw error;
+                if (error) {
+                    console.error("Supabase query error:", error);
+                    throw error;
+                }
 
                 if (data && data.length > 0 && chartRef.current && seriesRef.current && volumeSeriesRef.current && ma5SeriesRef.current && ma20SeriesRef.current) {
+                    // ... (기존 데이터 세팅 로직)
                     const candlestickData = data.map(d => ({
                         time: d.time,
                         open: d.open,
@@ -88,9 +94,33 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
                     ma5SeriesRef.current.setData(calculateMA(5));
                     ma20SeriesRef.current.setData(calculateMA(20));
+                } else if ((!data || data.length === 0) && stock.symbol) {
+                    // Trigger history fetch request to backend via RTDB
+                    console.log(`History data empty for ${stock.symbol}. Requesting fetch...`);
+                    const historyReqRef = ref(rtdb, `history_requests/${stock.symbol}`);
+                    const snapshot = await get(historyReqRef);
+
+                    if (!snapshot.exists() || snapshot.val().status === 'error') {
+                        await set(historyReqRef, {
+                            status: 'pending',
+                            requestedAt: new Date().toISOString()
+                        });
+                    }
+
+                    // Listen for completion to re-fetch
+                    const unsubscribe = onValue(historyReqRef, (snap) => {
+                        const val = snap.val();
+                        if (val && val.status === 'completed') {
+                            console.log(`History fetch completed for ${stock.symbol}. Re-fetching...`);
+                            unsubscribe(); // stop listening
+                            fetchHistory(); // Try again
+                        }
+                    });
                 }
-            } catch (e) {
-                console.error("Failed to fetch history from Supabase:", e);
+            } catch (e: any) {
+                console.error("Failed to fetch history from Supabase:", e?.message || e);
+            } finally {
+                setChartLoading(false);
             }
         };
 
@@ -340,12 +370,12 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
         try {
             if (orderType === "MARKET") {
                 if (mode === "BUY") {
-                    await buyStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity);
+                    await buyStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity, stock.market);
                 } else {
-                    await sellStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity);
+                    await sellStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity, stock.market);
                 }
             } else {
-                await placeLimitOrder(user.uid, stock.symbol, stock.name, mode, limitPrice, quantity);
+                await placeLimitOrder(user.uid, stock.symbol, stock.name, mode, limitPrice, quantity, stock.market);
             }
             onClose();
         } catch (err: any) {
@@ -372,8 +402,16 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
                 <div className="flex flex-col md:flex-row md:gap-8">
                     {/* Chart Column */}
-                    <div className="w-full md:w-[600px] mb-6 md:mb-0 shrink-0 flex flex-col gap-2">
-                        <div ref={chartContainerRef} className="w-full h-[300px] md:h-[450px] bg-gray-900 rounded border border-gray-700 overflow-hidden relative" />
+                    <div className="w-full md:w-[600px] mb-6 md:mb-0 shrink-0 flex flex-col gap-2 relative">
+                        <div className="relative">
+                            <div ref={chartContainerRef} className="w-full h-[300px] md:h-[450px] bg-gray-900 rounded border border-gray-700 overflow-hidden relative" />
+                            {chartLoading && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/60 backdrop-blur-[2px] z-20 pointer-events-none transition-opacity duration-300">
+                                    <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
+                                    <div className="text-sm font-medium text-blue-200 animate-pulse">차트 데이터를 불러오는 중...</div>
+                                </div>
+                            )}
+                        </div>
                         <div ref={chartInfoRef} className="min-h-[60px] bg-gray-900/50 p-2 rounded border border-gray-700 text-xs text-gray-400 flex flex-col justify-center">
                             차트 위에 마우스를 올리면 상세 정보를 확인할 수 있습니다.
                         </div>

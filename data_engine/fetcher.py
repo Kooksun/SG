@@ -51,9 +51,13 @@ def _build_stock_from_row(row, currency='KRW') -> Stock:
     # This function is primarily for the KRX listing format.
     symbol = str(row['Code'])
     name = row['Name']
-    # Market: KOSPI -> KRX, KOSDAQ/KOSDAQ GLOBAL -> KOSDAQ
-    raw_market = row.get('Market', 'KRX')
-    market = 'KOSDAQ' if 'KOSDAQ' in raw_market else 'KRX'
+    raw_market = row.get('Market', 'KOSPI')
+    if 'KOSDAQ' in raw_market:
+        market = 'KOSDAQ'
+    elif 'KOSPI' in raw_market:
+        market = 'KRX'  # Google Finance uses KRX for KOSPI
+    else:
+        market = 'KRX'
     
     # KR stocks are usually integer prices, but let's use float to be safe and consistent
     price = _to_float(row['Close'])
@@ -149,7 +153,7 @@ def fetch_us_stocks() -> Dict[str, Stock]:
                 change_percent=change_percent,
                 updated_at=datetime.now(MARKET_TZ),
                 currency='USD',
-                market='NASDAQ'
+                market='NASDAQ'  # Default for US in this app
             )
             snapshot[stock.symbol] = stock
             
@@ -206,6 +210,19 @@ def fetch_single_stock(symbol: str) -> Optional[Stock]:
             change = 0.0
             change_percent = 0.0
 
+        # Try to find market info from StockListing if KR
+        market = 'NASDAQ' if is_us else 'KRX'
+        if not is_us:
+            try:
+                # We could cache this but for a single fetch it's okay for now
+                listing = fdr.StockListing('KRX')
+                row = listing[listing['Code'] == symbol]
+                if not row.empty:
+                    raw_market = row.iloc[0]['Market']
+                    market = 'KOSDAQ' if 'KOSDAQ' in raw_market else 'KRX'
+            except:
+                pass
+
         return Stock(
             symbol=symbol,
             name=name,
@@ -214,7 +231,7 @@ def fetch_single_stock(symbol: str) -> Optional[Stock]:
             change_percent=change_percent,
             updated_at=datetime.now(MARKET_TZ),
             currency=currency,
-            market='NASDAQ' if is_us else 'KRX' # simplistic fallback for KRX
+            market=market
         )
     except Exception as e:
         print(f"Error fetching single stock {symbol}: {e}")

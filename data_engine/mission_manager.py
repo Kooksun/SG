@@ -133,19 +133,28 @@ def get_today_str():
     kst = timezone(timedelta(hours=9))
     return datetime.now(kst).strftime("%Y-%m-%d")
 
-def generate_daily_missions(uid: str) -> List[Dict[str, Any]]:
+def generate_daily_missions(uid: str, force_ids: List[str] = None) -> List[Dict[str, Any]]:
     """
-    Generate 3 random missions for the user for today.
+    Generate 3 random missions for the user for today, or force specific ones.
     """
     today_str = get_today_str()
     mission_ref = db.collection("users").document(uid).collection("missions").document(today_str)
     
     doc = mission_ref.get()
-    if doc.exists:
+    # If not forcing, return existing ones if they exist
+    if doc.exists and not force_ids:
         return doc.to_dict().get("missions", [])
 
-    # Select 3 unique missions
-    selected = random.sample(MISSION_POOL, 3)
+    if force_ids:
+        selected = [m for m in MISSION_POOL if m["id"] in force_ids]
+        # Fill with random if less than 3 forced
+        if len(selected) < 3:
+            remaining = [m for m in MISSION_POOL if m["id"] not in [s["id"] for s in selected]]
+            selected += random.sample(remaining, 3 - len(selected))
+    else:
+        # Toggle: 샘플링 시 MISSION_POOL의 크기보다 큰 값을 요청하지 않도록 주의
+        count = min(3, len(MISSION_POOL))
+        selected = random.sample(MISSION_POOL, count)
     missions = []
     for m in selected:
         missions.append({
@@ -231,8 +240,11 @@ def update_mission_progress(uid: str):
         
         m_id = m["id"]
         
-        # Helper to check if a symbol is US (simple heuristic for now)
-        def is_us(symbol):
+        # Helper to check if a symbol is US
+        def is_us_tx(t):
+            m = t.get("market", "")
+            if m == "US": return True
+            symbol = t.get("symbol", "")
             return not symbol.isdigit()
 
         if m_id == "active_trader":
@@ -241,13 +253,12 @@ def update_mission_progress(uid: str):
             buy_txs = [t for t in transactions if t["type"] == "BUY"]
             new_current = len(set(t["symbol"] for t in buy_txs))
         elif m_id == "us_market_explorer":
-            new_current = len([t for t in transactions if is_us(t.get("symbol", ""))])
+            new_current = len([t for t in transactions if is_us_tx(t)])
         elif m_id == "kosdaq_hunter":
-            # This would require market info in Transaction doc, which we should add or look up
-            # For now, let's assume market info might be there or we skip/simplified
             new_current = len([t for t in transactions if t.get("market") == "KOSDAQ"])
         elif m_id == "kospi_lover":
-            new_current = len([t for t in transactions if t.get("market") == "KOSPI" and t["type"] == "BUY"])
+            # Handle both KOSPI and legacy/fallback KRX
+            new_current = len([t for t in transactions if t.get("market") in ["KOSPI", "KRX"] and t["type"] == "BUY"])
         elif m_id == "profit_taste":
             new_current = sum(t.get("profit", 0) for t in transactions)
         elif m_id == "perfect_sell":

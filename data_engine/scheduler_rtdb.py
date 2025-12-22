@@ -24,7 +24,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 MARKET_TZ = ZoneInfo("Asia/Seoul")
 FETCH_INTERVAL_MINUTES = 1
 SYNC_INTERVAL_MINUTES = 1
-STOCK_LIMIT = 200
+STOCK_LIMIT = 500
 DAILY_INTEREST_RATE = 0.001  # 0.1% per day
 
 latest_snapshot: Dict[str, Stock] = {}
@@ -41,6 +41,7 @@ def has_stock_changed(new: Stock, old: Stock) -> bool:
         new.change != old.change,
         round(new.change_percent, 4) != round(old.change_percent, 4),
         new.name != old.name,
+        new.market != old.market,
     ))
 
 def fetch_job(force: bool = False):
@@ -509,10 +510,11 @@ def process_limit_orders():
             if execute:
                 try:
                     print(f"  -> Executing LIMIT {order_type} for user {uid}: {symbol} @ {current_price} (Target: {target_price})")
+                    market = stock_info.market
                     if order_type == "BUY":
-                        buy_stock(uid, symbol, name, current_price, quantity, order_type="LIMIT")
+                        buy_stock(uid, symbol, name, current_price, quantity, order_type="LIMIT", market=market)
                     else:
-                        sell_stock(uid, symbol, name, current_price, quantity, order_type="LIMIT")
+                        sell_stock(uid, symbol, name, current_price, quantity, order_type="LIMIT", market=market)
                     
                     orders_ref.document(order_doc.id).update({
                         "status": "COMPLETED",
@@ -567,6 +569,7 @@ def start_scheduler():
         try:
             process_ai_requests()
             process_search_requests()
+            process_history_requests()
         except Exception as e:
             print(f"Error in background processing: {e}")
             
@@ -828,6 +831,47 @@ def process_search_requests():
             except Exception as e:
                 print(f"Error processing Search request for {uid}: {e}")
                 ref.child(uid).update({
+                    'status': 'error',
+                    'error': str(e)
+                })
+
+def process_history_requests():
+    """
+    Check RTDB for pending history fetch requests.
+    path: history_requests/{symbol}
+    """
+    ref = rtdb_admin.reference('history_requests')
+    requests = ref.get()
+    
+    if not requests:
+        return
+
+    for symbol, data in requests.items():
+        # data might be a boolean True or a dict with status
+        status = 'pending'
+        if isinstance(data, dict):
+            status = data.get('status', 'pending')
+        elif data == True:
+            status = 'pending'
+            
+        if status == 'pending':
+            print(f"[{now_kst()}] Processing History request for symbol: {symbol}")
+            try:
+                # Reuse the existing update_single_stock_history
+                success = update_single_stock_history(symbol)
+                if success:
+                    ref.child(symbol).set({
+                        'status': 'completed',
+                        'updatedAt': now_kst().isoformat()
+                    })
+                else:
+                    ref.child(symbol).update({
+                        'status': 'error',
+                        'error': 'Fetch returned no data or failed'
+                    })
+            except Exception as e:
+                print(f"Error processing History request for {symbol}: {e}")
+                ref.child(symbol).update({
                     'status': 'error',
                     'error': str(e)
                 })

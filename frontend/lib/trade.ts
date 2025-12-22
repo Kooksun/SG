@@ -1,7 +1,7 @@
 import { db } from "@/lib/firebase";
 import { doc, runTransaction, serverTimestamp, increment, collection, setDoc } from "firebase/firestore";
 
-export async function buyStock(uid: string, symbol: string, name: string, price: number, quantity: number) {
+export async function buyStock(uid: string, symbol: string, name: string, price: number, quantity: number, market: string = "KRX") {
     if (quantity <= 0) throw new Error("Quantity must be positive");
 
     const cost = Math.floor(price * quantity);
@@ -114,6 +114,7 @@ export async function buyStock(uid: string, symbol: string, name: string, price:
             fee: 0,
             profit: profit,
             orderType: "MARKET",
+            market: market,
             creditUsed: creditToUse,
             creditReleased: creditToRelease,
             timestamp: serverTimestamp()
@@ -121,7 +122,7 @@ export async function buyStock(uid: string, symbol: string, name: string, price:
     });
 }
 
-export async function sellStock(uid: string, symbol: string, name: string, price: number, quantity: number) {
+export async function sellStock(uid: string, symbol: string, name: string, price: number, quantity: number, market: string = "KRX") {
     if (quantity <= 0) throw new Error("Quantity must be positive");
 
     const amount = Math.floor(price * quantity);
@@ -240,6 +241,7 @@ export async function sellStock(uid: string, symbol: string, name: string, price
             fee: fee,
             profit: currentQty > 0 ? proceeds - Math.floor(currentAvg * Math.min(currentQty, quantity)) : 0,
             orderType: "MARKET",
+            market: market,
             creditUsed: creditToUse,
             creditRepaid: creditRepayment,
             timestamp: serverTimestamp()
@@ -247,7 +249,7 @@ export async function sellStock(uid: string, symbol: string, name: string, price
     });
 }
 
-export async function placeLimitOrder(uid: string, symbol: string, name: string, type: "BUY" | "SELL", targetPrice: number, quantity: number) {
+export async function placeLimitOrder(uid: string, symbol: string, name: string, type: "BUY" | "SELL", targetPrice: number, quantity: number, market: string = "KRX") {
     if (quantity <= 0) throw new Error("Quantity must be positive");
     if (targetPrice <= 0) throw new Error("Target price must be positive");
 
@@ -260,6 +262,7 @@ export async function placeLimitOrder(uid: string, symbol: string, name: string,
         orderType: "LIMIT",
         targetPrice,
         quantity,
+        market,
         status: "PENDING",
         timestamp: serverTimestamp()
     });
