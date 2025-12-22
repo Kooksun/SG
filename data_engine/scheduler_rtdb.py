@@ -510,9 +510,9 @@ def process_limit_orders():
                 try:
                     print(f"  -> Executing LIMIT {order_type} for user {uid}: {symbol} @ {current_price} (Target: {target_price})")
                     if order_type == "BUY":
-                        buy_stock(uid, symbol, name, current_price, quantity)
+                        buy_stock(uid, symbol, name, current_price, quantity, order_type="LIMIT")
                     else:
-                        sell_stock(uid, symbol, name, current_price, quantity)
+                        sell_stock(uid, symbol, name, current_price, quantity, order_type="LIMIT")
                     
                     orders_ref.document(order_doc.id).update({
                         "status": "COMPLETED",
@@ -552,7 +552,7 @@ def start_scheduler():
     
     # Schedule missions
     schedule.every().day.at("00:00").do(process_missions_daily)
-    schedule.every(2).minutes.do(update_all_mission_progress)
+    schedule.every(1).minutes.do(update_all_mission_progress)
 
     # Schedule search requests processing every 5 seconds (not use schedule for high frequency)
     # Actually we'll call it in the loop
@@ -594,6 +594,7 @@ def process_ai_requests():
     for uid, data in requests.items():
         if isinstance(data, dict) and data.get('status') == 'pending':
             print(f"[{now_kst()}] Processing AI request for user {uid}...")
+            portfolio_signature = None
             
             try:
                 # 1. Fetch User Portfolio from Firestore

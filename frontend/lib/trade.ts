@@ -113,6 +113,7 @@ export async function buyStock(uid: string, symbol: string, name: string, price:
             amount: cost,
             fee: 0,
             profit: profit,
+            orderType: "MARKET",
             creditUsed: creditToUse,
             creditReleased: creditToRelease,
             timestamp: serverTimestamp()
@@ -238,6 +239,7 @@ export async function sellStock(uid: string, symbol: string, name: string, price
             amount: amount,
             fee: fee,
             profit: currentQty > 0 ? proceeds - Math.floor(currentAvg * Math.min(currentQty, quantity)) : 0,
+            orderType: "MARKET",
             creditUsed: creditToUse,
             creditRepaid: creditRepayment,
             timestamp: serverTimestamp()
