@@ -592,38 +592,43 @@ def process_ai_requests():
                 if not portfolio_text:
                     result_text = "보유한 주식이 없습니다. 포트폴리오를 구성한 뒤 다시 요청해주세요."
                 else:
-                    # 2. Fetch User Credit Info
-                    credit_text = ""
+                    # 2. Fetch Detailed User Info for Context
+                    user_info_text = ""
                     try:
                         user_doc = firestore_db.collection("users").document(uid).get()
                         if user_doc.exists:
                             user_data = user_doc.to_dict()
+                            balance = user_data.get('balance', 0)
                             used_credit = user_data.get('usedCredit', 0)
-                            if used_credit > 0:
-                                credit_limit = user_data.get('creditLimit', 0)
-                                credit_text = (
-                                    f"\n\n[추가 정보: 신용(레버리지) 사용 중]\n"
-                                    f"- 사용 신용 금액: {used_credit:,.0f} KRW\n"
-                                    f"- 신용 한도: {credit_limit:,.0f} KRW\n"
-                                    "사용자가 빚을 내어 투자(신용 거래) 중이므로, 반대매매 위험성이나 이자 부담을 고려하여 "
-                                    "리스크 관리에 대해 더 강력하고 구체적인 조언을 포함해줘."
-                                )
+                            credit_limit = user_data.get('creditLimit', 0)
+                            
+                            leverage_ratio = (used_credit / credit_limit * 100) if credit_limit > 0 else 0
+                            
+                            user_info_text = (
+                                f"\n[사용자 자산 상태]\n"
+                                f"- 현재 현금 잔고: {balance:,.0f} KRW\n"
+                                f"- 사용 중인 신용/레버리지: {used_credit:,.0f} KRW (한도 대비 {leverage_ratio:.1f}% 사용)\n"
+                                f"- 전체 신용 한도: {credit_limit:,.0f} KRW"
+                            )
                     except Exception as e:
-                        print(f"Error fetching user credit info: {e}")
+                        print(f"Error fetching user info for AI: {e}")
 
-                    # 3. Construct Prompt
+                    # 3. Construct Refined Prompt
                     prompt = (
-                        f"너는 주식 투자 게임의 AI 조언가야. 사용자의 현재 포트폴리오는 다음과 같아:\n\n"
-                        f"{chr(10).join(portfolio_text)}\n\n"
-                        f"총 평가액: {total_value:,.0f} KRW"
-                        f"{credit_text}\n\n"
-                        "이 포트폴리오에 대해 간단명료하게 분석해주고, 리스크 관리나 수익률 개선을 위한 구체적인 조언을 3~4문장으로 해줘. "
-                        "말투는 친절하고 전문적으로 한국어로 해줘."
+                        f"너는 주식 투자 게임의 전문 AI 조언가야. 사용자의 현재 상황은 다음과 같아:\n\n"
+                        f"[포트폴리오 구성]\n"
+                        f"{chr(10).join(portfolio_text)}\n"
+                        f"- 주식 총 평가액(Net): {total_value:,.0f} KRW\n"
+                        f"{user_info_text}\n\n"
+                        "위 데이터를 바탕으로 포트폴리오를 분석하고 다음 가이드라인에 따라 조언해줘:\n"
+                        "1. **리스크 평가**: 신용 사용량(레버리지 비율)이 적절한지 판단해줘. (사용량이 한도 대비 매우 적으면 과도한 경고보다는 안정적이라고 평가해줘)\n"
+                        "2. **공매도 분석**: 공매도(Short) 포지션이 있다면, 주가 상승 시 손실이 무한대일 수 있다는 점을 고려하여 적절한 리스크 관리를 조언해줘.\n"
+                        "3. **수익성 및 분산**: 포트폴리오의 집중도나 종목 구성에 대해 전문적인 의견을 제시해줘.\n\n"
+                        "답변은 3~4문장으로 간단명료하게, 친절하고 전문적인 한국어로 작성해줘."
                     )
                     
-                    # 3. Call Gemini API
-                    # Using gemini-2.5-flash as it is available for this key
-                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    # 4. Call Gemini API
+                    model = genai.GenerativeModel('gemini-3-pro-preview')
                     response = model.generate_content(prompt)
                     result_text = response.text
             

@@ -4,6 +4,7 @@ import React from 'react';
 import { UserProfile } from "@/types";
 import AssetAllocationChart from "./AssetAllocationChart";
 import { CreditCard, Wallet, TrendingUp, DollarSign } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface DashboardOverviewProps {
     userProfile: UserProfile;
@@ -199,8 +200,22 @@ export default function DashboardOverview({
                                 </div>
                             ) : aiResult ? (
                                 <div className="h-full flex flex-col">
-                                    <div className="flex-grow overflow-y-auto leading-relaxed text-green-50 space-y-4 whitespace-pre-wrap font-light text-base p-2">
-                                        {aiResult}
+                                    <div className="flex-grow overflow-y-auto leading-relaxed text-green-50 font-light text-base p-2">
+                                        <ReactMarkdown
+                                            components={{
+                                                h1: ({ ...props }) => <h1 className="text-xl font-bold mt-4 mb-2 text-green-200" {...props} />,
+                                                h2: ({ ...props }) => <h2 className="text-lg font-bold mt-3 mb-1 text-green-300" {...props} />,
+                                                h3: ({ ...props }) => <h3 className="text-md font-bold mt-2 mb-1 text-green-400" {...props} />,
+                                                p: ({ ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+                                                ul: ({ ...props }) => <ul className="list-disc list-inside mb-3 ml-2" {...props} />,
+                                                ol: ({ ...props }) => <ol className="list-decimal list-inside mb-3 ml-2" {...props} />,
+                                                li: ({ ...props }) => <li className="mb-1" {...props} />,
+                                                strong: ({ ...props }) => <strong className="font-bold text-green-300" {...props} />,
+                                                blockquote: ({ ...props }) => <blockquote className="border-l-4 border-green-700 pl-4 py-1 my-3 bg-green-900/20 italic" {...props} />,
+                                            }}
+                                        >
+                                            {aiResult}
+                                        </ReactMarkdown>
                                     </div>
                                     <div className="mt-4 pt-4 border-t border-white/10 text-xs text-green-500/70 text-right">
                                         Last Updated: {aiTimestamp ? new Date(aiTimestamp).toLocaleString() : ''}
