@@ -70,7 +70,7 @@ def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int):
         
         # Update User
         update_data = {
-            "balance": firestore.Increment(credit_to_release - cash_to_use),
+            "balance": firestore.Increment(-cash_to_use),
             "usedCredit": firestore.Increment(credit_to_use - credit_to_release)
         }
         if profit != 0:
@@ -201,7 +201,7 @@ def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int):
 
         # Updates
         update_data = {
-            "balance": firestore.Increment(cash_to_recieve),
+            "balance": firestore.Increment(proceeds - credit_repayment),
             "usedCredit": firestore.Increment(credit_to_use - credit_repayment)
         }
         # In trade_executor.py, we also track totalAssetValue change (realized profit)

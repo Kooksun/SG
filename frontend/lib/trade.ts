@@ -67,7 +67,7 @@ export async function buyStock(uid: string, symbol: string, name: string, price:
 
         // WRITES
         transaction.update(userRef, {
-            balance: increment(creditToRelease - cashToUse),
+            balance: increment(-cashToUse),
             usedCredit: increment(creditToUse - creditToRelease)
         });
 
@@ -196,7 +196,7 @@ export async function sellStock(uid: string, symbol: string, name: string, price
 
         // WRITES
         transaction.update(userRef, {
-            balance: increment(cashToRecieve),
+            balance: increment(proceeds - creditRepayment),
             usedCredit: increment(creditToUse - creditRepayment)
         });
 

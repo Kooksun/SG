@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 interface PortfolioItem {
     symbol: string;
     quantity: number;
+    averagePrice?: number;
 }
 
 export default function Leaderboard() {
@@ -80,6 +81,7 @@ export default function Leaderboard() {
                     items.push({
                         symbol: data.symbol,
                         quantity: data.quantity,
+                        averagePrice: data.averagePrice,
                     });
                 });
                 setPortfolios((prev) => ({
@@ -116,11 +118,33 @@ export default function Leaderboard() {
                 const stock = stocks[item.symbol];
                 if (!stock) return total;
                 const price = stock.currency === 'USD' ? stock.price * exchangeRate : stock.price;
+                return total + price * item.quantity; // item.quantity is negative for shorts
+            }, 0);
+
+            // For short positions, usedCredit includes a liability (margin) equal to the initial sell value.
+            // To get net equity, we must add back that margin because 'holdingsValue' already subtracted the current cost to cover.
+            // Equity = Cash + LongValue - ShortValue - (TotalUsedCredit - ShortInitialValue)
+            // Equity = balance + LongValue - ShortValue - TotalUsedCredit + ShortInitialValue
+            const shortInitialValue = holdings.reduce((total, item) => {
+                if (item.quantity < 0) {
+                    return total + (Math.abs(item.quantity) * (item.averagePrice || 0));
+                }
+                return total;
+            }, 0);
+
+            const usedCredit = typeof user.usedCredit === "number" ? user.usedCredit : 0;
+
+            // totalAssets for display: Cash + LongValue
+            const longValue = holdings.reduce((total, item) => {
+                if (item.quantity <= 0) return total;
+                const stock = stocks[item.symbol];
+                if (!stock) return total;
+                const price = stock.currency === 'USD' ? stock.price * exchangeRate : stock.price;
                 return total + price * item.quantity;
             }, 0);
-            const usedCredit = typeof user.usedCredit === "number" ? user.usedCredit : 0;
-            const totalAssets = user.balance + holdingsValue;
-            const equity = totalAssets - usedCredit; // net assets after accounting for borrowed credit
+            const totalAssets = (user.balance - shortInitialValue) + longValue;
+
+            const equity = user.balance + holdingsValue - (usedCredit - shortInitialValue);
             const startingBalance = typeof user.startingBalance === "number" ? user.startingBalance : 100000000;
             const profit = equity - startingBalance;
             const returnPct = startingBalance ? (profit / startingBalance) * 100 : 0;

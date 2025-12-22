@@ -577,14 +577,17 @@ def process_ai_requests():
                     symbol = item.get('symbol')
                     quantity = item.get('quantity', 0)
                     
-                    if quantity > 0:
+                    if quantity != 0:
                         stock_info = latest_snapshot.get(symbol)
                         current_price = stock_info.price if stock_info else 0
                         name = stock_info.name if stock_info else symbol
                         
+                        # Use Absolute valuation for total value calculation but indicate short in text
                         value = quantity * current_price
-                        total_value += value
-                        portfolio_text.append(f"- {name} ({symbol}): {quantity}주 (평가액: {value:,.0f} KRW)")
+                        total_value += value # Net asset value
+                        
+                        pos_type = "매수" if quantity > 0 else "공매도"
+                        portfolio_text.append(f"- {name} ({symbol}): {quantity}주 ({pos_type}, 평가액: {value:,.0f} KRW)")
 
                 if not portfolio_text:
                     result_text = "보유한 주식이 없습니다. 포트폴리오를 구성한 뒤 다시 요청해주세요."

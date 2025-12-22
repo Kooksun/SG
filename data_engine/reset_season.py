@@ -1,7 +1,7 @@
 import argparse
 import sys
 from firebase_admin import db as rtdb_admin
-from firebase_admin import firestore
+from firebase_admin import firestore, auth
 import firestore_client  # Initializes Firebase app
 from firestore_client import db as firestore_db
 
@@ -21,64 +21,71 @@ def delete_collection(coll_ref, batch_size):
         return deleted + delete_collection(coll_ref, batch_size)
     return deleted
 
-def delete_user_data(dry_run=False):
-    print("Fetching users...")
-    users_ref = firestore_db.collection("users")
-    docs = users_ref.stream()
+def delete_auth_users(dry_run=False):
+    print("Fetching Firebase Authentication users...")
+    
+    users = []
+    page = auth.list_users()
+    while page:
+        users.extend(page.users)
+        page = page.get_next_page()
+    
+    count = len(users)
+    print(f"Found {count} users in Firebase Authentication.")
+    
+    if count == 0:
+        return
+
+    if not dry_run:
+        uids = [user.uid for user in users]
+        # auth.delete_users can handle up to 1000 users per call
+        for i in range(0, len(uids), 1000):
+            batch = uids[i:i+1000]
+            result = auth.delete_users(batch)
+            print(f"  - Deleted {result.success_count} users. Errors: {result.failure_count}")
+    else:
+        for user in users[:5]:
+            print(f"  [Dry Run] Would delete user: {user.uid} ({user.email or 'No Email'})")
+        if count > 5:
+            print(f"  [Dry Run] ... and {count - 5} more users.")
+
+def delete_all_firestore_collections(dry_run=False):
+    print("Fetching all top-level Firestore collections...")
+    collections = firestore_db.collections()
     
     count = 0
-    for doc in docs:
-        uid = doc.id
-        print(f"Found user: {uid}")
-        
+    for coll_ref in collections:
+        print(f"Processing collection: {coll_ref.id}")
         if not dry_run:
-            # 1. Delete Subcollections (Portfolio)
-            portfolio_ref = users_ref.document(uid).collection("portfolio")
-            deleted_items = delete_collection(portfolio_ref, 100)
-            if deleted_items > 0:
-                print(f"  - Deleted {deleted_items} portfolio items.")
-            
-            # 2. Delete User Document
-            doc.reference.delete()
-            print(f"  - Deleted user profile.")
+            deleted_items = delete_collection(coll_ref, 100)
+            print(f"  - Deleted {deleted_items} documents from '{coll_ref.id}'.")
         else:
-            print(f"  [Dry Run] Would delete user {uid} and their portfolio.")
-            
+            print(f"  [Dry Run] Would delete all documents in collection '{coll_ref.id}'.")
         count += 1
-        
-    print(f"Total users processed: {count}")
-
-def delete_transactions(dry_run=False):
-    print("Fetching transactions...")
-    tx_ref = firestore_db.collection("transactions")
     
-    if dry_run:
-        # Just count them for dry run (counting huge collections might be slow but safe for now)
-        # Using aggregation query is better for counting but simple stream limit is okay for small scale
-        # For safety/speed let's just stream a few or check existence
-        docs = tx_ref.limit(5).stream()
-        found = sum(1 for _ in docs)
-        if found > 0:
-             print("  [Dry Run] Found transactions. Would delete all documents in 'transactions' collection.")
-        else:
-             print("  [Dry Run] No transactions found.")
+    if count == 0:
+        print("No Firestore collections found.")
     else:
-        deleted = delete_collection(tx_ref, 100)
-        print(f"Total transactions deleted: {deleted}")
+        print(f"Total collections processed: {count}")
+
+# delete_transactions is now redundant as we delete ALL collections, but kept here for reference if needed
+# or can be removed. Let's remove it to keep it clean.
 
 def delete_rtdb_nodes(dry_run=False):
-    print("Checking RTDB nodes...")
-    ref = rtdb_admin.reference('ai_requests')
+    nodes = ['ai_requests', 'custom_symbols', 'search_requests', 'search_results']
+    print(f"Checking RTDB nodes: {', '.join(nodes)}")
     
-    if dry_run:
-        data = ref.get()
-        if data:
-            print(f"  [Dry Run] Would delete 'ai_requests' node containing {len(data)} items.")
+    for node in nodes:
+        ref = rtdb_admin.reference(node)
+        if dry_run:
+            data = ref.get()
+            if data:
+                print(f"  [Dry Run] Would delete '{node}' node containing {len(data) if isinstance(data, (dict, list)) else 1} items.")
+            else:
+                print(f"  [Dry Run] '{node}' node is empty or missing.")
         else:
-            print("  [Dry Run] 'ai_requests' node is empty or missing.")
-    else:
-        ref.delete()
-        print("Deleted 'ai_requests' node from RTDB.")
+            ref.delete()
+            print(f"Deleted '{node}' node from RTDB.")
 
 def main():
     parser = argparse.ArgumentParser(description="RESET SEASON: Deletes all user data to start a new season.")
@@ -102,11 +109,11 @@ def main():
             print("Aborted.")
             sys.exit(0)
 
-    print("\n--- Step 1: Cleaning Firestore Users & Portfolios ---")
-    delete_user_data(dry_run=args.dry_run)
-    
-    print("\n--- Step 2: Cleaning Firestore Transactions ---")
-    delete_transactions(dry_run=args.dry_run)
+    print("\n--- Step 1: Cleaning Firebase Authentication Users ---")
+    delete_auth_users(dry_run=args.dry_run)
+
+    print("\n--- Step 2: Cleaning ALL Firestore Collections ---")
+    delete_all_firestore_collections(dry_run=args.dry_run)
     
     print("\n--- Step 3: Cleaning RTDB User Data ---")
     delete_rtdb_nodes(dry_run=args.dry_run)

@@ -47,10 +47,11 @@ export default function DashboardOverview({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-gray-800 p-4 rounded-lg shadow border border-gray-700">
                     <div className="flex items-center justify-between mb-2">
-                        <div className="text-gray-400 text-sm">Net Worth</div>
+                        <div className="text-gray-400 text-sm">Net Worth (Equity)</div>
                         <Wallet className="w-4 h-4 text-emerald-400" />
                     </div>
                     <div className="text-2xl font-bold text-white">{netWorth.toLocaleString()} <span className="text-sm font-normal text-gray-500">KRW</span></div>
+                    <div className="text-[10px] text-gray-500 mt-1">Cash + Longs - Shorts - Debt</div>
                 </div>
                 <div className="bg-gray-800 p-4 rounded-lg shadow border border-gray-700">
                     <div className="flex items-center justify-between mb-2">
@@ -58,16 +59,28 @@ export default function DashboardOverview({
                         <DollarSign className="w-4 h-4 text-blue-400" />
                     </div>
                     <div className="text-2xl font-bold text-white">{userProfile.balance.toLocaleString()} <span className="text-sm font-normal text-gray-500">KRW</span></div>
+                    {shortInitialValue > 0 && (
+                        <div className="text-[10px] text-gray-400 mt-1 flex flex-col">
+                            <div className="flex justify-between">
+                                <span>Pure Cash:</span>
+                                <span>{(userProfile.balance - shortInitialValue).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-blue-400">
+                                <span>Short Proceeds:</span>
+                                <span>+ {shortInitialValue.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <div className="bg-gray-800 p-4 rounded-lg shadow border border-gray-700">
                     <div className="flex items-center justify-between mb-2">
-                        <div className="text-gray-400 text-sm">Stock Value (Net)</div>
+                        <div className="text-gray-400 text-sm">Market Value (Net)</div>
                         <TrendingUp className="w-4 h-4 text-purple-400" />
                     </div>
                     <div className="text-2xl font-bold text-white">{(stockValue - shortValue).toLocaleString()} <span className="text-sm font-normal text-gray-500">KRW</span></div>
-                    <div className="text-xs text-gray-400 mt-1 flex justify-between">
-                        <span>L: {stockValue.toLocaleString()}</span>
-                        <span>S: {shortValue.toLocaleString()}</span>
+                    <div className="text-[10px] text-gray-400 mt-1 flex justify-between">
+                        <span>Long: {stockValue.toLocaleString()}</span>
+                        <span>Short: -{shortValue.toLocaleString()}</span>
                     </div>
                 </div>
                 <div className="bg-gray-800 p-4 rounded-lg shadow border border-gray-700">
@@ -76,6 +89,7 @@ export default function DashboardOverview({
                         <CreditCard className="w-4 h-4 text-yellow-400" />
                     </div>
                     <div className="text-2xl font-bold text-yellow-400">{buyingPower.toLocaleString()} <span className="text-sm font-normal text-gray-500">KRW</span></div>
+                    <div className="text-[10px] text-gray-500 mt-1">Cash + Available Credit</div>
                 </div>
             </div>
 
