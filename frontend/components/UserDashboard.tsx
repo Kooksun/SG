@@ -9,10 +9,11 @@ import PortfolioTable from "@/components/PortfolioTable";
 import TransactionHistory from "@/components/TransactionHistory";
 import DashboardOverview from "@/components/DashboardOverview";
 import ActiveOrders from "@/components/ActiveOrders";
+import MissionModal from "@/components/MissionModal";
 import { UserProfile, Stock } from "@/types";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { applyDailyInterestAndAutoLiquidate } from "@/lib/credit";
-import { LayoutDashboard, PieChart, History, Coins } from "lucide-react";
+import { LayoutDashboard, PieChart, History, Coins, Gift } from "lucide-react";
 
 interface PortfolioItem {
     symbol: string;
@@ -37,6 +38,8 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     const [aiTimestamp, setAiTimestamp] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<Tab>('overview');
     const [pendingSymbols, setPendingSymbols] = useState<Set<string>>(new Set());
+    const [isMissionOpen, setIsMissionOpen] = useState(false);
+    const [hasUnclaimed, setHasUnclaimed] = useState(false);
     const interestAppliedRef = useRef(false);
 
     useEffect(() => {
@@ -134,6 +137,23 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
         });
         return () => unsubscribe();
     }, [uid, currentUser]);
+
+    useEffect(() => {
+        if (!uid) return;
+
+        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+        const unsubscribe = onSnapshot(doc(db, "users", uid, "missions", today), (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const missions = docSnapshot.data().missions || [];
+                const unclaimed = missions.some((m: any) => m.status === "COMPLETED");
+                setHasUnclaimed(unclaimed);
+            } else {
+                setHasUnclaimed(false);
+            }
+        });
+
+        return () => unsubscribe();
+    }, [uid]);
 
     useEffect(() => {
         const stocksRef = ref(rtdb, 'stocks');
@@ -262,16 +282,32 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                         </div>
                     </div>
 
-                    {/* Point Display - Far Right */}
-                    <div className="px-6 py-2 bg-gray-900/40 rounded-lg border border-gray-700/50 flex items-center gap-3 mr-2">
-                        <div className="p-1.5 bg-yellow-500/10 rounded-md">
-                            <Coins size={16} className="text-yellow-500" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-none">My Points</span>
-                            <span className="text-sm font-black text-yellow-400 leading-tight">
-                                {(userProfile.points || 0).toLocaleString()} <span className="text-[10px] font-normal text-gray-400">P</span>
-                            </span>
+                    {/* Mission & Point Display - Far Right */}
+                    <div className="flex items-center gap-2 mr-2">
+                        <button
+                            onClick={() => setIsMissionOpen(true)}
+                            className="relative flex items-center gap-2 px-3 py-2 bg-gray-900/40 hover:bg-gray-800/60 rounded-lg border border-gray-700/50 transition-all group"
+                        >
+                            <Gift size={18} className={hasUnclaimed ? "text-yellow-400 animate-bounce" : "text-gray-400 group-hover:text-white"} />
+                            <div className="flex flex-col items-start">
+                                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-none">Missions</span>
+                                <span className="text-xs font-bold text-gray-300 leading-tight">Daily</span>
+                            </div>
+                            {hasUnclaimed && (
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-900 animate-pulse"></span>
+                            )}
+                        </button>
+
+                        <div className="px-4 py-2 bg-gray-900/40 rounded-lg border border-gray-700/50 flex items-center gap-3">
+                            <div className="p-1.5 bg-yellow-500/10 rounded-md">
+                                <Coins size={16} className="text-yellow-500" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-none">My Points</span>
+                                <span className="text-sm font-black text-yellow-400 leading-tight">
+                                    {(userProfile.points || 0).toLocaleString()} <span className="text-[10px] font-normal text-gray-400">P</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -320,6 +356,12 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                     )}
                 </div>
             </div>
+
+            <MissionModal
+                uid={uid}
+                isOpen={isMissionOpen}
+                onClose={() => setIsMissionOpen(false)}
+            />
         </main>
     );
 }
