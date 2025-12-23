@@ -726,6 +726,7 @@ def process_ai_requests():
                     # 4. Generate Content (Primary: Groq, Secondary: Gemini)
                     result_text = ""
                     used_model = "openai/gpt-oss-120b"
+                    last_error = None
                     #print(prompt) # Reduced noise
 
                     if groq_client:
@@ -749,6 +750,7 @@ def process_ai_requests():
                             except Exception as gemini_e:
                                 print(f"  -> Gemini Analysis failed: {gemini_e}")
                                 result_text = "AI 분석 중 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+                                last_error = gemini_e
                     print(f"  -> Analysis completed using {used_model}")
 
                     # 5. Generate Portfolio Signature for Change Detection
@@ -763,6 +765,7 @@ def process_ai_requests():
             except Exception as e:
                 print(f"Error processing AI request for {uid}: {e}")
                 result_text = "AI 분석 데이터 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+                last_error = e
                 portfolio_signature = None
 
             # 6. Update RTDB
@@ -770,7 +773,8 @@ def process_ai_requests():
                 'status': 'completed',
                 'result': result_text,
                 'completedAt': now_kst().isoformat(),
-                'usedModel': used_model
+                'usedModel': used_model,
+                'lastError': last_error
             }
             if portfolio_signature:
                 update_payload['portfolioSignature'] = portfolio_signature

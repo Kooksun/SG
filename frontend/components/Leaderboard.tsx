@@ -9,6 +9,7 @@ import { UserProfile, Stock } from "@/types";
 import { useRouter } from "next/navigation";
 import { History } from "lucide-react";
 import RankingHistoryModal from "./RankingHistoryModal";
+import StockHoldersModal from "./StockHoldersModal";
 
 interface PortfolioItem {
     symbol: string;
@@ -24,6 +25,8 @@ export default function Leaderboard() {
     const [globalChartMetric, setGlobalChartMetric] = useState<"value" | "quantity">("value");
     const [exchangeRate, setExchangeRate] = useState(1400);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [isHoldersModalOpen, setIsHoldersModalOpen] = useState(false);
+    const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
     const router = useRouter();
 
     const userMap = useMemo(() => {
@@ -294,7 +297,13 @@ export default function Leaderboard() {
                                 return (
                                     <div
                                         key={`${slice.symbol}-${idx}`}
-                                        className="flex items-center justify-between text-sm text-gray-200 bg-gray-700/50 rounded px-3 py-2"
+                                        className={`flex items-center justify-between text-sm text-gray-200 bg-gray-700/50 rounded px-3 py-2 ${slice.symbol !== "기타" ? "cursor-pointer hover:bg-gray-600 transition-colors" : ""}`}
+                                        onClick={() => {
+                                            if (slice.symbol !== "기타") {
+                                                setSelectedSymbol(slice.symbol);
+                                                setIsHoldersModalOpen(true);
+                                            }
+                                        }}
                                     >
                                         <div className="flex items-center gap-2">
                                             <span
@@ -323,6 +332,16 @@ export default function Leaderboard() {
                 isOpen={isHistoryOpen}
                 onClose={() => setIsHistoryOpen(false)}
                 userMap={userMap}
+            />
+
+            <StockHoldersModal
+                isOpen={isHoldersModalOpen}
+                onClose={() => setIsHoldersModalOpen(false)}
+                stock={selectedSymbol ? stocks[selectedSymbol] : null}
+                symbol={selectedSymbol}
+                users={users}
+                portfolios={portfolios}
+                exchangeRate={exchangeRate}
             />
         </div>
     );

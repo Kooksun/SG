@@ -33,7 +33,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
     const [exchangeRate, setExchangeRate] = useState(1400);
-    const [aiStatus, setAiStatus] = useState<'idle' | 'pending' | 'processing' | 'completed'>('idle');
+    const [aiStatus, setAiStatus] = useState<'init' | 'idle' | 'pending' | 'processing' | 'completed'>('init');
     const [aiResult, setAiResult] = useState<string | null>(null);
     const [aiTimestamp, setAiTimestamp] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -170,7 +170,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
 
     // Automated AI Refresh Trigger
     useEffect(() => {
-        if (!uid || aiStatus === 'pending' || aiStatus === 'processing' || portfolio.length === 0) return;
+        if (!uid || aiStatus === ('init' as any) || aiStatus === 'pending' || aiStatus === 'processing' || portfolio.length === 0) return;
 
         const currentSignature = [...portfolio]
             .sort((a, b) => a.symbol.localeCompare(b.symbol))
@@ -178,14 +178,14 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
             .join('|');
 
         const lastUpdateTime = aiTimestamp ? new Date(aiTimestamp).getTime() : 0;
-        const oneHourAgo = Date.now() - 3600000;
+        const tenMinutesAgo = Date.now() - 600000; // 10 minutes * 60 seconds * 1000ms
 
         // Auto request if:
         // 1. Signature changed (Portfolio changed)
-        // 2. AND Last report is older than 1 hour
-        // 3. AND aiStatus is not pending/processing
-        if (currentSignature !== aiSignature && lastUpdateTime < oneHourAgo) {
-            console.log("Automated AI Analysis Refresh triggered.");
+        // 2. AND Last report is older than 10 minutes
+        // 3. AND aiStatus is not init/pending/processing
+        if (currentSignature !== aiSignature && lastUpdateTime < tenMinutesAgo) {
+            console.log("Automated AI Analysis Refresh triggered (10min cooldown).");
             void handleRequestAiAnalysis();
         }
     }, [uid, portfolio, aiSignature, aiTimestamp, aiStatus]);

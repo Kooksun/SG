@@ -12,7 +12,7 @@ interface DashboardOverviewProps {
     shortValue: number;
     shortInitialValue: number;
     totalAssets: number;
-    aiStatus: 'idle' | 'pending' | 'processing' | 'completed';
+    aiStatus: 'init' | 'idle' | 'pending' | 'processing' | 'completed';
     aiResult: string | null;
     aiTimestamp: string | null;
     onAiRequest: () => void;
