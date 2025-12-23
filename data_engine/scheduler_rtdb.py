@@ -682,7 +682,15 @@ def process_ai_requests():
 
                     # 3. Construct Refined Prompt
                     prompt = (
-                        f"너는 주식 투자 게임의 전문 AI 조언가야. 사용자의 현재 상황은 다음과 같아:\n\n"
+                        """
+                        너는 개인 투자자를 위한 AI 리서치 애널리스트다.
+                        단순 정보 요약이 아닌, 현재 포트폴리오의 성격과 전략적 의미를 해석하는 데 집중하라.
+                        증권사 리포트 톤으로 중립적으로 작성하되, 분석적 깊이를 유지하라.
+                        특정 투자 성향을 단정하지 말고, 가능한 전략 시나리오를 병렬적으로 제시하라.
+                        명령형 표현이나 직접적인 매수/매도 권유는 사용하지 않는다.
+
+                        아래 정보를 바탕으로 포트폴리오 분석 보고서를 작성하라.
+                        """ + 
                         f"[포트폴리오 구성]\n"
                         f"{chr(10).join(portfolio_text)}\n\n"
                         f"[포트폴리오 성과]\n"
@@ -690,38 +698,54 @@ def process_ai_requests():
                         f"- 총 평가손익: {total_profit:,.0f} KRW ({profit_ratio:+.2f}%)\n"
                         f"- 주식 총 평가액(Net): {total_value:,.0f} KRW\n"
                         f"{user_info_text}\n\n"
-                        "위 데이터를 바탕으로 포트폴리오를 분석하고 다음 가이드라인에 따라 조언해줘:\n"
-                        "1. **성과 분석**: 현재 수익률과 투자원금 대비 성과를 평가해줘.\n"
-                        "2. **리스크 평가**: 신용 사용량(레버리지 비율)이 적절한지 판단해줘. (사용량이 한도 대비 매우 적으면 과도한 경고보다는 안정적이라고 평가해줘)\n"
-                        "3. **공매도 분석**: 공매도(Short) 포지션이 있다면, 주가 상승 시 손실이 무한대일 수 있다는 점을 고려하여 적절한 리스크 관리를 조언해줘.\n"
-                        "4. **수익성 및 분산**: 포트폴리오의 집중도나 종목 구성에 대해 전문적인 의견을 제시해줘.\n\n"
-                        "답변은 3~4문장으로 간단명료하게, 친절하고 전문적인 한국어로 작성해줘."
+                        +
+                        """
+                        [출력 형식 요구사항]
+                        - 전체 분량은 약 500~700자 이내
+                        - 아래 4개 섹션을 반드시 포함하라
+                        - 각 섹션마다 “해석 또는 판단” 문장을 최소 1개 이상 포함하라
+
+                        1. Executive Summary
+                           - 현재 포트폴리오의 성격(예: 테스트/대기/부분적 베팅)을 규정하고 요약
+
+                        2. Portfolio Structure & Performance
+                           - 자산 배분 구조와 성과를 해석 중심으로 서술
+                           - 단순 수치 나열 금지
+
+                        3. Risk, Exposure & Optionality
+                           - 현재 구조가 노출하고 있는 리스크
+                           - 동시에 확보하고 있는 선택지를 함께 서술
+
+                        4. Scenario-based View
+                           - 보수적 운용 시나리오
+                           - 공격적 운용 시나리오
+                           - 두 시나리오의 전제 조건을 함께 제시
+                        """
                     )
                     
                     # 4. Generate Content (Primary: Groq, Secondary: Gemini)
                     result_text = ""
-                    used_model = ""
-                    print(prompt) # Reduced noise
+                    used_model = "openai/gpt-oss-120b"
+                    #print(prompt) # Reduced noise
 
                     if groq_client:
                         try:
                             completion = groq_client.chat.completions.create(
-                                model="groq/compound",
+                                model=used_model,
                                 messages=[                                    
                                     {"role": "user", "content": prompt}
                                 ],
-                                max_tokens=1024,
+                                max_tokens=8192,
                             )
                             result_text = completion.choices[0].message.content
-                            used_model = "Groq"
                         except Exception as ge:
                             print(f"  -> Groq failed or quota exceeded: {ge}. Falling back to Gemini.")
                             try:
                                 # Failover to Gemini
-                                model = genai.GenerativeModel('gemini-3-pro-preview')
+                                used_model = "gemini-3-pro-preview"
+                                model = genai.GenerativeModel(used_model)
                                 response = model.generate_content(prompt)
                                 result_text = response.text
-                                used_model = "Gemini (Failover)"
                             except Exception as gemini_e:
                                 print(f"  -> Gemini Analysis failed: {gemini_e}")
                                 result_text = "AI 분석 중 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
@@ -745,7 +769,8 @@ def process_ai_requests():
             update_payload = {
                 'status': 'completed',
                 'result': result_text,
-                'completedAt': now_kst().isoformat()
+                'completedAt': now_kst().isoformat(),
+                'usedModel': used_model
             }
             if portfolio_signature:
                 update_payload['portfolioSignature'] = portfolio_signature
