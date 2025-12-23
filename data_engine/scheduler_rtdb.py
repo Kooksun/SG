@@ -562,6 +562,9 @@ def start_scheduler():
     # Schedule history job at 06:00 KST (after US market close)
     schedule.every().day.at("06:00").do(history_job)
 
+    # Schedule ranking history every hour
+    schedule.every().hour.at(":00").do(record_ranking_history)
+
     while True:
         schedule.run_pending()
         
@@ -834,6 +837,83 @@ def process_search_requests():
                     'status': 'error',
                     'error': str(e)
                 })
+
+def record_ranking_history():
+    """
+    Calculate total assets for all users and record their rankings in Supabase.
+    Run every hour.
+    """
+    print(f"[{now_kst()}] Recording ranking history...")
+    if not latest_snapshot:
+        print("Latest snapshot empty. Skipping ranking history.")
+        return
+
+    try:
+        # 1. Fetch all users from Firestore
+        users_ref = firestore_db.collection("users")
+        users_docs = users_ref.stream()
+        
+        user_data_map = {}
+        for doc in users_docs:
+            data = doc.to_dict()
+            user_data_map[doc.id] = {
+                'balance': data.get('balance', 0),
+                'usedCredit': data.get('usedCredit', 0),
+                'portfolio_value': 0
+            }
+            
+        # 2. Fetch all portfolios
+        portfolios = firestore_db.collection_group("portfolio").stream()
+        for doc in portfolios:
+            # UID is the grandparent of the portfolio item document
+            # Path: users/{uid}/portfolio/{symbol}
+            uid = doc.reference.parent.parent.id
+            if uid not in user_data_map:
+                continue
+            
+            data = doc.to_dict()
+            symbol = doc.id
+            quantity = data.get('quantity', 0)
+            
+            if quantity != 0:
+                stock_info = latest_snapshot.get(symbol)
+                if stock_info:
+                    user_data_map[uid]['portfolio_value'] += quantity * stock_info.price
+        
+        # 3. Calculate total assets and prepare for ranking
+        ranking_list = []
+        for uid, data in user_data_map.items():
+            total_assets = data['balance'] + data['portfolio_value'] - data['usedCredit']
+            ranking_list.append({
+                'uid': uid,
+                'total_assets': total_assets
+            })
+            
+        # 4. Sort by total assets descending
+        ranking_list.sort(key=lambda x: x['total_assets'], reverse=True)
+        
+        # 5. Assign ranks and prepare rows for Supabase
+        rows = []
+        recorded_at = now_kst().isoformat()
+        for i, item in enumerate(ranking_list):
+            rows.append({
+                'uid': item['uid'],
+                'total_assets': int(item['total_assets']),
+                'rank': i + 1,
+                'recorded_at': recorded_at
+            })
+            
+        # 6. Insert into Supabase
+        if rows:
+            supabase = get_supabase()
+            if supabase:
+                supabase.table("user_ranking_history").insert(rows).execute()
+                print(f"[{now_kst()}] Successfully recorded ranking history for {len(rows)} users.")
+            else:
+                print("Supabase client not available.")
+                
+    except Exception as e:
+        print(f"Error in record_ranking_history: {e}")
 
 def process_history_requests():
     """
