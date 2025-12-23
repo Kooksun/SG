@@ -945,7 +945,8 @@ def record_ranking_history():
             user_data_map[doc.id] = {
                 'balance': data.get('balance', 0),
                 'usedCredit': data.get('usedCredit', 0),
-                'portfolio_value': 0
+                'portfolio_value': 0,
+                'short_initial_value': 0
             }
             
         # 2. Fetch all portfolios
@@ -964,19 +965,33 @@ def record_ranking_history():
             if quantity != 0:
                 stock_info = latest_snapshot.get(symbol)
                 if stock_info:
-                    user_data_map[uid]['portfolio_value'] += quantity * stock_info.price
+                    # Handle USD conversion
+                    current_price = stock_info.price
+                    if stock_info.currency == 'USD':
+                        current_price *= latest_exchange_rate
+                        
+                    user_data_map[uid]['portfolio_value'] += quantity * current_price
+                    
+                    if quantity < 0:
+                        # Use absolute value of quantity * averagePrice for short initial value (margin)
+                        # averagePrice is stored in KRW in this app
+                        avg_price = data.get('averagePrice', 0)
+                        user_data_map[uid]['short_initial_value'] += abs(quantity) * avg_price
         
-        # 3. Calculate total assets and prepare for ranking
+        # 3. Calculate total assets (Equity) and prepare for ranking
         ranking_list = []
         for uid, data in user_data_map.items():
-            total_assets = data['balance'] + data['portfolio_value'] - data['usedCredit']
+            # Equity = Cash + PortfolioNetValue - (TotalUsedCredit - ShortMarginLock)
+            # This matches frontend/components/Leaderboard.tsx calculation
+            equity = data['balance'] + data['portfolio_value'] - (data['usedCredit'] - data['short_initial_value'])
+            
             ranking_list.append({
                 'uid': uid,
-                'total_assets': total_assets
+                'equity': equity
             })
             
-        # 4. Sort by total assets descending
-        ranking_list.sort(key=lambda x: x['total_assets'], reverse=True)
+        # 4. Sort by equity descending
+        ranking_list.sort(key=lambda x: x['equity'], reverse=True)
         
         # 5. Assign ranks and prepare rows for Supabase
         rows = []
@@ -984,7 +999,7 @@ def record_ranking_history():
         for i, item in enumerate(ranking_list):
             rows.append({
                 'uid': item['uid'],
-                'total_assets': int(item['total_assets']),
+                'total_assets': int(item['equity']),
                 'rank': i + 1,
                 'recorded_at': recorded_at
             })
