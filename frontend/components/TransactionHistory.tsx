@@ -8,12 +8,13 @@ import { Stock } from "@/types";
 
 interface Transaction {
     id: string;
-    symbol: string;
+    symbol?: string;
     name?: string;
-    type: "BUY" | "SELL" | "SHORT" | "COVER";
-    price: number;
-    quantity: number;
-    amount: number;
+    type: "BUY" | "SELL" | "SHORT" | "COVER" | "REWARD";
+    price?: number;
+    quantity?: number;
+    amount?: number;
+    points?: number;
     fee?: number;
     profit?: number;
     timestamp: Timestamp;
@@ -65,15 +66,17 @@ export default function TransactionHistory({
                     </thead>
                     <tbody>
                         {transactions.map((tx) => {
-                            const stockName = stocks?.[tx.symbol]?.name || tx.name;
+                            const stockName = tx.symbol ? (stocks?.[tx.symbol]?.name || tx.name) : tx.name;
 
                             return (
                                 <tr key={tx.id} className="border-b border-gray-700 hover:bg-gray-700">
                                     <td className="py-2">
-                                        {tx.timestamp?.toDate().toLocaleString()}
+                                        {tx.timestamp?.toDate().toLocaleString() || "-"}
                                     </td>
                                     <td className="py-2">
-                                        <div className="font-semibold text-white">{tx.symbol}</div>
+                                        {tx.symbol && (
+                                            <div className="font-semibold text-white">{tx.symbol}</div>
+                                        )}
                                         {stockName && (
                                             <div className="text-xs text-gray-400">{stockName}</div>
                                         )}
@@ -81,15 +84,23 @@ export default function TransactionHistory({
                                     <td className={`py-2 font-bold ${tx.type === "BUY" ? "text-red-400" :
                                         tx.type === "SHORT" ? "text-purple-400" :
                                             tx.type === "COVER" ? "text-orange-400" :
-                                                "text-blue-400" // SELL
+                                                tx.type === "REWARD" ? "text-yellow-400" :
+                                                    "text-blue-400" // SELL
                                         }`}>
                                         {tx.type}
                                     </td>
-                                    <td className="py-2">{tx.price.toLocaleString()}</td>
-                                    <td className="py-2">{tx.quantity}</td>
-                                    <td className="py-2">{tx.amount.toLocaleString()}</td>
+                                    <td className="py-2">
+                                        {tx.price !== undefined ? tx.price.toLocaleString() : "-"}
+                                    </td>
+                                    <td className="py-2">
+                                        {tx.quantity !== undefined ? tx.quantity : "-"}
+                                    </td>
+                                    <td className="py-2">
+                                        {tx.amount !== undefined ? tx.amount.toLocaleString() :
+                                            tx.points !== undefined ? `${tx.points.toLocaleString()} P` : "-"}
+                                    </td>
                                     <td className="py-2 text-gray-400">
-                                        {tx.fee ? tx.fee.toLocaleString() : "0"}
+                                        {tx.fee !== undefined ? tx.fee.toLocaleString() : "-"}
                                     </td>
                                     <td className={`py-2 ${tx.profit && tx.profit > 0 ? "text-red-400" : tx.profit && tx.profit < 0 ? "text-blue-400" : "text-gray-500"}`}>
                                         {tx.profit !== undefined && tx.profit !== 0 ? tx.profit.toLocaleString() : "-"}

@@ -606,26 +606,36 @@ def process_ai_requests():
 
     for uid, data in requests.items():
         if isinstance(data, dict) and data.get('status') == 'pending':
+            # 0. Immediate Lock: Set status to processing to avoid double execution
+            ref.child(uid).update({'status': 'processing'})
+            
             print(f"[{now_kst()}] Processing AI request for user {uid}...")
             portfolio_signature = None
             
             try:
                 # 1. Fetch User Portfolio from Firestore
                 portfolio_ref = firestore_db.collection("users").document(uid).collection("portfolio")
-                portfolio_docs = portfolio_ref.stream()
+                portfolio_docs = list(portfolio_ref.stream()) # Listify to use multiple times if needed
                 
                 portfolio_text = []
                 total_value = 0
+                total_principal = 0
+                total_profit = 0
                 
                 for doc in portfolio_docs:
                     item = doc.to_dict()
                     symbol = item.get('symbol')
                     quantity = item.get('quantity', 0)
+                    avg_price = item.get('averagePrice') or 0 # Handle None case
                     
                     if quantity != 0:
                         stock_info = latest_snapshot.get(symbol)
                         current_price = stock_info.price if stock_info else 0
                         name = stock_info.name if stock_info else symbol
+                        
+                        # Handle USD conversion
+                        if stock_info and stock_info.currency == 'USD':
+                            current_price *= latest_exchange_rate
                         
                         # Use Absolute valuation for total value calculation but indicate short in text
                         value = quantity * current_price
@@ -633,6 +643,18 @@ def process_ai_requests():
                         
                         pos_type = "매수" if quantity > 0 else "공매도"
                         portfolio_text.append(f"- {name} ({symbol}): {quantity}주 ({pos_type}, 평가액: {value:,.0f} KRW)")
+                        
+                        # Performance calculations
+                        principal = abs(quantity) * avg_price
+                        total_principal += principal
+                        
+                        if quantity > 0:
+                            profit = (current_price - avg_price) * quantity
+                        else:
+                            profit = (avg_price - current_price) * abs(quantity)
+                        total_profit += profit
+
+                profit_ratio = (total_profit / total_principal * 100) if total_principal > 0 else 0
 
                 if not portfolio_text:
                     result_text = "보유한 주식이 없습니다. 포트폴리오를 구성한 뒤 다시 요청해주세요."
@@ -662,28 +684,30 @@ def process_ai_requests():
                     prompt = (
                         f"너는 주식 투자 게임의 전문 AI 조언가야. 사용자의 현재 상황은 다음과 같아:\n\n"
                         f"[포트폴리오 구성]\n"
-                        f"{chr(10).join(portfolio_text)}\n"
+                        f"{chr(10).join(portfolio_text)}\n\n"
+                        f"[포트폴리오 성과]\n"
+                        f"- 총 투자원금: {total_principal:,.0f} KRW\n"
+                        f"- 총 평가손익: {total_profit:,.0f} KRW ({profit_ratio:+.2f}%)\n"
                         f"- 주식 총 평가액(Net): {total_value:,.0f} KRW\n"
                         f"{user_info_text}\n\n"
                         "위 데이터를 바탕으로 포트폴리오를 분석하고 다음 가이드라인에 따라 조언해줘:\n"
-                        "1. **리스크 평가**: 신용 사용량(레버리지 비율)이 적절한지 판단해줘. (사용량이 한도 대비 매우 적으면 과도한 경고보다는 안정적이라고 평가해줘)\n"
-                        "2. **공매도 분석**: 공매도(Short) 포지션이 있다면, 주가 상승 시 손실이 무한대일 수 있다는 점을 고려하여 적절한 리스크 관리를 조언해줘.\n"
-                        "3. **수익성 및 분산**: 포트폴리오의 집중도나 종목 구성에 대해 전문적인 의견을 제시해줘.\n\n"
+                        "1. **성과 분석**: 현재 수익률과 투자원금 대비 성과를 평가해줘.\n"
+                        "2. **리스크 평가**: 신용 사용량(레버리지 비율)이 적절한지 판단해줘. (사용량이 한도 대비 매우 적으면 과도한 경고보다는 안정적이라고 평가해줘)\n"
+                        "3. **공매도 분석**: 공매도(Short) 포지션이 있다면, 주가 상승 시 손실이 무한대일 수 있다는 점을 고려하여 적절한 리스크 관리를 조언해줘.\n"
+                        "4. **수익성 및 분산**: 포트폴리오의 집중도나 종목 구성에 대해 전문적인 의견을 제시해줘.\n\n"
                         "답변은 3~4문장으로 간단명료하게, 친절하고 전문적인 한국어로 작성해줘."
                     )
                     
                     # 4. Generate Content (Primary: Groq, Secondary: Gemini)
                     result_text = ""
                     used_model = ""
-                    print(prompt)
+                    print(prompt) # Reduced noise
 
                     if groq_client:
                         try:
-                            print(f"  -> Attempting Groq Analysis ...")
                             completion = groq_client.chat.completions.create(
                                 model="groq/compound",
-                                messages=[
-                                    {"role": "system", "content": "너는 주식 투자 게임의 전문 AI 조언가야."},
+                                messages=[                                    
                                     {"role": "user", "content": prompt}
                                 ],
                                 max_tokens=1024,
@@ -692,21 +716,21 @@ def process_ai_requests():
                             used_model = "Groq"
                         except Exception as ge:
                             print(f"  -> Groq failed or quota exceeded: {ge}. Falling back to Gemini.")
-
-                    if not result_text:
-                        # Failover to Gemini
-                        print(f"  -> Attempting Gemini Analysis (gemini-3-pro-preview)...")
-                        model = genai.GenerativeModel('gemini-3-pro-preview')
-                        response = model.generate_content(prompt)
-                        result_text = response.text
-                        used_model = "Gemini (Failover)"
-
+                            try:
+                                # Failover to Gemini
+                                model = genai.GenerativeModel('gemini-3-pro-preview')
+                                response = model.generate_content(prompt)
+                                result_text = response.text
+                                used_model = "Gemini (Failover)"
+                            except Exception as gemini_e:
+                                print(f"  -> Gemini Analysis failed: {gemini_e}")
+                                result_text = "AI 분석 중 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
                     print(f"  -> Analysis completed using {used_model}")
 
                     # 5. Generate Portfolio Signature for Change Detection
                     # Format: symbol:qty|symbol:qty (sorted)
                     items_for_sig = []
-                    for doc in firestore_db.collection("users").document(uid).collection("portfolio").stream():
+                    for doc in portfolio_docs:
                         d = doc.to_dict()
                         items_for_sig.append(f"{d.get('symbol')}:{d.get('quantity')}")
                     items_for_sig.sort()
@@ -714,7 +738,7 @@ def process_ai_requests():
             
             except Exception as e:
                 print(f"Error processing AI request for {uid}: {e}")
-                result_text = "AI 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+                result_text = "AI 분석 데이터 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
                 portfolio_signature = None
 
             # 6. Update RTDB

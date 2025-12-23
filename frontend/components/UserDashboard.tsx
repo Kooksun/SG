@@ -33,7 +33,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
     const [exchangeRate, setExchangeRate] = useState(1400);
-    const [aiStatus, setAiStatus] = useState<'idle' | 'pending' | 'completed'>('idle');
+    const [aiStatus, setAiStatus] = useState<'idle' | 'pending' | 'processing' | 'completed'>('idle');
     const [aiResult, setAiResult] = useState<string | null>(null);
     const [aiTimestamp, setAiTimestamp] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -170,7 +170,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
 
     // Automated AI Refresh Trigger
     useEffect(() => {
-        if (!uid || aiStatus === 'pending' || portfolio.length === 0) return;
+        if (!uid || aiStatus === 'pending' || aiStatus === 'processing' || portfolio.length === 0) return;
 
         const currentSignature = [...portfolio]
             .sort((a, b) => a.symbol.localeCompare(b.symbol))
@@ -183,7 +183,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
         // Auto request if:
         // 1. Signature changed (Portfolio changed)
         // 2. AND Last report is older than 1 hour
-        // 3. ANDaiStatus is not pending
+        // 3. AND aiStatus is not pending/processing
         if (currentSignature !== aiSignature && lastUpdateTime < oneHourAgo) {
             console.log("Automated AI Analysis Refresh triggered.");
             void handleRequestAiAnalysis();
@@ -197,6 +197,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
             const { update: rtdbUpdate } = await import("firebase/database");
             await rtdbUpdate(ref(rtdb, `ai_requests/${uid}`), {
                 status: 'pending',
+                result: null, // Clear previous results to avoid showing error/stale content during generation
                 timestamp: Date.now()
             });
         } catch (error) {
