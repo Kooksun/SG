@@ -7,6 +7,8 @@ import { ref, onValue } from "firebase/database";
 import { db, rtdb } from "@/lib/firebase";
 import { UserProfile, Stock } from "@/types";
 import { useRouter } from "next/navigation";
+import { History } from "lucide-react";
+import RankingHistoryModal from "./RankingHistoryModal";
 
 interface PortfolioItem {
     symbol: string;
@@ -21,7 +23,16 @@ export default function Leaderboard() {
     const [globalHoldings, setGlobalHoldings] = useState<Record<string, number>>({});
     const [globalChartMetric, setGlobalChartMetric] = useState<"value" | "quantity">("value");
     const [exchangeRate, setExchangeRate] = useState(1400);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const router = useRouter();
+
+    const userMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        users.forEach((u) => {
+            map[u.uid] = u.displayName || "Unknown";
+        });
+        return map;
+    }, [users]);
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
@@ -204,7 +215,16 @@ export default function Leaderboard() {
 
     return (
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-            <h2 className="text-2xl font-bold mb-4 text-white">Leaderboard</h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-white">Leaderboard</h2>
+                <button
+                    onClick={() => setIsHistoryOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-blue-400 rounded-lg transition-all text-sm font-medium border border-gray-600 whitespace-nowrap"
+                >
+                    <History size={18} />
+                    순위 기록 보기
+                </button>
+            </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-gray-300">
                     <thead>
@@ -298,6 +318,12 @@ export default function Leaderboard() {
                     <p className="text-gray-400 text-sm">집계된 포트폴리오 데이터가 없습니다.</p>
                 )}
             </div>
+
+            <RankingHistoryModal
+                isOpen={isHistoryOpen}
+                onClose={() => setIsHistoryOpen(false)}
+                userMap={userMap}
+            />
         </div>
     );
 }

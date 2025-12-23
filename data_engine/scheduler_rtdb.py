@@ -8,6 +8,7 @@ from typing import Dict, Optional
 from firebase_admin import db as rtdb_admin
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
+from groq import Groq
 
 from fetcher import fetch_top_stocks, fetch_us_stocks, fetch_exchange_rate, fetch_single_stock, fetch_stock_history
 from models import Stock
@@ -586,6 +587,12 @@ if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable is not set")
 genai.configure(api_key=GEMINI_API_KEY)
 
+# Configure Groq API
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+groq_client = None
+if GROQ_API_KEY:
+    groq_client = Groq(api_key=GROQ_API_KEY)
+
 def process_ai_requests():
     """
     Check RTDB for pending AI analysis requests and use Gemini API.
@@ -665,10 +672,36 @@ def process_ai_requests():
                         "답변은 3~4문장으로 간단명료하게, 친절하고 전문적인 한국어로 작성해줘."
                     )
                     
-                    # 4. Call Gemini API
-                    model = genai.GenerativeModel('gemini-3-pro-preview')
-                    response = model.generate_content(prompt)
-                    result_text = response.text
+                    # 4. Generate Content (Primary: Groq, Secondary: Gemini)
+                    result_text = ""
+                    used_model = ""
+                    print(prompt)
+
+                    if groq_client:
+                        try:
+                            print(f"  -> Attempting Groq Analysis ...")
+                            completion = groq_client.chat.completions.create(
+                                model="groq/compound",
+                                messages=[
+                                    {"role": "system", "content": "너는 주식 투자 게임의 전문 AI 조언가야."},
+                                    {"role": "user", "content": prompt}
+                                ],
+                                max_tokens=1024,
+                            )
+                            result_text = completion.choices[0].message.content
+                            used_model = "Groq"
+                        except Exception as ge:
+                            print(f"  -> Groq failed or quota exceeded: {ge}. Falling back to Gemini.")
+
+                    if not result_text:
+                        # Failover to Gemini
+                        print(f"  -> Attempting Gemini Analysis (gemini-3-pro-preview)...")
+                        model = genai.GenerativeModel('gemini-3-pro-preview')
+                        response = model.generate_content(prompt)
+                        result_text = response.text
+                        used_model = "Gemini (Failover)"
+
+                    print(f"  -> Analysis completed using {used_model}")
 
                     # 5. Generate Portfolio Signature for Change Detection
                     # Format: symbol:qty|symbol:qty (sorted)
