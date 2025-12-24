@@ -171,8 +171,8 @@ export default function DashboardOverview({
                 </div>
 
                 {/* Right Column (2 cols): AI Coach */}
-                <div className="lg:col-span-2">
-                    <div className="h-full bg-gradient-to-br from-green-900/40 to-teal-900/40 border border-green-800 p-6 rounded-lg shadow backdrop-blur-sm flex flex-col">
+                <div className="lg:col-span-2 lg:relative">
+                    <div className="lg:absolute lg:inset-0 bg-gradient-to-br from-green-900/40 to-teal-900/40 border border-green-800 p-6 rounded-lg shadow backdrop-blur-sm flex flex-col">
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h3 className="text-xl font-bold text-green-100 flex items-center gap-2">
@@ -206,7 +206,7 @@ export default function DashboardOverview({
                                             Updating...
                                         </div>
                                     )}
-                                    <div className="flex-grow overflow-y-auto leading-relaxed text-green-50 font-light text-base p-2">
+                                    <div className="flex-grow overflow-y-auto leading-relaxed text-green-50 font-light text-base p-2 custom-scrollbar">
                                         <ReactMarkdown
                                             components={{
                                                 h1: ({ ...props }) => <h1 className="text-xl font-bold mt-4 mb-2 text-green-200" {...props} />,
