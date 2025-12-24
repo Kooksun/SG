@@ -421,7 +421,7 @@ def update_all_mission_progress():
             if last_tx and (not last_update or last_tx > last_update):
                 mission_manager.update_mission_progress(uid)
                 activities_ref.child(uid).update({
-                    'lastMissionUpdateAt': now_kst().isoformat()
+                    'lastMissionUpdateAt': datetime.utcnow().isoformat() + "Z"
                 })
                 count += 1
         

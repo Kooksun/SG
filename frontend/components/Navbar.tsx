@@ -5,12 +5,38 @@ import { useAuth } from "@/lib/hooks/useAuth"; // I need to create this hook
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LayoutDashboard, User, LogOut, TrendingUp } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 
 export default function Navbar() {
     const { user } = useAuth();
     const router = useRouter();
+    const [hasUnclaimed, setHasUnclaimed] = useState(false);
+
+    useEffect(() => {
+        if (!user?.uid) {
+            setHasUnclaimed(false);
+            return;
+        }
+
+        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+        const unsubscribe = onSnapshot(doc(db, "users", user.uid, "missions", today), (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const missions = docSnapshot.data().missions || [];
+                const unclaimed = missions.some((m: any) => m.status === "COMPLETED");
+                setHasUnclaimed(unclaimed);
+            } else {
+                setHasUnclaimed(false);
+            }
+        }, (error) => {
+            console.error("Error fetching missions in Navbar:", error);
+            setHasUnclaimed(false);
+        });
+
+        return () => unsubscribe();
+    }, [user?.uid]);
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -36,10 +62,13 @@ export default function Navbar() {
                         <>
                             <Link
                                 href={`/user?uid=${user.uid}`}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all hover:bg-gray-800 text-gray-300 hover:text-white"
+                                className="relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all hover:bg-gray-800 text-gray-300 hover:text-white"
                             >
                                 <User size={18} />
                                 <span>My Page</span>
+                                {hasUnclaimed && (
+                                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-900 animate-pulse"></span>
+                                )}
                             </Link>
                             <button
                                 onClick={handleLogout}

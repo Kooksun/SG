@@ -124,7 +124,7 @@ def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int, ord
         # Mark user activity in RTDB for mission processing
         try:
             rtdb_admin.reference(f'user_activities/{uid}').update({
-                'lastTransactionAt': datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
+                'lastTransactionAt': datetime.utcnow().isoformat() + "Z"
             })
         except Exception as e:
             print(f"Error updating user activity in RTDB: {e}")
@@ -314,7 +314,7 @@ def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int, or
         # Mark user activity in RTDB for mission processing
         try:
             rtdb_admin.reference(f'user_activities/{uid}').update({
-                'lastTransactionAt': datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
+                'lastTransactionAt': datetime.utcnow().isoformat() + "Z"
             })
         except Exception as e:
             print(f"Error updating user activity in RTDB: {e}")
