@@ -397,15 +397,36 @@ def process_missions_daily():
         print(f"Error generating daily missions: {e}")
 
 def update_all_mission_progress():
-    print(f"[{now_kst()}] Updating all users' mission progress...")
+    """
+    Optimized: Only update missions for users who had a transaction since their last mission update.
+    Tracks activity via RTDB user_activities/{uid}.
+    """
+    print(f"[{now_kst()}] Checking users for mission updates...")
     try:
-        users_ref = firestore_db.collection("users")
-        docs = users_ref.stream()
+        activities_ref = rtdb_admin.reference('user_activities')
+        activities = activities_ref.get()
+        
+        if not activities:
+            # print(f"[{now_kst()}] No active users found in RTDB activities.")
+            return
+
         count = 0
-        for doc in docs:
-            mission_manager.update_mission_progress(doc.id)
-            count += 1
-        print(f"[{now_kst()}] Mission progress updated for {count} users.")
+        for uid, activity in activities.items():
+            if not isinstance(activity, dict): continue
+            
+            last_tx = activity.get('lastTransactionAt')
+            last_update = activity.get('lastMissionUpdateAt')
+            
+            # If there's a transaction after the last update, or if never updated
+            if last_tx and (not last_update or last_tx > last_update):
+                mission_manager.update_mission_progress(uid)
+                activities_ref.child(uid).update({
+                    'lastMissionUpdateAt': now_kst().isoformat()
+                })
+                count += 1
+        
+        if count > 0:
+            print(f"[{now_kst()}] Mission progress updated for {count} active users.")
     except Exception as e:
         print(f"Error updating mission progress: {e}")
 
@@ -555,7 +576,6 @@ def start_scheduler():
     
     # Schedule missions
     schedule.every().day.at("00:00").do(process_missions_daily)
-    schedule.every(1).minutes.do(update_all_mission_progress)
 
     # Schedule search requests processing every 5 seconds (not use schedule for high frequency)
     # Actually we'll call it in the loop
@@ -569,11 +589,12 @@ def start_scheduler():
     while True:
         schedule.run_pending()
         
-        # Check AI requests and Limit Orders more frequently
+        # Check AI requests, Search, and Mission progress more frequently
         try:
             process_ai_requests()
             process_search_requests()
             process_history_requests()
+            update_all_mission_progress()
         except Exception as e:
             print(f"Error in background processing: {e}")
             

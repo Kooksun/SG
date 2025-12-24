@@ -184,19 +184,14 @@ def update_mission_progress(uid: str):
     start_time = datetime.now(kst).replace(hour=0, minute=0, second=0, microsecond=0)
     
     # 1. Fetch Today's Transactions
-    # Use simple query to avoid composite index requirement
+    # Optimized: only fetch transactions from today using existing index (uid, timestamp DESC)
     tx_ref = db.collection("transactions")
-    query = tx_ref.where(filter=firestore.FieldFilter("uid", "==", uid)).stream()
+    query = tx_ref.where(filter=firestore.FieldFilter("uid", "==", uid))\
+                  .where(filter=firestore.FieldFilter("timestamp", ">=", start_time))\
+                  .order_by("timestamp", direction=firestore.Query.DESCENDING)\
+                  .stream()
     
-    transactions = []
-    for t in query:
-        dt = t.get("timestamp")
-        # Handle both datetime objects and strings if any
-        if isinstance(dt, str):
-            dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
-            
-        if dt and dt >= start_time:
-            transactions.append(t.to_dict())
+    transactions = [t.to_dict() for t in query]
     
     # 2. Fetch User Info (for leverage check)
     user_doc_snapshot = db.collection("users").document(uid).get()

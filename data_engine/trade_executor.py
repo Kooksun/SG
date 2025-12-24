@@ -1,6 +1,7 @@
 import math
 from datetime import datetime
-from firebase_admin import firestore
+from zoneinfo import ZoneInfo
+from firebase_admin import firestore, db as rtdb_admin
 from google.cloud.firestore_v1.base_transaction import BaseTransaction
 from firestore_client import db
 
@@ -120,6 +121,14 @@ def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int, ord
             "timestamp": firestore.SERVER_TIMESTAMP
         })
         
+        # Mark user activity in RTDB for mission processing
+        try:
+            rtdb_admin.reference(f'user_activities/{uid}').update({
+                'lastTransactionAt': datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
+            })
+        except Exception as e:
+            print(f"Error updating user activity in RTDB: {e}")
+
         return cost
 
     return update_in_transaction(transaction)
@@ -256,6 +265,14 @@ def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int, or
             "timestamp": firestore.SERVER_TIMESTAMP
         })
         
+        # Mark user activity in RTDB for mission processing
+        try:
+            rtdb_admin.reference(f'user_activities/{uid}').update({
+                'lastTransactionAt': datetime.now(ZoneInfo("Asia/Seoul")).isoformat()
+            })
+        except Exception as e:
+            print(f"Error updating user activity in RTDB: {e}")
+
         return proceeds
 
     return update_in_transaction(transaction)
