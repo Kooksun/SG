@@ -42,10 +42,13 @@ export default function Leaderboard() {
             const userData: UserProfile[] = [];
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data() as UserProfile;
+                const uid = docSnap.id;
                 if (typeof data.startingBalance !== "number") {
-                    void updateDoc(doc(db, "users", data.uid), { startingBalance: 100000000 });
-                    data.startingBalance = 100000000;
+                    void updateDoc(doc(db, "users", uid), { startingBalance: 500000000 });
+                    data.startingBalance = 500000000;
                 }
+                // Ensure data.uid is also set if missing from document
+                if (!data.uid) data.uid = uid;
                 userData.push(data);
             });
             setUsers(userData);

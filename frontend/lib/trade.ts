@@ -1,5 +1,6 @@
-import { db } from "@/lib/firebase";
+import { db, rtdb } from "@/lib/firebase";
 import { doc, runTransaction, serverTimestamp, increment, collection, setDoc } from "firebase/firestore";
+import { ref, update } from "firebase/database";
 
 export async function buyStock(uid: string, symbol: string, name: string, price: number, quantity: number, market: string = "KRX") {
     if (quantity <= 0) throw new Error("Quantity must be positive");
@@ -120,6 +121,14 @@ export async function buyStock(uid: string, symbol: string, name: string, price:
             timestamp: serverTimestamp()
         });
     });
+
+    try {
+        await update(ref(rtdb, `user_activities/${uid}`), {
+            lastTransactionAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error("Error updating activity in RTDB:", error);
+    }
 }
 
 export async function sellStock(uid: string, symbol: string, name: string, price: number, quantity: number, market: string = "KRX") {
@@ -283,6 +292,14 @@ export async function sellStock(uid: string, symbol: string, name: string, price
             });
         }
     });
+
+    try {
+        await update(ref(rtdb, `user_activities/${uid}`), {
+            lastTransactionAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error("Error updating activity in RTDB:", error);
+    }
 }
 
 export async function placeLimitOrder(uid: string, symbol: string, name: string, type: "BUY" | "SELL", targetPrice: number, quantity: number, market: string = "KRX") {
