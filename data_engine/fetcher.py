@@ -291,6 +291,51 @@ def update_stocks(limit: int = 100):
 if __name__ == "__main__":
     update_stocks()
 
+def fetch_indices() -> Dict[str, Dict]:
+    """
+    Fetch major market indices: KOSPI, KOSDAQ, S&P 500, Nasdaq, Dow Jones.
+    """
+    indices = {
+        'KOSPI': 'KS11',
+        'KOSDAQ': 'KQ11',
+        'S&P 500': 'US500',
+        'Nasdaq': 'IXIC',
+        'Dow Jones': 'DJI'
+    }
+    
+    results = {}
+    print(f"Fetching latest market indices...")
+    for name, sym in indices.items():
+        try:
+            # Fetch last few days to ensure we have data to calculate change
+            df = fdr.DataReader(sym, start=(datetime.now() - pd.Timedelta(days=5)).strftime('%Y-%m-%d'))
+            if df.empty:
+                continue
+                
+            last_row = df.iloc[-1]
+            if len(df) >= 2:
+                prev_close = float(df.iloc[-2]['Close'])
+                price = float(last_row['Close'])
+                change = float(price - prev_close)
+                change_percent = float((change / prev_close) * 100)
+            else:
+                price = float(last_row['Close'])
+                change = 0.0
+                change_percent = 0.0
+
+            results[name] = {
+                'symbol': sym,
+                'name': name,
+                'price': price,
+                'change': change,
+                'change_percent': change_percent,
+                'updated_at': datetime.now(MARKET_TZ).isoformat()
+            }
+        except Exception as e:
+            print(f"Error fetching index {name} ({sym}): {e}")
+            
+    return results
+
 def fetch_stock_history(symbol: str, days: int = 90) -> List[Dict]:
     """
     Fetches historical daily data using yfinance.

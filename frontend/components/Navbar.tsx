@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { LayoutDashboard, User, LogOut, TrendingUp } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
+import Ticker from "./Ticker";
 
 export default function Navbar() {
     const { user } = useAuth();
@@ -46,11 +47,14 @@ export default function Navbar() {
     return (
         <nav className="bg-gray-900 border-b border-gray-800 text-white p-3 sticky top-0 z-50 backdrop-blur-md bg-opacity-80">
             <div className="container mx-auto flex justify-between items-center px-4">
-                <Link href="/" className="text-xl font-black bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent flex items-center gap-2">
+                <Link href="/" className="text-xl font-black bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent flex items-center gap-2 flex-shrink-0">
                     <TrendingUp size={24} className="text-emerald-400" />
                     StockGame v2
                 </Link>
-                <div className="flex gap-2 items-center">
+
+                <Ticker />
+
+                <div className="flex gap-2 items-center flex-shrink-0">
                     <Link
                         href="/"
                         className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all hover:bg-gray-800 text-gray-300 hover:text-white"

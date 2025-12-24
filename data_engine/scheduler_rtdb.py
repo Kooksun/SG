@@ -10,7 +10,7 @@ from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from groq import Groq
 
-from fetcher import fetch_top_stocks, fetch_us_stocks, fetch_exchange_rate, fetch_single_stock, fetch_stock_history
+from fetcher import fetch_top_stocks, fetch_us_stocks, fetch_exchange_rate, fetch_single_stock, fetch_stock_history, fetch_indices
 from models import Stock
 import firestore_client  # Initializes Firebase app
 from firestore_client import db as firestore_db
@@ -31,6 +31,7 @@ DAILY_INTEREST_RATE = 0.001  # 0.1% per day
 latest_snapshot: Dict[str, Stock] = {}
 last_written_snapshot: Dict[str, Stock] = {}
 latest_exchange_rate: float = 1400.0
+latest_indices: Dict[str, Dict] = {}
 held_stocks_cache: set[str] = set()
 
 def now_kst() -> datetime:
@@ -46,7 +47,7 @@ def has_stock_changed(new: Stock, old: Stock) -> bool:
     ))
 
 def fetch_job(force: bool = False):
-    global latest_snapshot, latest_exchange_rate
+    global latest_snapshot, latest_exchange_rate, latest_indices
     print("-" * 60)
     print(f"[{now_kst()}] Starting fetch job...")
     
@@ -62,6 +63,11 @@ def fetch_job(force: bool = False):
     if rate:
         latest_exchange_rate = rate
         
+    # Fetch Market Indices
+    indices = fetch_indices()
+    if indices:
+        latest_indices = indices
+
     # Merge
     # Merge
     all_stocks = {**kr_stocks, **us_stocks}
@@ -208,6 +214,11 @@ def sync_job(force: bool = False):
     # or we could check if it changed. Let's just update it.
     rtdb_admin.reference('system/exchange_rate').set(latest_exchange_rate)
     print(f"[{now_kst()}] Synced Exchange Rate: {latest_exchange_rate}")
+
+    # Sync Indices
+    if latest_indices:
+        rtdb_admin.reference('system/indices').set(latest_indices)
+        print(f"[{now_kst()}] Synced Market Indices.")
 
     last_written_snapshot = {symbol: stock for symbol, stock in latest_snapshot.items()}
 
