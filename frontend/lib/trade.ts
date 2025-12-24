@@ -229,23 +229,59 @@ export async function sellStock(uid: string, symbol: string, name: string, price
             }, { merge: true });
         }
 
-        // Record Transaction
-        const newTransactionRef = doc(collection(db, "transactions"));
-        transaction.set(newTransactionRef, {
-            uid: uid,
-            symbol: symbol,
-            type: cashToRecieve < proceeds ? "SHORT" : "SELL",
-            price: price,
-            quantity: quantity,
-            amount: amount,
-            fee: fee,
-            profit: currentQty > 0 ? proceeds - Math.floor(currentAvg * Math.min(currentQty, quantity)) : 0,
-            orderType: "MARKET",
-            market: market,
-            creditUsed: creditToUse,
-            creditRepaid: creditRepayment,
-            timestamp: serverTimestamp()
-        });
+        // Record Transaction(s)
+        const sellableQty = currentQty > 0 ? Math.min(currentQty, quantity) : 0;
+        const shortQty = currentQty > 0 ? Math.max(0, quantity - sellableQty) : quantity;
+
+        // 1. Record SELL transaction for long position part
+        if (sellableQty > 0) {
+            const sellAmount = Math.floor(price * sellableQty);
+            const sellFee = Math.floor(sellAmount * 0.001);
+            const sellProceeds = sellAmount - sellFee;
+            const sellProfit = sellProceeds - Math.floor(currentAvg * sellableQty);
+
+            const newTransactionRef = doc(collection(db, "transactions"));
+            transaction.set(newTransactionRef, {
+                uid: uid,
+                symbol: symbol,
+                name: name,
+                type: "SELL",
+                price: price,
+                quantity: sellableQty,
+                amount: sellAmount,
+                fee: sellFee,
+                profit: sellProfit,
+                orderType: "MARKET",
+                market: market,
+                creditUsed: 0,
+                creditRepaid: shortQty === 0 ? creditRepayment : 0,
+                timestamp: serverTimestamp()
+            });
+        }
+
+        // 2. Record SHORT transaction for the shorting part
+        if (shortQty > 0) {
+            const shortAmount = Math.floor(price * shortQty);
+            const shortFee = Math.floor(shortAmount * 0.001);
+
+            const newTransactionRef = doc(collection(db, "transactions"));
+            transaction.set(newTransactionRef, {
+                uid: uid,
+                symbol: symbol,
+                name: name,
+                type: "SHORT",
+                price: price,
+                quantity: shortQty,
+                amount: shortAmount,
+                fee: shortFee,
+                profit: 0,
+                orderType: "MARKET",
+                market: market,
+                creditUsed: shortAmount,
+                creditRepaid: sellableQty === 0 ? creditRepayment : 0,
+                timestamp: serverTimestamp()
+            });
+        }
     });
 }
 

@@ -246,24 +246,70 @@ def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int, or
                 "valuation": math.floor(abs(new_qty) * price)
             }, merge=True)
 
-        # Record Transaction
-        new_tx_ref = db.collection("transactions").document()
-        transaction.set(new_tx_ref, {
-            "uid": uid,
-            "symbol": symbol,
-            "name": name,
-            "type": "SHORT" if cash_to_recieve < proceeds else "SELL",
-            "price": price,
-            "quantity": quantity,
-            "amount": amount,
-            "fee": fee,
-            "profit": profit,
-            "orderType": order_type,
-            "market": market,
-            "creditUsed": credit_to_use,
-            "creditRepaid": credit_repayment,
-            "timestamp": firestore.SERVER_TIMESTAMP
-        })
+        # Record Transaction(s)
+        # If we had a long position and sold more than we had, we split the transaction records.
+        sellable_qty = 0
+        short_qty = 0
+        
+        if current_qty > 0:
+            sellable_qty = min(current_qty, quantity)
+            short_qty = max(0, quantity - sellable_qty)
+        else:
+            short_qty = quantity
+
+        # 1. Record SELL transaction for long position part
+        if sellable_qty > 0:
+            sell_amount = math.floor(price * sellable_qty)
+            sell_fee = math.floor(sell_amount * 0.001)
+            sell_proceeds = sell_amount - sell_fee
+            sell_profit = sell_proceeds - math.floor(current_avg * sellable_qty)
+            
+            # For the first part, credit repayment is handled
+            # (In total, proceeds - credit_repayment is added to balance)
+            # This is a bit tricky to split perfectly, let's keep it simple for the user.
+            
+            tx_sell_ref = db.collection("transactions").document()
+            transaction.set(tx_sell_ref, {
+                "uid": uid,
+                "symbol": symbol,
+                "name": name,
+                "type": "SELL",
+                "price": price,
+                "quantity": sellable_qty,
+                "amount": sell_amount,
+                "fee": sell_fee,
+                "profit": sell_profit,
+                "orderType": order_type,
+                "market": market,
+                "creditUsed": 0,
+                "creditRepaid": credit_repayment if short_qty == 0 else 0, # Simplify: attach repayment to the last record or split? 
+                # Actually, let's just make it clear.
+                "timestamp": firestore.SERVER_TIMESTAMP
+            })
+
+        # 2. Record SHORT transaction for the shorting part
+        if short_qty > 0:
+            short_amount = math.floor(price * short_qty)
+            short_fee = math.floor(short_amount * 0.001)
+            # Short doesn't have realized profit at the time of entry
+            
+            tx_short_ref = db.collection("transactions").document()
+            transaction.set(tx_short_ref, {
+                "uid": uid,
+                "symbol": symbol,
+                "name": name,
+                "type": "SHORT",
+                "price": price,
+                "quantity": short_qty,
+                "amount": short_amount,
+                "fee": short_fee,
+                "profit": 0,
+                "orderType": order_type,
+                "market": market,
+                "creditUsed": short_amount,
+                "creditRepaid": credit_repayment if sellable_qty == 0 else 0,
+                "timestamp": firestore.SERVER_TIMESTAMP
+            })
         
         # Mark user activity in RTDB for mission processing
         try:

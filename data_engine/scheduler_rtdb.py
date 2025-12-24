@@ -401,7 +401,7 @@ def update_all_mission_progress():
     Optimized: Only update missions for users who had a transaction since their last mission update.
     Tracks activity via RTDB user_activities/{uid}.
     """
-    print(f"[{now_kst()}] Checking users for mission updates...")
+    #print(f"[{now_kst()}] Checking users for mission updates...")
     try:
         activities_ref = rtdb_admin.reference('user_activities')
         activities = activities_ref.get()
