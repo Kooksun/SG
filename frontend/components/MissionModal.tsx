@@ -21,9 +21,10 @@ interface MissionModalProps {
     uid: string;
     isOpen: boolean;
     onClose: () => void;
+    isOwner: boolean;
 }
 
-export default function MissionModal({ uid, isOpen, onClose }: MissionModalProps) {
+export default function MissionModal({ uid, isOpen, onClose, isOwner }: MissionModalProps) {
     const [missions, setMissions] = useState<Mission[]>([]);
     const [loading, setLoading] = useState(true);
     const [claiming, setClaiming] = useState<string | null>(null);
@@ -146,11 +147,13 @@ export default function MissionModal({ uid, isOpen, onClose }: MissionModalProps
                                 {mission.status === "COMPLETED" && (
                                     <button
                                         onClick={() => handleClaim(mission.id)}
-                                        disabled={!!claiming}
+                                        disabled={!!claiming || !isOwner}
                                         className="w-full mt-5 bg-yellow-500 hover:bg-yellow-400 disabled:bg-gray-700 disabled:text-gray-500 text-gray-900 font-black py-3 rounded-lg transition-all shadow-lg shadow-yellow-500/10 flex items-center justify-center gap-2 text-sm"
                                     >
                                         {claiming === mission.id ? (
                                             <Loader2 className="animate-spin" size={18} />
+                                        ) : !isOwner ? (
+                                            <>본인만 보상을 받을 수 있습니다</>
                                         ) : (
                                             <>보상 수령하기</>
                                         )}

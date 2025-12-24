@@ -362,6 +362,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                 uid={uid}
                 isOpen={isMissionOpen}
                 onClose={() => setIsMissionOpen(false)}
+                isOwner={currentUser?.uid === uid}
             />
         </main>
     );
