@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Check if user is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // User profiles and sub-collections
+    match /users/{uid} {
+      // Allow reading any profile if signed in (for leaderboard)
+      allow read: if isSignedIn();
+      // Only the owner can write to their own profile
+      allow write: if isSignedIn() && request.auth.uid == uid;
+      
+      // Portfolios sub-collection
+      match /portfolio/{symbol} {
+        // Allow reading any portfolio if signed in (for stats/holders list)
+        allow read: if isSignedIn();
+        // Only the owner can manage their portfolio
+        allow write: if isSignedIn() && request.auth.uid == uid;
+      }
+      
+      // Missions sub-collection
+      match /missions/{date} {
+        // Only the owner can access their missions
+        allow read, write: if isSignedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // Transactions collection (Top-level)
+    match /transactions/{txId} {
+      // Users can only see their own transactions
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      // Users can create their own transactions
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      // Transactions should be immutable
+      allow update, delete: if false;
+    }
+
+    // Active limit orders collection (Top-level)
+    match /active_orders/{orderId} {
+      // Users can view and cancel (delete) their own pending orders
+      allow read, delete: if isSignedIn() && (resource == null || resource.data.uid == request.auth.uid);
+      // Users can create their own orders
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      // Status updates are handled by Backend Admin SDK
+      allow update: if false;
+    }
+    
+    // Support for collectionGroup queries on portfolio
+    match /{path=**}/portfolio/{symbol} {
+      allow read: if isSignedIn();
+    }
+  }
+}

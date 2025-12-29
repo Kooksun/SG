@@ -42,6 +42,15 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     const [hasUnclaimed, setHasUnclaimed] = useState(false);
     const interestAppliedRef = useRef(false);
 
+    // Security: Reset to overview if active tab is private and not the owner
+    useEffect(() => {
+        if (currentUser && currentUser.uid !== uid) {
+            if (activeTab === 'history' || activeTab === 'orders') {
+                setActiveTab('overview');
+            }
+        }
+    }, [uid, currentUser, activeTab]);
+
     useEffect(() => {
         const rateRef = ref(rtdb, 'system/exchange_rate');
         const unsubscribe = onValue(rateRef, (snapshot) => {
@@ -260,25 +269,27 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                             >
                                 Portfolio
                             </button>
-                            <button
-                                onClick={() => setActiveTab('history')}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'history'
-                                    ? 'bg-blue-600 text-white shadow'
-                                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                                    }`}
-                            >
-                                History
-                            </button>
                             {currentUser?.uid === uid && (
-                                <button
-                                    onClick={() => setActiveTab('orders')}
-                                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'orders'
-                                        ? 'bg-blue-600 text-white shadow'
-                                        : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                                        }`}
-                                >
-                                    Orders
-                                </button>
+                                <>
+                                    <button
+                                        onClick={() => setActiveTab('history')}
+                                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'history'
+                                            ? 'bg-blue-600 text-white shadow'
+                                            : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        History
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('orders')}
+                                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'orders'
+                                            ? 'bg-blue-600 text-white shadow'
+                                            : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        Orders
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>
@@ -344,7 +355,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                         </div>
                     )}
 
-                    {activeTab === 'history' && (
+                    {activeTab === 'history' && currentUser?.uid === uid && (
                         <div className="animate-fade-in">
                             <TransactionHistory uid={uid} stocks={stocks} />
                         </div>
