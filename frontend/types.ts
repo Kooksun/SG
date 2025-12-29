@@ -8,6 +8,7 @@ export interface Stock {
     change_percent: number;
     updatedAt: Timestamp | string;
     currency?: string;
+    market?: string;
 }
 
 export interface UserProfile {
@@ -15,6 +16,7 @@ export interface UserProfile {
     email: string;
     displayName: string;
     balance: number;
+    points?: number;
     creditLimit: number;
     usedCredit: number;
     lastInterestDate?: string;

@@ -1,28 +1,31 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { doc, onSnapshot, collection } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, where } from "firebase/firestore";
 import { ref, onValue, set } from "firebase/database";
 import { db, rtdb } from "@/lib/firebase";
 import Navbar from "@/components/Navbar";
 import PortfolioTable from "@/components/PortfolioTable";
 import TransactionHistory from "@/components/TransactionHistory";
 import DashboardOverview from "@/components/DashboardOverview";
+import ActiveOrders from "@/components/ActiveOrders";
+import MissionModal from "@/components/MissionModal";
 import { UserProfile, Stock } from "@/types";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { applyDailyInterestAndAutoLiquidate } from "@/lib/credit";
-import { LayoutDashboard, PieChart, History } from "lucide-react";
+import { LayoutDashboard, PieChart, History, Coins, Gift } from "lucide-react";
 
 interface PortfolioItem {
     symbol: string;
     quantity: number;
+    averagePrice: number;
 }
 
 interface UserDashboardProps {
     uid: string;
 }
 
-type Tab = 'overview' | 'portfolio' | 'history';
+type Tab = 'overview' | 'portfolio' | 'history' | 'orders';
 
 export default function UserDashboard({ uid }: UserDashboardProps) {
     const { user: currentUser } = useAuth();
@@ -30,11 +33,23 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
     const [exchangeRate, setExchangeRate] = useState(1400);
-    const [aiStatus, setAiStatus] = useState<'idle' | 'pending' | 'completed'>('idle');
+    const [aiStatus, setAiStatus] = useState<'init' | 'idle' | 'pending' | 'processing' | 'completed'>('init');
     const [aiResult, setAiResult] = useState<string | null>(null);
     const [aiTimestamp, setAiTimestamp] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<Tab>('overview');
+    const [pendingSymbols, setPendingSymbols] = useState<Set<string>>(new Set());
+    const [isMissionOpen, setIsMissionOpen] = useState(false);
+    const [hasUnclaimed, setHasUnclaimed] = useState(false);
     const interestAppliedRef = useRef(false);
+
+    // Security: Reset to overview if active tab is private and not the owner
+    useEffect(() => {
+        if (currentUser && currentUser.uid !== uid) {
+            if (activeTab === 'history' || activeTab === 'orders') {
+                setActiveTab('overview');
+            }
+        }
+    }, [uid, currentUser, activeTab]);
 
     useEffect(() => {
         const rateRef = ref(rtdb, 'system/exchange_rate');
@@ -46,6 +61,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     }, []);
 
     // Listen for AI Analysis Request Status
+    const [aiSignature, setAiSignature] = useState<string | null>(null);
     useEffect(() => {
         if (!uid) return;
         const aiRef = ref(rtdb, `ai_requests/${uid}`);
@@ -53,6 +69,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
             const data = snapshot.val();
             if (data) {
                 setAiStatus(data.status);
+                setAiSignature(data.portfolioSignature || null);
                 if (data.status === 'completed' && data.result) {
                     setAiResult(data.result);
                     setAiTimestamp(data.completedAt);
@@ -61,6 +78,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                 setAiStatus('idle');
                 setAiResult(null);
                 setAiTimestamp(null);
+                setAiSignature(null);
             }
         });
         return () => unsubscribe();
@@ -97,13 +115,52 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
             const items: PortfolioItem[] = [];
             snapshot.forEach((docSnapshot) => {
                 const data = docSnapshot.data();
+                const symbol = data.symbol || docSnapshot.id;
                 items.push({
-                    symbol: data.symbol,
+                    symbol: symbol,
                     quantity: data.quantity,
+                    averagePrice: data.averagePrice || 0,
                 });
             });
             setPortfolio(items);
         });
+        return () => unsubscribe();
+    }, [uid]);
+
+    useEffect(() => {
+        if (!uid || currentUser?.uid !== uid) {
+            setPendingSymbols(new Set());
+            return;
+        }
+        const q = query(
+            collection(db, "active_orders"),
+            where("uid", "==", uid),
+            where("status", "==", "PENDING")
+        );
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const symbols = new Set<string>();
+            snapshot.docs.forEach(doc => {
+                symbols.add(doc.data().symbol);
+            });
+            setPendingSymbols(symbols);
+        });
+        return () => unsubscribe();
+    }, [uid, currentUser]);
+
+    useEffect(() => {
+        if (!uid) return;
+
+        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+        const unsubscribe = onSnapshot(doc(db, "users", uid, "missions", today), (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const missions = docSnapshot.data().missions || [];
+                const unclaimed = missions.some((m: any) => m.status === "COMPLETED");
+                setHasUnclaimed(unclaimed);
+            } else {
+                setHasUnclaimed(false);
+            }
+        });
+
         return () => unsubscribe();
     }, [uid]);
 
@@ -120,31 +177,64 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
         return () => unsubscribe();
     }, []);
 
+    // Automated AI Refresh Trigger
+    useEffect(() => {
+        if (!uid || aiStatus === ('init' as any) || aiStatus === 'pending' || aiStatus === 'processing' || portfolio.length === 0) return;
+
+        const currentSignature = [...portfolio]
+            .sort((a, b) => a.symbol.localeCompare(b.symbol))
+            .map(item => `${item.symbol}:${item.quantity}`)
+            .join('|');
+
+        const lastUpdateTime = aiTimestamp ? new Date(aiTimestamp).getTime() : 0;
+        const tenMinutesAgo = Date.now() - 600000; // 10 minutes * 60 seconds * 1000ms
+
+        // Auto request if:
+        // 1. Signature changed (Portfolio changed)
+        // 2. AND Last report is older than 10 minutes
+        // 3. AND aiStatus is not init/pending/processing
+        if (currentSignature !== aiSignature && lastUpdateTime < tenMinutesAgo) {
+            console.log("Automated AI Analysis Refresh triggered (10min cooldown).");
+            void handleRequestAiAnalysis();
+        }
+    }, [uid, portfolio, aiSignature, aiTimestamp, aiStatus]);
+
     const handleRequestAiAnalysis = async () => {
         if (!uid) return;
         try {
-            await set(ref(rtdb, `ai_requests/${uid}`), {
+            // Use IMPORT update directly to avoid name collision or misunderstanding
+            const { update: rtdbUpdate } = await import("firebase/database");
+            await rtdbUpdate(ref(rtdb, `ai_requests/${uid}`), {
                 status: 'pending',
+                result: null, // Clear previous results to avoid showing error/stale content during generation
                 timestamp: Date.now()
             });
         } catch (error) {
             console.error("Failed to request AI analysis:", error);
-            alert("분석 요청 중 오류가 발생했습니다.");
         }
     };
 
     if (!userProfile) return <div className="text-white p-8">Loading...</div>;
 
-    let stockValue = 0;
+    let longStockValue = 0;
+    let shortStockValue = 0;
+    let totalShortInitialValue = 0;
     portfolio.forEach((item) => {
         const stock = stocks[item.symbol];
         if (stock) {
             const price = stock.currency === 'USD' ? stock.price * exchangeRate : stock.price;
-            stockValue += item.quantity * price;
+            if (item.quantity > 0) {
+                longStockValue += item.quantity * price;
+            } else if (item.quantity < 0) {
+                // Short value is the current cost to cover. 
+                shortStockValue += Math.abs(item.quantity) * price;
+                // Initial value is what was added to usedCredit when shorting
+                totalShortInitialValue += Math.abs(item.quantity) * (item.averagePrice || 0);
+            }
         }
     });
 
-    const totalAssets = userProfile.balance + stockValue;
+    const totalAssets = (userProfile.balance - totalShortInitialValue) + longStockValue;
 
     return (
         <main className="min-h-screen bg-gray-900 text-white">
@@ -164,8 +254,8 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                             <button
                                 onClick={() => setActiveTab('overview')}
                                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'overview'
-                                        ? 'bg-blue-600 text-white shadow'
-                                        : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                                    ? 'bg-blue-600 text-white shadow'
+                                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
                                     }`}
                             >
                                 Overview
@@ -173,21 +263,63 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                             <button
                                 onClick={() => setActiveTab('portfolio')}
                                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'portfolio'
-                                        ? 'bg-blue-600 text-white shadow'
-                                        : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                                    ? 'bg-blue-600 text-white shadow'
+                                    : 'text-gray-400 hover:text-white hover:bg-gray-700'
                                     }`}
                             >
                                 Portfolio
                             </button>
-                            <button
-                                onClick={() => setActiveTab('history')}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'history'
-                                        ? 'bg-blue-600 text-white shadow'
-                                        : 'text-gray-400 hover:text-white hover:bg-gray-700'
-                                    }`}
-                            >
-                                History
-                            </button>
+                            {currentUser?.uid === uid && (
+                                <>
+                                    <button
+                                        onClick={() => setActiveTab('history')}
+                                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'history'
+                                            ? 'bg-blue-600 text-white shadow'
+                                            : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        History
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('orders')}
+                                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'orders'
+                                            ? 'bg-blue-600 text-white shadow'
+                                            : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        Orders
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Mission & Point Display - Far Right */}
+                    <div className="flex items-center gap-2 mr-2">
+                        <button
+                            onClick={() => setIsMissionOpen(true)}
+                            className="relative flex items-center gap-2 px-3 py-2 bg-gray-900/40 hover:bg-gray-800/60 rounded-lg border border-gray-700/50 transition-all group"
+                        >
+                            <Gift size={18} className={hasUnclaimed ? "text-yellow-400 animate-bounce" : "text-gray-400 group-hover:text-white"} />
+                            <div className="flex flex-col items-start">
+                                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-none">Missions</span>
+                                <span className="text-xs font-bold text-gray-300 leading-tight">Daily</span>
+                            </div>
+                            {hasUnclaimed && (
+                                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-900 animate-pulse"></span>
+                            )}
+                        </button>
+
+                        <div className="px-4 py-2 bg-gray-900/40 rounded-lg border border-gray-700/50 flex items-center gap-3">
+                            <div className="p-1.5 bg-yellow-500/10 rounded-md">
+                                <Coins size={16} className="text-yellow-500" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-none">My Points</span>
+                                <span className="text-sm font-black text-yellow-400 leading-tight">
+                                    {(userProfile.points || 0).toLocaleString()} <span className="text-[10px] font-normal text-gray-400">P</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -197,7 +329,9 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                     {activeTab === 'overview' && (
                         <DashboardOverview
                             userProfile={userProfile}
-                            stockValue={stockValue}
+                            stockValue={longStockValue}
+                            shortValue={shortStockValue}
+                            shortInitialValue={totalShortInitialValue}
                             totalAssets={totalAssets}
                             aiStatus={aiStatus}
                             aiResult={aiResult}
@@ -215,17 +349,32 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                                 balance={userProfile.balance}
                                 creditLimit={userProfile.creditLimit || 0}
                                 usedCredit={userProfile.usedCredit || 0}
+                                pendingSymbols={pendingSymbols}
+                                onTabChange={setActiveTab}
                             />
                         </div>
                     )}
 
-                    {activeTab === 'history' && (
+                    {activeTab === 'history' && currentUser?.uid === uid && (
                         <div className="animate-fade-in">
                             <TransactionHistory uid={uid} stocks={stocks} />
                         </div>
                     )}
+
+                    {activeTab === 'orders' && currentUser?.uid === uid && (
+                        <div className="animate-fade-in">
+                            <ActiveOrders stocks={stocks} exchangeRate={exchangeRate} />
+                        </div>
+                    )}
                 </div>
             </div>
+
+            <MissionModal
+                uid={uid}
+                isOpen={isMissionOpen}
+                onClose={() => setIsMissionOpen(false)}
+                isOwner={currentUser?.uid === uid}
+            />
         </main>
     );
 }

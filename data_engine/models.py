@@ -10,6 +10,7 @@ class Stock:
     change_percent: float
     updated_at: datetime
     currency: str = 'KRW'
+    market: str = 'KRX'
 
     def to_dict(self):
         return {
@@ -19,6 +20,7 @@ class Stock:
             'change': self.change,
             'change_percent': self.change_percent,
             'currency': self.currency,
+            'market': self.market,
             'updatedAt': self.updated_at
         }
 

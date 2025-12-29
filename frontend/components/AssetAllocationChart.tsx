@@ -5,36 +5,36 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 
 interface AssetAllocationChartProps {
     cash: number;
-    stockValue: number;
-    usedCredit?: number; // Optional, if we want to visualize debt
+    stockValue: number; // This is longStockValue
+    shortValue?: number;
+    usedCredit?: number; // Debt
 }
 
 const COLOR_MAP: Record<string, string> = {
     'Cash': '#10B981',   // Emerald
-    'Stock Equity': '#3B82F6', // Blue
-    'Stock Debt': '#EF4444',   // Red
+    'Long': '#3B82F6',   // Blue
+    'Short': '#A855F7',  // Purple
+    'Debt': '#EF4444',    // Red
 };
 
-export default function AssetAllocationChart({ cash, stockValue, usedCredit = 0 }: AssetAllocationChartProps) {
-    // Calculate components
-    const stockDebt = usedCredit;
-    const stockEquity = Math.max(0, stockValue - stockDebt);
+export default function AssetAllocationChart({ cash, stockValue, shortValue = 0, usedCredit = 0 }: AssetAllocationChartProps) {
+    // We want to visualize Asset Distribution and Liabilities.
+    // For the pie chart, we can show:
+    // 1. Cash (Assets)
+    // 2. Long Equity (Portion of Long stocks bought with cash)
+    // 3. Long Debt (Portion of Long stocks bought with credit)
+    // 4. Short Exposure (Current value of short positions)
 
-    // If stock value is less than debt (technically insolvent on stocks), we just show all debt.
-    // In reality, debt > stockValue means negative equity, but chart can't show negative.
-    // We display 'Stock Debt' up to the Stock Value if insolvent, or full debt if we treat it as liability?
-    // Let's stick to the visual: "Portion of Stocks financed by Debt".
-    // So Stock Debt = min(stockValue, usedCredit).
-    // Remaining Debt is not "Stock Debt", it's just "Debt". But for this chart (Asset Allocation),
-    // we are likely visualizing the ASSETS.
+    const debtUsedForLong = Math.min(stockValue, usedCredit);
+    const longEquity = Math.max(0, stockValue - debtUsedForLong);
 
-    const displayStockDebt = Math.min(stockValue, stockDebt);
-    const displayStockEquity = Math.max(0, stockValue - displayStockDebt);
-
+    // Remaining debt (if any) could be from short selling margin. 
+    // But let's keep it simple for a single pie chart:
     const data = [
         { name: 'Cash', value: cash },
-        { name: 'Stock Equity', value: displayStockEquity },
-        { name: 'Stock Debt', value: displayStockDebt },
+        { name: 'Long', value: longEquity },
+        { name: 'Short', value: shortValue },
+        { name: 'Debt', value: usedCredit },
     ];
 
     // Filter out zero values to avoid ugly empty charts
@@ -52,10 +52,12 @@ export default function AssetAllocationChart({ cash, stockValue, usedCredit = 0 
                         data={activeData}
                         cx="50%"
                         cy="50%"
-                        innerRadius="60%"
-                        outerRadius="80%"
+                        innerRadius="50%"
+                        outerRadius="75%"
                         paddingAngle={5}
                         dataKey="value"
+                        label={({ percent }) => percent ? `${(percent * 100).toFixed(0)}%` : ''}
+                        labelLine={false}
                     >
                         {activeData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLOR_MAP[entry.name]} />

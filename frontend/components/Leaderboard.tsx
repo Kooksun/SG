@@ -7,10 +7,14 @@ import { ref, onValue } from "firebase/database";
 import { db, rtdb } from "@/lib/firebase";
 import { UserProfile, Stock } from "@/types";
 import { useRouter } from "next/navigation";
+import { History } from "lucide-react";
+import RankingHistoryModal from "./RankingHistoryModal";
+import StockHoldersModal from "./StockHoldersModal";
 
 interface PortfolioItem {
     symbol: string;
     quantity: number;
+    averagePrice?: number;
 }
 
 export default function Leaderboard() {
@@ -20,17 +24,31 @@ export default function Leaderboard() {
     const [globalHoldings, setGlobalHoldings] = useState<Record<string, number>>({});
     const [globalChartMetric, setGlobalChartMetric] = useState<"value" | "quantity">("value");
     const [exchangeRate, setExchangeRate] = useState(1400);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [isHoldersModalOpen, setIsHoldersModalOpen] = useState(false);
+    const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
     const router = useRouter();
+
+    const userMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        users.forEach((u) => {
+            map[u.uid] = u.displayName || "Unknown";
+        });
+        return map;
+    }, [users]);
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, "users"), (snapshot) => {
             const userData: UserProfile[] = [];
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data() as UserProfile;
+                const uid = docSnap.id;
                 if (typeof data.startingBalance !== "number") {
-                    void updateDoc(doc(db, "users", data.uid), { startingBalance: 100000000 });
-                    data.startingBalance = 100000000;
+                    void updateDoc(doc(db, "users", uid), { startingBalance: 500000000 });
+                    data.startingBalance = 500000000;
                 }
+                // Ensure data.uid is also set if missing from document
+                if (!data.uid) data.uid = uid;
                 userData.push(data);
             });
             setUsers(userData);
@@ -80,6 +98,7 @@ export default function Leaderboard() {
                     items.push({
                         symbol: data.symbol,
                         quantity: data.quantity,
+                        averagePrice: data.averagePrice,
                     });
                 });
                 setPortfolios((prev) => ({
@@ -116,11 +135,33 @@ export default function Leaderboard() {
                 const stock = stocks[item.symbol];
                 if (!stock) return total;
                 const price = stock.currency === 'USD' ? stock.price * exchangeRate : stock.price;
+                return total + price * item.quantity; // item.quantity is negative for shorts
+            }, 0);
+
+            // For short positions, usedCredit includes a liability (margin) equal to the initial sell value.
+            // To get net equity, we must add back that margin because 'holdingsValue' already subtracted the current cost to cover.
+            // Equity = Cash + LongValue - ShortValue - (TotalUsedCredit - ShortInitialValue)
+            // Equity = balance + LongValue - ShortValue - TotalUsedCredit + ShortInitialValue
+            const shortInitialValue = holdings.reduce((total, item) => {
+                if (item.quantity < 0) {
+                    return total + (Math.abs(item.quantity) * (item.averagePrice || 0));
+                }
+                return total;
+            }, 0);
+
+            const usedCredit = typeof user.usedCredit === "number" ? user.usedCredit : 0;
+
+            // totalAssets for display: Cash + LongValue
+            const longValue = holdings.reduce((total, item) => {
+                if (item.quantity <= 0) return total;
+                const stock = stocks[item.symbol];
+                if (!stock) return total;
+                const price = stock.currency === 'USD' ? stock.price * exchangeRate : stock.price;
                 return total + price * item.quantity;
             }, 0);
-            const usedCredit = typeof user.usedCredit === "number" ? user.usedCredit : 0;
-            const totalAssets = user.balance + holdingsValue;
-            const equity = totalAssets - usedCredit; // net assets after accounting for borrowed credit
+            const totalAssets = (user.balance - shortInitialValue) + longValue;
+
+            const equity = user.balance + holdingsValue - (usedCredit - shortInitialValue);
             const startingBalance = typeof user.startingBalance === "number" ? user.startingBalance : 100000000;
             const profit = equity - startingBalance;
             const returnPct = startingBalance ? (profit / startingBalance) * 100 : 0;
@@ -180,7 +221,16 @@ export default function Leaderboard() {
 
     return (
         <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-            <h2 className="text-2xl font-bold mb-4 text-white">Leaderboard</h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-white">Leaderboard</h2>
+                <button
+                    onClick={() => setIsHistoryOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-blue-400 rounded-lg transition-all text-sm font-medium border border-gray-600 whitespace-nowrap"
+                >
+                    <History size={18} />
+                    순위 기록 보기
+                </button>
+            </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-gray-300">
                     <thead>
@@ -250,7 +300,13 @@ export default function Leaderboard() {
                                 return (
                                     <div
                                         key={`${slice.symbol}-${idx}`}
-                                        className="flex items-center justify-between text-sm text-gray-200 bg-gray-700/50 rounded px-3 py-2"
+                                        className={`flex items-center justify-between text-sm text-gray-200 bg-gray-700/50 rounded px-3 py-2 ${slice.symbol !== "기타" ? "cursor-pointer hover:bg-gray-600 transition-colors" : ""}`}
+                                        onClick={() => {
+                                            if (slice.symbol !== "기타") {
+                                                setSelectedSymbol(slice.symbol);
+                                                setIsHoldersModalOpen(true);
+                                            }
+                                        }}
                                     >
                                         <div className="flex items-center gap-2">
                                             <span
@@ -274,6 +330,22 @@ export default function Leaderboard() {
                     <p className="text-gray-400 text-sm">집계된 포트폴리오 데이터가 없습니다.</p>
                 )}
             </div>
+
+            <RankingHistoryModal
+                isOpen={isHistoryOpen}
+                onClose={() => setIsHistoryOpen(false)}
+                userMap={userMap}
+            />
+
+            <StockHoldersModal
+                isOpen={isHoldersModalOpen}
+                onClose={() => setIsHoldersModalOpen(false)}
+                stock={selectedSymbol ? stocks[selectedSymbol] : null}
+                symbol={selectedSymbol}
+                users={users}
+                portfolios={portfolios}
+                exchangeRate={exchangeRate}
+            />
         </div>
     );
 }

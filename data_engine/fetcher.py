@@ -26,7 +26,9 @@ US_TICKER_MAP = {
     'V': '비자', 'MA': '마스터카드', 'PYPL': '페이팔', 
     'UBER': '우버', 'ABNB': '에어비앤비', 'LCID': '루시드', 'U': '유니티', 
     'RBLX': '로블록스', 'OPEN': '오픈도어', 'SOFI': '소파이', 'AFRM': '어펌', 
-    'UPST': '업스타트', 'DKNG': '드래프트킹스', 'AI': 'C3 AI'
+    'UPST': '업스타트', 'DKNG': '드래프트킹스', 'AI': 'C3 AI',
+    'SQQQ': 'SQQQ (나스닥 3배 인버스)', 'SOXS': 'SOXS (반도체 3배 인버스)',
+    'BITI': 'BITI (비트코인 인버스)', 'PSQ': 'PSQ (나스닥 1배 인버스)'
 }
 
 def _to_float(value) -> float:
@@ -49,6 +51,14 @@ def _build_stock_from_row(row, currency='KRW') -> Stock:
     # This function is primarily for the KRX listing format.
     symbol = str(row['Code'])
     name = row['Name']
+    raw_market = row.get('Market', 'KOSPI')
+    if 'KOSDAQ' in raw_market:
+        market = 'KOSDAQ'
+    elif 'KOSPI' in raw_market:
+        market = 'KRX'  # Google Finance uses KRX for KOSPI
+    else:
+        market = 'KRX'
+    
     # KR stocks are usually integer prices, but let's use float to be safe and consistent
     price = _to_float(row['Close'])
     change = _to_float(row['Changes'])
@@ -61,7 +71,8 @@ def _build_stock_from_row(row, currency='KRW') -> Stock:
         change=change,
         change_percent=change_percent,
         updated_at=datetime.now(MARKET_TZ),
-        currency=currency
+        currency=currency,
+        market=market
     )
 
 def fetch_top_stocks(limit: int = 100, additional_symbols: Iterable[str] = ()) -> Dict[str, Stock]:
@@ -141,7 +152,8 @@ def fetch_us_stocks() -> Dict[str, Stock]:
                 change=change,
                 change_percent=change_percent,
                 updated_at=datetime.now(MARKET_TZ),
-                currency='USD'
+                currency='USD',
+                market='NASDAQ'  # Default for US in this app
             )
             snapshot[stock.symbol] = stock
             
@@ -198,6 +210,19 @@ def fetch_single_stock(symbol: str) -> Optional[Stock]:
             change = 0.0
             change_percent = 0.0
 
+        # Try to find market info from StockListing if KR
+        market = 'NASDAQ' if is_us else 'KRX'
+        if not is_us:
+            try:
+                # We could cache this but for a single fetch it's okay for now
+                listing = fdr.StockListing('KRX')
+                row = listing[listing['Code'] == symbol]
+                if not row.empty:
+                    raw_market = row.iloc[0]['Market']
+                    market = 'KOSDAQ' if 'KOSDAQ' in raw_market else 'KRX'
+            except:
+                pass
+
         return Stock(
             symbol=symbol,
             name=name,
@@ -205,7 +230,8 @@ def fetch_single_stock(symbol: str) -> Optional[Stock]:
             change=change,
             change_percent=change_percent,
             updated_at=datetime.now(MARKET_TZ),
-            currency=currency
+            currency=currency,
+            market=market
         )
     except Exception as e:
         print(f"Error fetching single stock {symbol}: {e}")
@@ -265,6 +291,51 @@ def update_stocks(limit: int = 100):
 if __name__ == "__main__":
     update_stocks()
 
+def fetch_indices() -> Dict[str, Dict]:
+    """
+    Fetch major market indices: KOSPI, KOSDAQ, S&P 500, Nasdaq, Dow Jones.
+    """
+    indices = {
+        'KOSPI': 'KS11',
+        'KOSDAQ': 'KQ11',
+        'S&P 500': 'US500',
+        'Nasdaq': 'IXIC',
+        'Dow Jones': 'DJI'
+    }
+    
+    results = {}
+    print(f"Fetching latest market indices...")
+    for name, sym in indices.items():
+        try:
+            # Fetch last few days to ensure we have data to calculate change
+            df = fdr.DataReader(sym, start=(datetime.now() - pd.Timedelta(days=5)).strftime('%Y-%m-%d'))
+            if df.empty:
+                continue
+                
+            last_row = df.iloc[-1]
+            if len(df) >= 2:
+                prev_close = float(df.iloc[-2]['Close'])
+                price = float(last_row['Close'])
+                change = float(price - prev_close)
+                change_percent = float((change / prev_close) * 100)
+            else:
+                price = float(last_row['Close'])
+                change = 0.0
+                change_percent = 0.0
+
+            results[name] = {
+                'symbol': sym,
+                'name': name,
+                'price': price,
+                'change': change,
+                'change_percent': change_percent,
+                'updated_at': datetime.now(MARKET_TZ).isoformat()
+            }
+        except Exception as e:
+            print(f"Error fetching index {name} ({sym}): {e}")
+            
+    return results
+
 def fetch_stock_history(symbol: str, days: int = 90) -> List[Dict]:
     """
     Fetches historical daily data using yfinance.
@@ -284,14 +355,14 @@ def fetch_stock_history(symbol: str, days: int = 90) -> List[Dict]:
     try:
         ticker = yf.Ticker(yf_symbol)
         # Fetch slightly more than needed to ensure we have enough trading days
-        hist = ticker.history(period="3mo", interval="1d")
+        hist = ticker.history(period="1y", interval="1d")
         
         if hist.empty and not is_known_us:
              # Fallback to KQ if KS failed (only for implicit KR stocks)
              yf_symbol = f"{symbol}.KQ"
              print(f"Retrying with {yf_symbol}...")
              ticker = yf.Ticker(yf_symbol)
-             hist = ticker.history(period="3mo", interval="1d")
+             hist = ticker.history(period="1y", interval="1d")
         
         if hist.empty:
             print(f"No history found for {symbol}")
@@ -310,7 +381,8 @@ def fetch_stock_history(symbol: str, days: int = 90) -> List[Dict]:
                 'open': float(row['Open']),
                 'high': float(row['High']),
                 'low': float(row['Low']),
-                'close': float(row['Close'])
+                'close': float(row['Close']),
+                'volume': float(row['Volume'])
             })
             
         return formatted_data

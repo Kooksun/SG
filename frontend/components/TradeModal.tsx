@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useRef } from "react";
 import { Stock } from "@/types";
-import { buyStock, sellStock } from "@/lib/trade";
+import { buyStock, sellStock, placeLimitOrder } from "@/lib/trade";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { ref, onValue, get, child } from "firebase/database";
+import { ref, onValue, get, child, set } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
-import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickSeries } from 'lightweight-charts';
+import { supabase } from "@/lib/supabase";
+import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts';
 
 interface TradeModalProps {
     isOpen: boolean;
@@ -25,10 +26,17 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [exchangeRate, setExchangeRate] = useState(1400);
+    const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">("MARKET");
+    const [limitPrice, setLimitPrice] = useState(0);
+    const [chartLoading, setChartLoading] = useState(false);
 
     const chartContainerRef = useRef<HTMLDivElement>(null);
+    const chartInfoRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+    const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+    const ma5SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+    const ma20SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
     useEffect(() => {
         const rateRef = ref(rtdb, 'system/exchange_rate');
@@ -44,18 +52,75 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
         if (!isOpen || !stock.symbol) return;
 
         const fetchHistory = async () => {
+            setChartLoading(true);
             try {
-                const snapshot = await get(child(ref(rtdb), `stock_history/${stock.symbol}`));
-                if (snapshot.exists()) {
-                    const data = snapshot.val();
-                    if (Array.isArray(data) && chartRef.current && seriesRef.current) {
-                        // Sort just in case
-                        const sortedData = data.sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime());
-                        seriesRef.current.setData(sortedData);
-                    }
+                const { data, error } = await supabase
+                    .from('stock_history')
+                    .select('time, open, high, low, close, volume')
+                    .eq('symbol', stock.symbol)
+                    .order('time', { ascending: true });
+
+                if (error) {
+                    console.error("Supabase query error:", error);
+                    throw error;
                 }
-            } catch (e) {
-                console.error("Failed to fetch history:", e);
+
+                if (data && data.length > 0 && chartRef.current && seriesRef.current && volumeSeriesRef.current && ma5SeriesRef.current && ma20SeriesRef.current) {
+                    // ... (기존 데이터 세팅 로직)
+                    const candlestickData = data.map(d => ({
+                        time: d.time,
+                        open: d.open,
+                        high: d.high,
+                        low: d.low,
+                        close: d.close
+                    }));
+
+                    seriesRef.current.setData(candlestickData);
+
+                    volumeSeriesRef.current.setData(data.map(d => ({
+                        time: d.time,
+                        value: d.volume,
+                        color: d.close >= d.open ? 'rgba(239, 68, 68, 0.5)' : 'rgba(59, 130, 246, 0.5)'
+                    })));
+
+                    // Calculate Moving Averages
+                    const calculateMA = (period: number) => {
+                        return data.map((d, i) => {
+                            if (i < period - 1) return null;
+                            const sum = data.slice(i - period + 1, i + 1).reduce((acc, curr) => acc + curr.close, 0);
+                            return { time: d.time, value: sum / period };
+                        }).filter(d => d !== null) as { time: string, value: number }[];
+                    };
+
+                    ma5SeriesRef.current.setData(calculateMA(5));
+                    ma20SeriesRef.current.setData(calculateMA(20));
+                } else if ((!data || data.length === 0) && stock.symbol) {
+                    // Trigger history fetch request to backend via RTDB
+                    console.log(`History data empty for ${stock.symbol}. Requesting fetch...`);
+                    const historyReqRef = ref(rtdb, `history_requests/${stock.symbol}`);
+                    const snapshot = await get(historyReqRef);
+
+                    if (!snapshot.exists() || snapshot.val().status === 'error') {
+                        await set(historyReqRef, {
+                            status: 'pending',
+                            requestedAt: new Date().toISOString()
+                        });
+                    }
+
+                    // Listen for completion to re-fetch
+                    const unsubscribe = onValue(historyReqRef, (snap) => {
+                        const val = snap.val();
+                        if (val && val.status === 'completed') {
+                            console.log(`History fetch completed for ${stock.symbol}. Re-fetching...`);
+                            unsubscribe(); // stop listening
+                            fetchHistory(); // Try again
+                        }
+                    });
+                }
+            } catch (e: any) {
+                console.error("Failed to fetch history from Supabase:", e?.message || e);
+            } finally {
+                setChartLoading(false);
             }
         };
 
@@ -89,10 +154,112 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
             borderVisible: false,
             wickUpColor: '#ef4444',
             wickDownColor: '#3b82f6',
+            lastValueVisible: false, // Remove last price label
+            priceLineVisible: false, // Remove price line
+        });
+
+        const volumeSeries = chart.addSeries(HistogramSeries, {
+            color: '#26a69a',
+            priceFormat: {
+                type: 'volume',
+            },
+            priceScaleId: '', // set as overlay
+            lastValueVisible: false, // Remove last volume label
+        });
+
+        volumeSeries.priceScale().applyOptions({
+            scaleMargins: {
+                top: 0.8,
+                bottom: 0,
+            },
+        });
+
+        const ma5Series = chart.addSeries(LineSeries, {
+            color: '#eab308', // yellow-500
+            lineWidth: 1,
+            lastValueVisible: false, // Remove MA5 label
+            priceLineVisible: false,
+        });
+
+        const ma20Series = chart.addSeries(LineSeries, {
+            color: '#ec4899', // pink-500
+            lineWidth: 1,
+            lastValueVisible: false, // Remove MA20 label
+            priceLineVisible: false,
+        });
+
+        // Legend implementation - Move OUTSIDE to chartInfoRef
+        const legend = chartInfoRef.current;
+        if (!legend) return;
+
+        const setLegendText = (data: any) => {
+            const dateStr = data.time.toString();
+            const volume = data.volume !== undefined ? data.volume : (data.value || 0);
+            const isKR = stock.currency === 'KRW';
+
+            // Format volume (e.g., 1.2M, 500K)
+            const formatVol = (v: number) => {
+                if (v >= 1000000) return (v / 1000000).toFixed(2) + 'M';
+                if (v >= 1000) return (v / 1000).toFixed(1) + 'K';
+                return v.toLocaleString();
+            };
+
+            const formatPrice = (p: number) => {
+                return isKR ? Math.floor(p).toLocaleString() : p.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            };
+
+            const colorClass = data.close >= data.open ? 'text-red-400' : 'text-blue-400';
+
+            legend.innerHTML = `
+                <div class="flex items-center justify-between w-full border-b border-gray-700 pb-1 mb-1">
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-400 font-mono">${dateStr}</span>
+                        ${data.ma5 ? `<span class="text-[10px] text-yellow-500 whitespace-nowrap">MA5: ${formatPrice(data.ma5)}</span>` : ''}
+                        ${data.ma20 ? `<span class="text-[10px] text-pink-500 whitespace-nowrap">MA20: ${formatPrice(data.ma20)}</span>` : ''}
+                    </div>
+                    <div class="text-emerald-400 font-bold ml-2">Vol: ${formatVol(volume)}</div>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-[10px] md:text-sm font-mono">
+                    <div class="flex flex-col"><span class="text-gray-500 text-[8px] md:text-[10px]">OPEN</span><span class="${colorClass}">${formatPrice(data.open)}</span></div>
+                    <div class="flex flex-col"><span class="text-gray-500 text-[8px] md:text-[10px]">HIGH</span><span class="${colorClass}">${formatPrice(data.high)}</span></div>
+                    <div class="flex flex-col"><span class="text-gray-500 text-[8px] md:text-[10px]">LOW</span><span class="${colorClass}">${formatPrice(data.low)}</span></div>
+                    <div class="flex flex-col"><span class="text-gray-500 text-[8px] md:text-[10px]">CLOSE</span><span class="${colorClass}">${formatPrice(data.close)}</span></div>
+                </div>
+            `;
+        };
+
+        chart.subscribeCrosshairMove(param => {
+            if (
+                param.point === undefined ||
+                !param.time ||
+                param.point.x < 0 ||
+                param.point.x > chartContainerRef.current!.clientWidth ||
+                param.point.y < 0 ||
+                param.point.y > chartContainerRef.current!.clientHeight
+            ) {
+                return;
+            }
+
+            const candle = param.seriesData.get(candlestickSeries) as any;
+            const vol = param.seriesData.get(volumeSeries) as any;
+            const ma5 = param.seriesData.get(ma5Series) as any;
+            const ma20 = param.seriesData.get(ma20Series) as any;
+
+            if (candle && vol) {
+                setLegendText({
+                    ...candle,
+                    volume: vol.value,
+                    ma5: ma5?.value,
+                    ma20: ma20?.value
+                });
+            }
         });
 
         chartRef.current = chart;
-        seriesRef.current = candlestickSeries;
+        seriesRef.current = candlestickSeries as ISeriesApi<"Candlestick">;
+        volumeSeriesRef.current = volumeSeries as ISeriesApi<"Histogram">;
+        ma5SeriesRef.current = ma5Series as ISeriesApi<"Line">;
+        ma20SeriesRef.current = ma20Series as ISeriesApi<"Line">;
 
         const handleResize = () => {
             if (chartContainerRef.current) {
@@ -146,6 +313,13 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
             close: stock.price
         });
 
+        if (volumeSeriesRef.current) {
+            volumeSeriesRef.current.update({
+                time: today,
+                value: 0, // We don't have realtime volume streaming yet
+            });
+        }
+
     }, [stock.price]);
 
     const isUS = stock.currency === 'USD';
@@ -155,15 +329,23 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     // Calculate max quantity based on mode
     const availableCredit = Math.max(0, creditLimit - usedCredit);
     const totalBuyingPower = balance + availableCredit;
+
+    // For selling/shorting: you can sell what you own + what you can short with credit
+    const maxShortable = Math.floor(availableCredit / effectivePrice);
+    const maxSellQuantity = Math.max(0, holdingQuantity) + maxShortable;
+
     const maxQuantity = mode === "BUY"
         ? Math.floor(totalBuyingPower / effectivePrice)
-        : holdingQuantity;
+        : maxSellQuantity;
 
     useEffect(() => {
         if (isOpen) {
             setQuantity(1);
+            setOrderType("MARKET");
         }
     }, [isOpen, stock.symbol]);
+
+
 
     // Ensure quantity doesn't exceed max when switching modes
     useEffect(() => {
@@ -178,23 +360,22 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     const fee = mode === "SELL" ? Math.floor(amount * 0.0005) : 0;
     const total = mode === "BUY" ? amount : amount - fee;
 
+    const isShorting = mode === "SELL" && quantity > Math.max(0, holdingQuantity);
+    const isCovering = mode === "BUY" && holdingQuantity < 0;
+
     const handleTrade = async () => {
         if (!user) return;
         setLoading(true);
         setError("");
         try {
-            if (mode === "BUY") {
-                if (amount > totalBuyingPower) {
-                    throw new Error("Insufficient funds");
+            if (orderType === "MARKET") {
+                if (mode === "BUY") {
+                    await buyStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity, stock.market);
+                } else {
+                    await sellStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity, stock.market);
                 }
-                // Pass effectivePrice (KRW) to buyStock
-                await buyStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity);
             } else {
-                if (quantity > holdingQuantity) {
-                    throw new Error("Insufficient shares");
-                }
-                // Pass effectivePrice (KRW) to sellStock
-                await sellStock(user.uid, stock.symbol, effectivePrice, quantity);
+                await placeLimitOrder(user.uid, stock.symbol, stock.name, mode, limitPrice, quantity, stock.market);
             }
             onClose();
         } catch (err: any) {
@@ -210,7 +391,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                 <h2 className="text-xl font-bold mb-4 flex items-center border-b border-gray-700 pb-4 shrink-0">
                     {stock.name} <span className="text-gray-400 text-sm ml-2 font-normal">({stock.symbol})</span>
                     <a
-                        href={`https://www.google.com/finance/quote/${stock.symbol}:${isUS ? "NASDAQ" : "KRX"}`}
+                        href={`https://www.google.com/finance/quote/${stock.symbol}:${stock.market || (isUS ? "NASDAQ" : "KRX")}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="ml-auto px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm text-blue-400 font-normal transition-colors"
@@ -221,8 +402,19 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
                 <div className="flex flex-col md:flex-row md:gap-8">
                     {/* Chart Column */}
-                    <div className="w-full md:w-[600px] mb-6 md:mb-0 shrink-0">
-                        <div ref={chartContainerRef} className="w-full h-[300px] md:h-[450px] bg-gray-900 rounded border border-gray-700 overflow-hidden" />
+                    <div className="w-full md:w-[600px] mb-6 md:mb-0 shrink-0 flex flex-col gap-2 relative">
+                        <div className="relative">
+                            <div ref={chartContainerRef} className="w-full h-[300px] md:h-[450px] bg-gray-900 rounded border border-gray-700 overflow-hidden relative" />
+                            {chartLoading && (
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/60 backdrop-blur-[2px] z-20 pointer-events-none transition-opacity duration-300">
+                                    <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
+                                    <div className="text-sm font-medium text-blue-200 animate-pulse">차트 데이터를 불러오는 중...</div>
+                                </div>
+                            )}
+                        </div>
+                        <div ref={chartInfoRef} className="min-h-[60px] bg-gray-900/50 p-2 rounded border border-gray-700 text-xs text-gray-400 flex flex-col justify-center">
+                            차트 위에 마우스를 올리면 상세 정보를 확인할 수 있습니다.
+                        </div>
                     </div>
 
                     {/* Trade UI Column */}
@@ -242,22 +434,57 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                             </button>
                         </div>
 
+                        <div className="flex gap-2 mb-4 bg-gray-900 p-1 rounded">
+                            <button
+                                onClick={() => setOrderType("MARKET")}
+                                className={`flex-1 py-1 text-sm rounded ${orderType === "MARKET" ? "bg-gray-700 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                            >
+                                Market
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setOrderType("LIMIT");
+                                    setLimitPrice(effectivePrice);
+                                }}
+                                className={`flex-1 py-1 text-sm rounded ${orderType === "LIMIT" ? "bg-gray-700 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                            >
+                                Limit
+                            </button>
+                        </div>
+
                         <div className="space-y-4 flex-1">
                             <div>
-                                <label className="block text-sm text-gray-400">Price</label>
-                                <div className="text-lg font-bold">
-                                    {isUS ? (
-                                        <>
-                                            ${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            <span className="text-sm text-gray-400 ml-2">
-                                                (≈ {effectivePrice.toLocaleString()} KRW)
-                                            </span>
-                                        </>
-                                    ) : (
-                                        `${stock.price.toLocaleString()} KRW`
-                                    )}
-                                </div>
-                                {isUS && (
+                                <label className="block text-sm text-gray-400">{orderType === "MARKET" ? "Current Price" : "Target Price"}</label>
+                                {orderType === "MARKET" ? (
+                                    <div className="text-lg font-bold">
+                                        {isUS ? (
+                                            <>
+                                                ${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                <span className="text-sm text-gray-400 ml-2">
+                                                    (≈ {effectivePrice.toLocaleString()} KRW)
+                                                </span>
+                                            </>
+                                        ) : (
+                                            `${stock.price.toLocaleString()} KRW`
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-1 mt-1">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                value={limitPrice}
+                                                onChange={(e) => setLimitPrice(parseInt(e.target.value) || 0)}
+                                                className="w-full bg-gray-700 rounded p-2 text-white font-bold"
+                                            />
+                                            <span className="text-sm">KRW</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            Current: {effectivePrice.toLocaleString()} KRW
+                                        </div>
+                                    </div>
+                                )}
+                                {isUS && orderType === "MARKET" && (
                                     <div className="text-xs text-gray-500">
                                         Exchange Rate: 1 USD = {exchangeRate.toLocaleString()} KRW
                                     </div>
@@ -310,14 +537,35 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                                     <span>
                                         {mode === "BUY"
                                             ? `${balance.toLocaleString()} KRW (Cash) + ${availableCredit.toLocaleString()} KRW (Credit)`
-                                            : `${holdingQuantity} Shares`}
+                                            : holdingQuantity > 0
+                                                ? `${holdingQuantity} Shares owned + ${maxShortable} Shortable`
+                                                : holdingQuantity < 0
+                                                    ? `Shorting ${Math.abs(holdingQuantity)} Shares + ${maxShortable} Shortable`
+                                                    : `${maxShortable} Shortable`}
                                     </span>
                                 </div>
-                                {mode === "BUY" && amount > balance && (
+                                {mode === "BUY" && isCovering && (
+                                    <div className="mt-2 p-2 bg-blue-900 border border-blue-600 rounded text-sm text-blue-200">
+                                        ℹ️ This will cover your short position.
+                                    </div>
+                                )}
+                                {mode === "BUY" && !isCovering && amount > balance && (
                                     <div className="mt-2 p-2 bg-yellow-900 border border-yellow-600 rounded text-sm text-yellow-200">
                                         ⚠️ Credit will be used: {(amount - balance).toLocaleString()} KRW
                                     </div>
                                 )}
+                                {mode === "SELL" && isShorting && (
+                                    <div className="mt-2 p-2 bg-purple-900 border border-purple-600 rounded text-sm text-purple-200">
+                                        ⚠️ This is a short sell. Margin will be used: {amount.toLocaleString()} KRW
+                                    </div>
+                                )}
+                                {orderType === "LIMIT" && (
+                                    (mode === "BUY" && limitPrice >= effectivePrice) || (mode === "SELL" && limitPrice <= effectivePrice)
+                                ) && (
+                                        <div className="mt-2 p-2 bg-orange-900 border border-orange-600 rounded text-sm text-orange-200">
+                                            ⚠️ Current price satisfies your limit. This order will likely execute immediately.
+                                        </div>
+                                    )}
                             </div>
                         </div>
 
@@ -332,10 +580,10 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                             </button>
                             <button
                                 onClick={handleTrade}
-                                disabled={loading || quantity <= 0 || (mode === "BUY" && amount > totalBuyingPower) || (mode === "SELL" && quantity > holdingQuantity)}
+                                disabled={loading || quantity <= 0 || (mode === "BUY" && amount > totalBuyingPower) || (mode === "SELL" && quantity > maxSellQuantity)}
                                 className={`flex-1 py-2 rounded ${mode === "BUY" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"} disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
-                                {loading ? "Processing..." : mode}
+                                {loading ? "Processing..." : orderType === "LIMIT" ? "Limit Order" : isShorting ? "Short" : isCovering ? "Buy to Cover" : mode}
                             </button>
                         </div>
                     </div>

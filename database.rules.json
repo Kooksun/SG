@@ -1,0 +1,46 @@
+{
+    "rules": {
+        "stocks": {
+            ".read": "auth != null",
+            ".write": false
+        },
+        "system": {
+            ".read": "auth != null",
+            ".write": false
+        },
+        "user_activities": {
+            "$uid": {
+                ".read": "auth != null && auth.uid == $uid",
+                ".write": "auth != null && auth.uid == $uid"
+            }
+        },
+        "ai_requests": {
+            "$uid": {
+                ".read": "auth != null && auth.uid == $uid",
+                ".write": "auth != null && auth.uid == $uid"
+            }
+        },
+        "search_requests": {
+            "$uid": {
+                ".read": "auth != null && auth.uid == $uid",
+                ".write": "auth != null && auth.uid == $uid"
+            }
+        },
+        "search_results": {
+            "$uid": {
+                ".read": "auth != null && auth.uid == $uid",
+                ".write": false
+            }
+        },
+        "history_requests": {
+            "$symbol": {
+                ".read": "auth != null",
+                ".write": "auth != null"
+            }
+        },
+        "custom_symbols": {
+            ".read": "auth != null",
+            ".write": false
+        }
+    }
+}

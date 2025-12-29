@@ -41,12 +41,12 @@ export default function LoginPage() {
                     uid: user.uid,
                     email: user.email,
                     displayName: displayName || email.split("@")[0],
-                    balance: 100000000, // 100 Million KRW
-                    creditLimit: 50000000, // 50 Million KRW Credit Limit
+                    balance: 500000000, // 500 Million KRW
+                    creditLimit: 500000000, // 500 Million KRW Credit Limit
                     usedCredit: 0, // No credit used initially
                     lastInterestDate: new Date().toISOString().slice(0, 10),
-                    totalAssetValue: 100000000,
-                    startingBalance: 100000000,
+                    totalAssetValue: 500000000,
+                    startingBalance: 500000000,
                     createdAt: serverTimestamp(),
                 });
             } else {
@@ -64,13 +64,13 @@ export default function LoginPage() {
 
                     // Initialize missing credit fields for legacy users
                     if (typeof userData.creditLimit !== "number") {
-                        updates.creditLimit = 50000000;
+                        updates.creditLimit = 500000000;
                     }
                     if (typeof userData.usedCredit !== "number") {
                         updates.usedCredit = 0;
                     }
                     if (typeof userData.startingBalance !== "number") {
-                        updates.startingBalance = 100000000;
+                        updates.startingBalance = 500000000;
                     }
                     if (!userData.lastInterestDate) {
                         updates.lastInterestDate = new Date().toISOString().slice(0, 10);

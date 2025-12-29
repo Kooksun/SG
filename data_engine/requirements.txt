@@ -5,3 +5,5 @@ schedule
 yfinance
 google-generativeai
 python-dotenv
+supabase
+groq
