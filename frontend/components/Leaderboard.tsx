@@ -165,7 +165,7 @@ export default function Leaderboard() {
             const totalAssets = (user.balance - shortInitialValue) + longValue;
 
             const equity = user.balance + holdingsValue - (usedCredit - shortInitialValue);
-            const startingBalance = typeof user.startingBalance === "number" ? user.startingBalance : 100000000;
+            const startingBalance = typeof user.startingBalance === "number" ? user.startingBalance : 500000000;
             const profit = equity - startingBalance;
             const returnPct = startingBalance ? (profit / startingBalance) * 100 : 0;
             return {
