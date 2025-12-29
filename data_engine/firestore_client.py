@@ -4,8 +4,23 @@ from firebase_admin import firestore
 import os
 
 # Initialize Firebase Admin
-cred_path = os.path.join(os.path.dirname(__file__), 'serviceAccountKey.json')
-cred = credentials.Certificate(cred_path)
+cred_json = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
+
+if cred_json:
+    import json
+    # If JSON string is provided via environment variable
+    cred_dict = json.loads(cred_json)
+    cred = credentials.Certificate(cred_dict)
+    print("Initializing Firebase with credentials from environment variable.")
+else:
+    # Use local file as fallback
+    cred_path = os.path.join(os.path.dirname(__file__), 'serviceAccountKey.json')
+    if os.path.exists(cred_path):
+        cred = credentials.Certificate(cred_path)
+        print(f"Initializing Firebase with credentials from file: {cred_path}")
+    else:
+        raise ValueError("Firebase credentials not found. Provide FIREBASE_SERVICE_ACCOUNT_JSON env var or serviceAccountKey.json file.")
+
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://stock-8ff9e-default-rtdb.firebaseio.com/'
 })
