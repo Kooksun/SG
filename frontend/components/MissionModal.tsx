@@ -42,7 +42,9 @@ export default function MissionModal({ uid, isOpen, onClose, isOwner }: MissionM
             }
             setLoading(false);
         }, (error) => {
-            console.error("Error fetching missions:", error);
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching missions in MissionModal:", error);
+            }
             setLoading(false);
         });
 

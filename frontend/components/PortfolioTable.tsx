@@ -62,6 +62,10 @@ export default function PortfolioTable({
                 items.push(data);
             });
             setPortfolio(items);
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching portfolio in PortfolioTable:", error);
+            }
         });
 
         return () => unsubscribe();

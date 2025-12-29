@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { collection, onSnapshot, updateDoc, doc, collectionGroup } from "firebase/firestore";
 import { ref, onValue } from "firebase/database";
-import { db, rtdb } from "@/lib/firebase";
+import { auth, db, rtdb } from "@/lib/firebase";
 import { UserProfile, Stock } from "@/types";
 import { useRouter } from "next/navigation";
 import { History } from "lucide-react";
+import { useAuth } from "@/lib/hooks/useAuth";
 import RankingHistoryModal from "./RankingHistoryModal";
 import StockHoldersModal from "./StockHoldersModal";
 
@@ -18,6 +19,7 @@ interface PortfolioItem {
 }
 
 export default function Leaderboard() {
+    const { user: currentUser } = useAuth();
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
     const [portfolios, setPortfolios] = useState<Record<string, PortfolioItem[]>>({});
@@ -47,7 +49,9 @@ export default function Leaderboard() {
                 data.uid = uid;
 
                 if (typeof data.startingBalance !== "number") {
-                    void updateDoc(doc(db, "users", uid), { startingBalance: 500000000 });
+                    if (currentUser) {
+                        void updateDoc(doc(db, "users", uid), { startingBalance: 500000000 });
+                    }
                     data.startingBalance = 500000000;
                 }
                 // Ensure data.uid is also set if missing from document
@@ -55,6 +59,10 @@ export default function Leaderboard() {
                 userData.push(data);
             });
             setUsers(userData);
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching users in Leaderboard:", error);
+            }
         });
 
         return () => unsubscribe();
@@ -108,6 +116,10 @@ export default function Leaderboard() {
                     ...prev,
                     [user.uid]: items,
                 }));
+            }, (error) => {
+                if (error.code !== "permission-denied") {
+                    console.error(`Error fetching portfolio for ${user.uid} in Leaderboard:`, error);
+                }
             })
         );
 
@@ -127,6 +139,10 @@ export default function Leaderboard() {
                 quantityMap[symbol] = (quantityMap[symbol] || 0) + quantity;
             });
             setGlobalHoldings(quantityMap);
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching global portfolio in Leaderboard:", error);
+            }
         });
         return () => unsubscribe();
     }, []);

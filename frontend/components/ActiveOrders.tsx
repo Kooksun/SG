@@ -43,6 +43,10 @@ export default function ActiveOrders({ stocks = {}, exchangeRate = 1400 }: Activ
                 ...doc.data()
             } as Order));
             setOrders(newOrders);
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching active orders in ActiveOrders:", error);
+            }
         });
 
         return () => unsubscribe();

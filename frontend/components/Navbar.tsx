@@ -32,7 +32,9 @@ export default function Navbar() {
                 setHasUnclaimed(false);
             }
         }, (error) => {
-            console.error("Error fetching missions in Navbar:", error);
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching missions in Navbar:", error);
+            }
             setHasUnclaimed(false);
         });
 

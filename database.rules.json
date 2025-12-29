@@ -1,11 +1,11 @@
 {
     "rules": {
         "stocks": {
-            ".read": "auth != null",
+            ".read": true,
             ".write": false
         },
         "system": {
-            ".read": "auth != null",
+            ".read": true,
             ".write": false
         },
         "user_activities": {
@@ -34,7 +34,7 @@
         },
         "history_requests": {
             "$symbol": {
-                ".read": "auth != null",
+                ".read": true,
                 ".write": "auth != null"
             }
         },

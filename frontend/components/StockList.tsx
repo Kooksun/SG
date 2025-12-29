@@ -92,6 +92,10 @@ export default function StockList() {
                 setUserCreditLimit(data.creditLimit || 0);
                 setUserUsedCredit(data.usedCredit || 0);
             }
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching user data in StockList:", error);
+            }
         });
         return () => unsubscribe();
     }, [user]);
@@ -108,6 +112,10 @@ export default function StockList() {
                 portfolioMap[data.symbol] = data.quantity;
             });
             setPortfolio(portfolioMap);
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching portfolio in StockList:", error);
+            }
         });
         return () => unsubscribe();
     }, [user]);

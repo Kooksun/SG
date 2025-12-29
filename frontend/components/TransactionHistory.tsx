@@ -42,6 +42,10 @@ export default function TransactionHistory({
                 data.push({ id: doc.id, ...doc.data() } as Transaction);
             });
             setTransactions(data);
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching transactions in TransactionHistory:", error);
+            }
         });
 
         return () => unsubscribe();

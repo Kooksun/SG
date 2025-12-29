@@ -9,15 +9,15 @@ service cloud.firestore {
 
     // User profiles and sub-collections
     match /users/{uid} {
-      // Allow reading any profile if signed in (for leaderboard)
-      allow read: if isSignedIn();
+      // Allow reading any profile (for leaderboard)
+      allow read: if true;
       // Only the owner can write to their own profile
       allow write: if isSignedIn() && request.auth.uid == uid;
       
       // Portfolios sub-collection
       match /portfolio/{symbol} {
-        // Allow reading any portfolio if signed in (for stats/holders list)
-        allow read: if isSignedIn();
+        // Allow reading any portfolio (for stats/holders list)
+        allow read: if true;
         // Only the owner can manage their portfolio
         allow write: if isSignedIn() && request.auth.uid == uid;
       }
@@ -51,7 +51,7 @@ service cloud.firestore {
     
     // Support for collectionGroup queries on portfolio
     match /{path=**}/portfolio/{symbol} {
-      allow read: if isSignedIn();
+      allow read: if true;
     }
   }
 }

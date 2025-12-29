@@ -90,6 +90,10 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
             if (docSnapshot.exists()) {
                 setUserProfile(docSnapshot.data() as UserProfile);
             }
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching user profile in UserDashboard:", error);
+            }
         });
         return () => unsubscribe();
     }, [uid]);
@@ -123,6 +127,10 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                 });
             });
             setPortfolio(items);
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching portfolio in UserDashboard:", error);
+            }
         });
         return () => unsubscribe();
     }, [uid]);
@@ -143,6 +151,10 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                 symbols.add(doc.data().symbol);
             });
             setPendingSymbols(symbols);
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching active orders in UserDashboard:", error);
+            }
         });
         return () => unsubscribe();
     }, [uid, currentUser]);
@@ -158,6 +170,10 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                 setHasUnclaimed(unclaimed);
             } else {
                 setHasUnclaimed(false);
+            }
+        }, (error) => {
+            if (error.code !== "permission-denied") {
+                console.error("Error fetching missions in UserDashboard:", error);
             }
         });
 
