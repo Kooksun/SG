@@ -43,6 +43,9 @@ export default function Leaderboard() {
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data() as UserProfile;
                 const uid = docSnap.id;
+                // Ensure uid is consistent with document ID
+                data.uid = uid;
+
                 if (typeof data.startingBalance !== "number") {
                     void updateDoc(doc(db, "users", uid), { startingBalance: 500000000 });
                     data.startingBalance = 500000000;
