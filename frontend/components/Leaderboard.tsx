@@ -23,8 +23,10 @@ export default function Leaderboard() {
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
     const [portfolios, setPortfolios] = useState<Record<string, PortfolioItem[]>>({});
-    const [globalHoldings, setGlobalHoldings] = useState<Record<string, number>>({});
+    const [globalHoldingsLong, setGlobalHoldingsLong] = useState<Record<string, number>>({});
+    const [globalHoldingsShort, setGlobalHoldingsShort] = useState<Record<string, number>>({});
     const [globalChartMetric, setGlobalChartMetric] = useState<"value" | "quantity">("value");
+    const [positionMode, setPositionMode] = useState<"long" | "short">("long");
     const [exchangeRate, setExchangeRate] = useState(1400);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [isHoldersModalOpen, setIsHoldersModalOpen] = useState(false);
@@ -130,15 +132,22 @@ export default function Leaderboard() {
 
     useEffect(() => {
         const unsubscribe = onSnapshot(collectionGroup(db, "portfolio"), (snapshot) => {
-            const quantityMap: Record<string, number> = {};
+            const longMap: Record<string, number> = {};
+            const shortMap: Record<string, number> = {};
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data();
                 const symbol = data.symbol;
                 const quantity = data.quantity;
-                if (!symbol || typeof quantity !== "number" || quantity <= 0) return;
-                quantityMap[symbol] = (quantityMap[symbol] || 0) + quantity;
+                if (!symbol || typeof quantity !== "number" || quantity === 0) return;
+
+                if (quantity > 0) {
+                    longMap[symbol] = (longMap[symbol] || 0) + quantity;
+                } else {
+                    shortMap[symbol] = (shortMap[symbol] || 0) + Math.abs(quantity);
+                }
             });
-            setGlobalHoldings(quantityMap);
+            setGlobalHoldingsLong(longMap);
+            setGlobalHoldingsShort(shortMap);
         }, (error) => {
             if (error.code !== "permission-denied") {
                 console.error("Error fetching global portfolio in Leaderboard:", error);
@@ -195,7 +204,8 @@ export default function Leaderboard() {
         .slice(0, 10);
 
     const globalSlices = useMemo(() => {
-        const entries = Object.entries(globalHoldings)
+        const currentData = positionMode === "long" ? globalHoldingsLong : globalHoldingsShort;
+        const entries = Object.entries(currentData)
             .map(([symbol, quantity]) => {
                 const stock = stocks[symbol];
                 const rawPrice = stock?.price;
@@ -220,7 +230,7 @@ export default function Leaderboard() {
             topSlices.push({ symbol: "기타", label: "기타", quantity: globalChartMetric === "quantity" ? othersTotal : 0, value: globalChartMetric === "value" ? othersTotal : 0 });
         }
         return topSlices;
-    }, [globalHoldings, stocks, globalChartMetric]);
+    }, [globalHoldingsLong, globalHoldingsShort, stocks, globalChartMetric, positionMode]);
 
     const totalGlobalAmount = globalSlices.reduce((sum, item) => sum + (globalChartMetric === "value" ? item.value : item.quantity), 0);
     const pieColors = ["#FF6384", "#36A2EB", "#FFCE56", "#F472B6", "#34D399", "#A78BFA", "#FBBF24", "#60A5FA", "#cdf871ff", "#8c85eeff"];
@@ -292,21 +302,40 @@ export default function Leaderboard() {
                 </table>
             </div>
             <div className="mt-8">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-4">
                     <h3 className="text-xl font-semibold text-white">전체 포트폴리오 비중</h3>
-                    <div className="flex gap-2 text-sm">
-                        <button
-                            onClick={() => setGlobalChartMetric("value")}
-                            className={`px-3 py-1 rounded border ${globalChartMetric === "value" ? "bg-blue-600 text-white border-blue-500" : "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"}`}
-                        >
-                            가치 기준
-                        </button>
-                        <button
-                            onClick={() => setGlobalChartMetric("quantity")}
-                            className={`px-3 py-1 rounded border ${globalChartMetric === "quantity" ? "bg-blue-600 text-white border-blue-500" : "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"}`}
-                        >
-                            수량 기준
-                        </button>
+                    <div className="flex flex-wrap gap-2 text-sm justify-end">
+                        {/* Position Mode Toggle */}
+                        <div className="flex bg-gray-700 p-1 rounded-lg border border-gray-600">
+                            <button
+                                onClick={() => setPositionMode("long")}
+                                className={`px-3 py-1 rounded-md transition-all ${positionMode === "long" ? "bg-blue-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
+                            >
+                                Long (매수)
+                            </button>
+                            <button
+                                onClick={() => setPositionMode("short")}
+                                className={`px-3 py-1 rounded-md transition-all ${positionMode === "short" ? "bg-red-600 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
+                            >
+                                Short (공매도)
+                            </button>
+                        </div>
+
+                        {/* Metric Toggle */}
+                        <div className="flex bg-gray-700 p-1 rounded-lg border border-gray-600">
+                            <button
+                                onClick={() => setGlobalChartMetric("value")}
+                                className={`px-3 py-1 rounded-md transition-all ${globalChartMetric === "value" ? "bg-gray-500 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
+                            >
+                                가치
+                            </button>
+                            <button
+                                onClick={() => setGlobalChartMetric("quantity")}
+                                className={`px-3 py-1 rounded-md transition-all ${globalChartMetric === "quantity" ? "bg-gray-500 text-white shadow-lg" : "text-gray-400 hover:text-white"}`}
+                            >
+                                수량
+                            </button>
+                        </div>
                     </div>
                 </div>
                 {totalGlobalAmount > 0 ? (
