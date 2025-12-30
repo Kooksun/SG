@@ -386,8 +386,14 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 p-6 rounded-lg w-full max-w-sm md:max-w-6xl md:w-auto text-white shadow-xl flex flex-col max-h-[90vh] overflow-y-auto md:overflow-visible">
+        <div
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={onClose}
+        >
+            <div
+                className="bg-gray-800 p-6 rounded-lg w-full max-w-sm md:max-w-6xl md:w-auto text-white shadow-xl flex flex-col max-h-[90vh] overflow-y-auto md:overflow-visible"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <h2 className="text-xl font-bold mb-4 flex items-center border-b border-gray-700 pb-4 shrink-0">
                     {stock.name} <span className="text-gray-400 text-sm ml-2 font-normal">({stock.symbol})</span>
                     <a
@@ -419,173 +425,194 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
                     {/* Trade UI Column */}
                     <div className="w-full md:w-80 flex flex-col">
-                        <div className="flex gap-2 mb-4">
-                            <button
-                                onClick={() => setMode("BUY")}
-                                className={`flex-1 py-2 rounded ${mode === "BUY" ? "bg-red-600" : "bg-gray-700"}`}
-                            >
-                                Buy
-                            </button>
-                            <button
-                                onClick={() => setMode("SELL")}
-                                className={`flex-1 py-2 rounded ${mode === "SELL" ? "bg-blue-600" : "bg-gray-700"}`}
-                            >
-                                Sell
-                            </button>
-                        </div>
+                        {!user ? (
+                            <div className="flex-1 flex flex-col items-center justify-center bg-gray-900/50 rounded-lg p-6 border border-dashed border-gray-600">
+                                <div className="text-4xl mb-4">🔒</div>
+                                <h3 className="text-lg font-bold text-white mb-2">로그인 필요</h3>
+                                <p className="text-center text-gray-400 text-sm mb-6">
+                                    매매 기능을 이용하시려면<br />로그인이 필요합니다.
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        onClose();
+                                        window.dispatchEvent(new CustomEvent('open-login-modal'));
+                                    }}
+                                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-colors"
+                                >
+                                    Login to Trade
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex gap-2 mb-4">
+                                    <button
+                                        onClick={() => setMode("BUY")}
+                                        className={`flex-1 py-2 rounded ${mode === "BUY" ? "bg-red-600" : "bg-gray-700"}`}
+                                    >
+                                        Buy
+                                    </button>
+                                    <button
+                                        onClick={() => setMode("SELL")}
+                                        className={`flex-1 py-2 rounded ${mode === "SELL" ? "bg-blue-600" : "bg-gray-700"}`}
+                                    >
+                                        Sell
+                                    </button>
+                                </div>
 
-                        <div className="flex gap-2 mb-4 bg-gray-900 p-1 rounded">
-                            <button
-                                onClick={() => setOrderType("MARKET")}
-                                className={`flex-1 py-1 text-sm rounded ${orderType === "MARKET" ? "bg-gray-700 text-white" : "text-gray-500 hover:text-gray-300"}`}
-                            >
-                                Market
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setOrderType("LIMIT");
-                                    setLimitPrice(effectivePrice);
-                                }}
-                                className={`flex-1 py-1 text-sm rounded ${orderType === "LIMIT" ? "bg-gray-700 text-white" : "text-gray-500 hover:text-gray-300"}`}
-                            >
-                                Limit
-                            </button>
-                        </div>
+                                <div className="flex gap-2 mb-4 bg-gray-900 p-1 rounded">
+                                    <button
+                                        onClick={() => setOrderType("MARKET")}
+                                        className={`flex-1 py-1 text-sm rounded ${orderType === "MARKET" ? "bg-gray-700 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                                    >
+                                        Market
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setOrderType("LIMIT");
+                                            setLimitPrice(effectivePrice);
+                                        }}
+                                        className={`flex-1 py-1 text-sm rounded ${orderType === "LIMIT" ? "bg-gray-700 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                                    >
+                                        Limit
+                                    </button>
+                                </div>
 
-                        <div className="space-y-4 flex-1">
-                            <div>
-                                <label className="block text-sm text-gray-400">{orderType === "MARKET" ? "Current Price" : "Target Price"}</label>
-                                {orderType === "MARKET" ? (
-                                    <div className="text-lg font-bold">
-                                        {isUS ? (
-                                            <>
-                                                ${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                <span className="text-sm text-gray-400 ml-2">
-                                                    (≈ {effectivePrice.toLocaleString()} KRW)
-                                                </span>
-                                            </>
+                                <div className="space-y-4 flex-1">
+                                    <div>
+                                        <label className="block text-sm text-gray-400">{orderType === "MARKET" ? "Current Price" : "Target Price"}</label>
+                                        {orderType === "MARKET" ? (
+                                            <div className="text-lg font-bold">
+                                                {isUS ? (
+                                                    <>
+                                                        ${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                        <span className="text-sm text-gray-400 ml-2">
+                                                            (≈ {effectivePrice.toLocaleString()} KRW)
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    `${stock.price.toLocaleString()} KRW`
+                                                )}
+                                            </div>
                                         ) : (
-                                            `${stock.price.toLocaleString()} KRW`
+                                            <div className="flex flex-col gap-1 mt-1">
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        value={limitPrice}
+                                                        onChange={(e) => setLimitPrice(parseInt(e.target.value) || 0)}
+                                                        className="w-full bg-gray-700 rounded p-2 text-white font-bold"
+                                                    />
+                                                    <span className="text-sm">KRW</span>
+                                                </div>
+                                                <div className="text-xs text-gray-500">
+                                                    Current: {effectivePrice.toLocaleString()} KRW
+                                                </div>
+                                            </div>
+                                        )}
+                                        {isUS && orderType === "MARKET" && (
+                                            <div className="text-xs text-gray-500">
+                                                Exchange Rate: 1 USD = {exchangeRate.toLocaleString()} KRW
+                                            </div>
                                         )}
                                     </div>
-                                ) : (
-                                    <div className="flex flex-col gap-1 mt-1">
-                                        <div className="flex items-center gap-2">
+                                    <div>
+                                        <label className="block text-sm text-gray-400">Quantity</label>
+                                        <div className="flex items-center gap-2 mb-2">
                                             <input
                                                 type="number"
-                                                value={limitPrice}
-                                                onChange={(e) => setLimitPrice(parseInt(e.target.value) || 0)}
-                                                className="w-full bg-gray-700 rounded p-2 text-white font-bold"
+                                                min="1"
+                                                max={maxQuantity}
+                                                value={quantity}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value) || 0;
+                                                    setQuantity(Math.min(val, maxQuantity));
+                                                }}
+                                                className="w-full bg-gray-700 rounded p-2 text-white"
                                             />
-                                            <span className="text-sm">KRW</span>
+                                            <span className="text-xs text-gray-400 whitespace-nowrap">
+                                                Max: {maxQuantity}
+                                            </span>
                                         </div>
-                                        <div className="text-xs text-gray-500">
-                                            Current: {effectivePrice.toLocaleString()} KRW
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max={Math.max(1, maxQuantity)}
+                                            value={quantity}
+                                            onChange={(e) => setQuantity(parseInt(e.target.value))}
+                                            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                    <div className="border-t border-gray-700 pt-4">
+                                        <div className="flex justify-between">
+                                            <span>Amount</span>
+                                            <span>{amount.toLocaleString()} KRW</span>
                                         </div>
-                                    </div>
-                                )}
-                                {isUS && orderType === "MARKET" && (
-                                    <div className="text-xs text-gray-500">
-                                        Exchange Rate: 1 USD = {exchangeRate.toLocaleString()} KRW
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-sm text-gray-400">Quantity</label>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max={maxQuantity}
-                                        value={quantity}
-                                        onChange={(e) => {
-                                            const val = parseInt(e.target.value) || 0;
-                                            setQuantity(Math.min(val, maxQuantity));
-                                        }}
-                                        className="w-full bg-gray-700 rounded p-2 text-white"
-                                    />
-                                    <span className="text-xs text-gray-400 whitespace-nowrap">
-                                        Max: {maxQuantity}
-                                    </span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="1"
-                                    max={Math.max(1, maxQuantity)}
-                                    value={quantity}
-                                    onChange={(e) => setQuantity(parseInt(e.target.value))}
-                                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                                />
-                            </div>
-                            <div className="border-t border-gray-700 pt-4">
-                                <div className="flex justify-between">
-                                    <span>Amount</span>
-                                    <span>{amount.toLocaleString()} KRW</span>
-                                </div>
-                                {mode === "SELL" && (
-                                    <div className="flex justify-between text-sm text-gray-400">
-                                        <span>Fee (0.05%)</span>
-                                        <span>{fee.toLocaleString()} KRW</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between font-bold text-lg mt-2">
-                                    <span>Total</span>
-                                    <span>{total.toLocaleString()} KRW</span>
-                                </div>
-                                <div className="flex justify-between text-sm text-gray-400 mt-1">
-                                    <span>Available</span>
-                                    <span>
-                                        {mode === "BUY"
-                                            ? `${balance.toLocaleString()} KRW (Cash) + ${availableCredit.toLocaleString()} KRW (Credit)`
-                                            : holdingQuantity > 0
-                                                ? `${holdingQuantity} Shares owned + ${maxShortable} Shortable`
-                                                : holdingQuantity < 0
-                                                    ? `Shorting ${Math.abs(holdingQuantity)} Shares + ${maxShortable} Shortable`
-                                                    : `${maxShortable} Shortable`}
-                                    </span>
-                                </div>
-                                {mode === "BUY" && isCovering && (
-                                    <div className="mt-2 p-2 bg-blue-900 border border-blue-600 rounded text-sm text-blue-200">
-                                        ℹ️ This will cover your short position.
-                                    </div>
-                                )}
-                                {mode === "BUY" && !isCovering && amount > balance && (
-                                    <div className="mt-2 p-2 bg-yellow-900 border border-yellow-600 rounded text-sm text-yellow-200">
-                                        ⚠️ Credit will be used: {(amount - balance).toLocaleString()} KRW
-                                    </div>
-                                )}
-                                {mode === "SELL" && isShorting && (
-                                    <div className="mt-2 p-2 bg-purple-900 border border-purple-600 rounded text-sm text-purple-200">
-                                        ⚠️ This is a short sell. Margin will be used: {amount.toLocaleString()} KRW
-                                    </div>
-                                )}
-                                {orderType === "LIMIT" && (
-                                    (mode === "BUY" && limitPrice >= effectivePrice) || (mode === "SELL" && limitPrice <= effectivePrice)
-                                ) && (
-                                        <div className="mt-2 p-2 bg-orange-900 border border-orange-600 rounded text-sm text-orange-200">
-                                            ⚠️ Current price satisfies your limit. This order will likely execute immediately.
+                                        {mode === "SELL" && (
+                                            <div className="flex justify-between text-sm text-gray-400">
+                                                <span>Fee (0.05%)</span>
+                                                <span>{fee.toLocaleString()} KRW</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between font-bold text-lg mt-2">
+                                            <span>Total</span>
+                                            <span>{total.toLocaleString()} KRW</span>
                                         </div>
-                                    )}
-                            </div>
-                        </div>
+                                        <div className="flex justify-between text-sm text-gray-400 mt-1">
+                                            <span>Available</span>
+                                            <span>
+                                                {mode === "BUY"
+                                                    ? `${balance.toLocaleString()} KRW (Cash) + ${availableCredit.toLocaleString()} KRW (Credit)`
+                                                    : holdingQuantity > 0
+                                                        ? `${holdingQuantity} Shares owned + ${maxShortable} Shortable`
+                                                        : holdingQuantity < 0
+                                                            ? `Shorting ${Math.abs(holdingQuantity)} Shares + ${maxShortable} Shortable`
+                                                            : `${maxShortable} Shortable`}
+                                            </span>
+                                        </div>
+                                        {mode === "BUY" && isCovering && (
+                                            <div className="mt-2 p-2 bg-blue-900 border border-blue-600 rounded text-sm text-blue-200">
+                                                ℹ️ This will cover your short position.
+                                            </div>
+                                        )}
+                                        {mode === "BUY" && !isCovering && amount > balance && (
+                                            <div className="mt-2 p-2 bg-yellow-900 border border-yellow-600 rounded text-sm text-yellow-200">
+                                                ⚠️ Credit will be used: {(amount - balance).toLocaleString()} KRW
+                                            </div>
+                                        )}
+                                        {mode === "SELL" && isShorting && (
+                                            <div className="mt-2 p-2 bg-purple-900 border border-purple-600 rounded text-sm text-purple-200">
+                                                ⚠️ This is a short sell. Margin will be used: {amount.toLocaleString()} KRW
+                                            </div>
+                                        )}
+                                        {orderType === "LIMIT" && (
+                                            (mode === "BUY" && limitPrice >= effectivePrice) || (mode === "SELL" && limitPrice <= effectivePrice)
+                                        ) && (
+                                                <div className="mt-2 p-2 bg-orange-900 border border-orange-600 rounded text-sm text-orange-200">
+                                                    ⚠️ Current price satisfies your limit. This order will likely execute immediately.
+                                                </div>
+                                            )}
+                                    </div>
+                                </div>
 
-                        {error && <div className="mt-4 text-red-500 text-sm">{error}</div>}
+                                {error && <div className="mt-4 text-red-500 text-sm">{error}</div>}
 
-                        <div className="mt-6 flex gap-2">
-                            <button
-                                onClick={onClose}
-                                className="flex-1 py-2 bg-gray-600 rounded hover:bg-gray-500"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleTrade}
-                                disabled={loading || quantity <= 0 || (mode === "BUY" && amount > totalBuyingPower) || (mode === "SELL" && quantity > maxSellQuantity)}
-                                className={`flex-1 py-2 rounded ${mode === "BUY" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"} disabled:opacity-50 disabled:cursor-not-allowed`}
-                            >
-                                {loading ? "Processing..." : orderType === "LIMIT" ? "Limit Order" : isShorting ? "Short" : isCovering ? "Buy to Cover" : mode}
-                            </button>
-                        </div>
+                                <div className="mt-6 flex gap-2">
+                                    <button
+                                        onClick={onClose}
+                                        className="flex-1 py-2 bg-gray-600 rounded hover:bg-gray-500"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleTrade}
+                                        disabled={loading || quantity <= 0 || (mode === "BUY" && amount > totalBuyingPower) || (mode === "SELL" && quantity > maxSellQuantity)}
+                                        className={`flex-1 py-2 rounded ${mode === "BUY" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"} disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    >
+                                        {loading ? "Processing..." : orderType === "LIMIT" ? "Limit Order" : isShorting ? "Short" : isCovering ? "Buy to Cover" : mode}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

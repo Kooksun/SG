@@ -6,6 +6,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import List, Dict, Optional, Iterable
 import pandas as pd
+import time
 
 from models import Stock
 from firestore_client import get_db
@@ -77,89 +78,95 @@ def _build_stock_from_row(row, currency='KRW') -> Stock:
 
 def fetch_top_stocks(limit: int = 100, additional_symbols: Iterable[str] = ()) -> Dict[str, Stock]:
     """
-    Fetch a snapshot of the top KRX stocks filtered to KOSPI/KOSDAQ.
-    Returns a dict keyed by symbol for easy diffing in the scheduler.
+    Fetch a snapshot of the top KRX stocks (KOSPI/KOSDAQ) via Naver API, excluding ETFs.
     """
-    print(f"Fetching latest KRX snapshot (limit={limit})...")
-    df = fdr.StockListing('KRX')
-    df = df[df['Market'].isin(['KOSPI', 'KOSDAQ', 'KOSDAQ GLOBAL'])]
-    
-    # Ensure Code is string for reliable matching
-    df['Code'] = df['Code'].astype(str)
-    
-    df_sorted = df.sort_values(by='Marcap', ascending=False)
-    
-    # Top N
-    top_n = df_sorted.head(limit)
-
-    if additional_symbols:
-        # Find rows for additional symbols
-        # Note: This only finds them if they are still in KOSPI/KOSDAQ list
-        print(f"DEBUG: additional_symbols passed: {list(additional_symbols)}")
-        additional_mask = df_sorted['Code'].isin(list(additional_symbols))
-        additional_df = df_sorted[additional_mask]
-        print(f"DEBUG: Found {len(additional_df)} additional stocks in KRX listing.")
-        
-        # Combine and drop duplicates (in case an additional symbol is also in top N)
-        combined = pd.concat([top_n, additional_df]).drop_duplicates(subset=['Code'])
-    else:
-        combined = top_n
-
+    print(f"Fetching latest KRX snapshot (KOSPI Top {limit}, KOSDAQ Top {limit})...")
     snapshot: Dict[str, Stock] = {}
-    for _, row in combined.iterrows():
-        try:
-            stock = _build_stock_from_row(row, currency='KRW')
-            snapshot[stock.symbol] = stock
-        except Exception as e:
-            print(f"Error parsing row {row.get('Name')}: {e}")
+    headers = {"User-Agent": "Mozilla/5.0"}
 
-    print(f"Fetched {len(snapshot)} KR stocks (Rank Top {limit} + Held).")
+    # sosok=0 (KOSPI), sosok=1 (KOSDAQ)
+    for sosok in [0, 1]:
+        market_name = "KRX" if sosok == 0 else "KOSDAQ"
+        url = f"https://m.stock.naver.com/api/json/sise/siseListJson.nhn?menu=market_sum&sosok={sosok}&pageSize={limit}&page=1"
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                items = data.get('result', {}).get('itemList', [])
+                for item in items:
+                    # Skip ETFs as requested
+                    if item.get('etf') is True:
+                        continue
+
+                    symbol = item.get('cd')
+                    price = float(item.get('nv', 0))
+                    change = float(item.get('cv', 0))
+                    change_rate = float(item.get('cr', 0))
+                    
+                    snapshot[symbol] = Stock(
+                        symbol=symbol,
+                        name=item.get('nm'),
+                        price=price,
+                        change=change,
+                        change_percent=change_rate,
+                        updated_at=datetime.now(MARKET_TZ),
+                        currency='KRW',
+                        market=market_name
+                    )
+        except Exception as e:
+            print(f"Error fetching {market_name} listing: {e}")
+
+    # Note: additional_symbols handling moved to scheduler for better consistency
+    # with existing RTDB records.
+    
     return snapshot
 
 def fetch_us_stocks() -> Dict[str, Stock]:
     """
-    Fetch a snapshot of selected US stocks.
+    Fetch a snapshot of selected US stocks via Naver API.
     """
-    # Use global map
     print(f"Fetching latest US snapshot ({len(US_TICKER_MAP)} tickers)...")
     snapshot: Dict[str, Stock] = {}
+    headers = {"User-Agent": "Mozilla/5.0"}
     
     for ticker, kor_name in US_TICKER_MAP.items():
         try:
-            # Always fetch a few days of history to ensure we have data and can calc change
-            # Fetching just 'today' often fails with KeyError if market is closed or data not ready
-            start_date = (datetime.now() - pd.Timedelta(days=5)).strftime('%Y-%m-%d')
-            df = fdr.DataReader(ticker, start=start_date)
+            # US stocks need a suffix in Naver API. Nasdaq: .O, NYSE/AMEX: often no suffix or .K/.N/.A
+            # We try .O first, then no suffix, then .K, .N, .A.
+            success = False
+            for suffix in ['.O', '', '.K', '.N', '.A']:
+                symbol_with_suffix = f"{ticker}{suffix}"
+                url = f"https://api.stock.naver.com/stock/{symbol_with_suffix}/basic"
+                resp = requests.get(url, headers=headers, timeout=5)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    # Navigating data structure from confirmed sandbox results
+                    price = float(str(data.get('closePrice', '0')).replace(',', ''))
+                    change = float(str(data.get('compareToPreviousClosePrice', '0')).replace(',', ''))
+                    ratio = float(data.get('fluctuationsRatio', 0))
+                    
+                    snapshot[ticker] = Stock(
+                        symbol=ticker,
+                        name=kor_name,
+                        price=price,
+                        change=change,
+                        change_percent=ratio,
+                        updated_at=datetime.now(MARKET_TZ),
+                        currency='USD',
+                        market='NASDAQ' if suffix == '.O' else ('NYSE' if suffix == '.N' else 'AMEX')
+                    )
+                    success = True
+                    break
+                time.sleep(0.1) # 100ms throttle between suffix retries
             
-            if df.empty:
-                continue
+            if not success:
+                print(f"Failed to find valid US market suffix for {ticker}")
                 
-            last_row = df.iloc[-1]
-            if len(df) >= 2:
-                prev_close = df.iloc[-2]['Close']
-                price = float(last_row['Close'])
-                change = price - prev_close
-                change_percent = (change / prev_close) * 100
-            else:
-                price = float(last_row['Close'])
-                change = 0.0
-                change_percent = 0.0
-
-            stock = Stock(
-                symbol=ticker,
-                name=kor_name, # Use Korean name
-                price=price,
-                change=change,
-                change_percent=change_percent,
-                updated_at=datetime.now(MARKET_TZ),
-                currency='USD',
-                market='NASDAQ'  # Default for US in this app
-            )
-            snapshot[stock.symbol] = stock
+            time.sleep(0.1) # 100ms throttle between tickers
             
         except Exception as e:
             print(f"Error fetching US stock {ticker}: {e}")
-
+ 
     print(f"Fetched {len(snapshot)} US stocks.")
     return snapshot
 
@@ -175,67 +182,63 @@ def fetch_exchange_rate() -> float:
 
 def fetch_single_stock(symbol: str) -> Optional[Stock]:
     """
-    Fetch data for a single stock (KR or US).
-    Identifies if it's a US stock by checking the US ticker map.
+    Fetch data for a single stock (KR or US) via Naver API.
     """
-    is_us = symbol in US_TICKER_MAP
-    name = US_TICKER_MAP.get(symbol, symbol) # default to symbol if not found (will fix later if KR)
-    currency = 'USD' if is_us else 'KRW'
+    time.sleep(0.1) # Mandatory 100ms throttle
+
+    is_us = any(c.isalpha() for c in symbol) # Simple heuristic for US/KR
+    headers = {"User-Agent": "Mozilla/5.0"}
     
     try:
-        # Fetch data
-        start_date = (datetime.now() - pd.Timedelta(days=5)).strftime('%Y-%m-%d')
-        df = fdr.DataReader(symbol, start=start_date)
-        
-        if df.empty:
-            return None
-            
-        last_row = df.iloc[-1]
-        
-        if not is_us and name == symbol:
-             # Try to get KR Name if possible, though fdr.DataReader by symbol doesn't return name directly easily
-             # without listing. For retry purpose, we might just keep the name empty or reuse existing?
-             # Actually, for KR stocks, we can try to look it up in StockListing if we really wanted to, 
-             # but this function is for 'retry', so maybe we can assume the name is already known or just use symbol.
-             # Let's try to do a quick lookup if it's KR.
-             pass
-
-        if len(df) >= 2:
-            prev_close = df.iloc[-2]['Close']
-            price = float(last_row['Close'])
-            change = price - prev_close
-            change_percent = (change / prev_close) * 100
-        else:
-            price = float(last_row['Close'])
-            change = 0.0
-            change_percent = 0.0
-
-        # Try to find market info from StockListing if KR
-        market = 'NASDAQ' if is_us else 'KRX'
         if not is_us:
-            try:
-                # We could cache this but for a single fetch it's okay for now
-                listing = fdr.StockListing('KRX')
-                row = listing[listing['Code'] == symbol]
-                if not row.empty:
-                    raw_market = row.iloc[0]['Market']
-                    market = 'KOSDAQ' if 'KOSDAQ' in raw_market else 'KRX'
-            except:
-                pass
-
-        return Stock(
-            symbol=symbol,
-            name=name,
-            price=price,
-            change=change,
-            change_percent=change_percent,
-            updated_at=datetime.now(MARKET_TZ),
-            currency=currency,
-            market=market
-        )
+            # KR Stock
+            url = f"https://m.stock.naver.com/api/stock/{symbol}/basic"
+            resp = requests.get(url, headers=headers, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                price = float(str(data.get('closePrice', '0')).replace(',', ''))
+                change = float(str(data.get('compareToPreviousClosePrice', '0')).replace(',', ''))
+                ratio = float(data.get('fluctuationsRatio', 0))
+                
+                market = "KRX"
+                # Naver basic API for KR sometimes doesn't show market directly, 
+                # but we can infer or use placeholder.
+                return Stock(
+                    symbol=symbol,
+                    name=data.get('stockName', symbol),
+                    price=price,
+                    change=change,
+                    change_percent=ratio,
+                    updated_at=datetime.now(MARKET_TZ),
+                    currency='KRW',
+                    market=market
+                )
+        else:
+            # US Stock - Try suffixes
+            for suffix in ['.O', '', '.K', '.N', '.A']:
+                url = f"https://api.stock.naver.com/stock/{symbol}{suffix}/basic"
+                resp = requests.get(url, headers=headers, timeout=5)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    price = float(str(data.get('closePrice', '0')).replace(',', ''))
+                    change = float(str(data.get('compareToPreviousClosePrice', '0')).replace(',', ''))
+                    ratio = float(data.get('fluctuationsRatio', 0))
+                    
+                    return Stock(
+                        symbol=symbol,
+                        name=US_TICKER_MAP.get(symbol, symbol),
+                        price=price,
+                        change=change,
+                        change_percent=ratio,
+                        updated_at=datetime.now(MARKET_TZ),
+                        currency='USD',
+                        market='NASDAQ' if suffix == '.O' else ('NYSE' if suffix == '.N' else 'AMEX')
+                    )
+                time.sleep(0.1)
+                
     except Exception as e:
         print(f"Error fetching single stock {symbol}: {e}")
-        return None
+    return None
 
 def commit_stock_changes(stocks_to_upsert: Iterable[Stock], symbols_to_delete: Iterable[str] = ()):
     """

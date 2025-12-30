@@ -342,7 +342,6 @@ export default function StockList() {
 
                             return (
                                 <tr key={stock.symbol} className="border-b border-gray-700 hover:bg-gray-700 cursor-pointer" onClick={() => {
-                                    if (!user) return; // Don't open modal if not logged in
                                     setSelectedStock(stock);
                                     setIsModalOpen(true);
                                 }}>

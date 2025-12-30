@@ -25,7 +25,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 MARKET_TZ = ZoneInfo("Asia/Seoul")
 FETCH_INTERVAL_MINUTES = 1
 SYNC_INTERVAL_MINUTES = 1
-STOCK_LIMIT = 500
+STOCK_LIMIT = 100
 DAILY_INTEREST_RATE = 0.001  # 0.1% per day
 
 latest_snapshot: Dict[str, Stock] = {}
@@ -33,6 +33,9 @@ last_written_snapshot: Dict[str, Stock] = {}
 latest_exchange_rate: float = 1400.0
 latest_indices: Dict[str, Dict] = {}
 held_stocks_cache: set[str] = set()
+last_kr_fetch_time: Optional[datetime] = None
+last_us_fetch_time: Optional[datetime] = None
+last_indices_fetch_time: Optional[datetime] = None
 
 def now_kst() -> datetime:
     return datetime.now(MARKET_TZ)
@@ -46,40 +49,115 @@ def has_stock_changed(new: Stock, old: Stock) -> bool:
         new.market != old.market,
     ))
 
+def is_kr_market_open() -> bool:
+    now = now_kst()
+    # Mon-Fri (0-4)
+    if now.weekday() >= 5:
+        return False
+    return dt_time(9, 0) <= now.time() <= dt_time(15, 30)
+
+def is_us_market_open() -> bool:
+    now = now_kst()
+    # US Market: 23:30 - 06:00 KST (Approximately Mon night - Fri night in NY)
+    # This covers Mon 23:30 -> Tue 06:00, ..., Fri 23:30 -> Sat 06:00
+    t = now.time()
+    weekday = now.weekday()
+    
+    # Mon night to Fri night
+    if weekday <= 4: # Mon - Fri
+        if t >= dt_time(23, 30): return True
+    
+    # Tue morning to Sat morning
+    if 1 <= weekday <= 5: # Tue - Sat
+        if t <= dt_time(6, 0): return True
+        
+    return False
+
 def fetch_job(force: bool = False):
     global latest_snapshot, latest_exchange_rate, latest_indices
+    global last_kr_fetch_time, last_us_fetch_time, last_indices_fetch_time
+    
+    now = now_kst()
     print("-" * 60)
-    print(f"[{now_kst()}] Starting fetch job...")
+    print(f"[{now}] Starting fetch job cycle...")
     
-    # Fetch KR Stocks
-    # Pass held stocks to ensure they are fetched even if not in top 200
-    kr_stocks = fetch_top_stocks(limit=STOCK_LIMIT, additional_symbols=held_stocks_cache)
+    kr_stocks = {}
+    us_stocks = {}
     
-    # Fetch US Stocks
-    us_stocks = fetch_us_stocks()
-    
-    # Fetch Exchange Rate
-    rate = fetch_exchange_rate()
-    if rate:
-        latest_exchange_rate = rate
+    # 1. KR Stocks Fetch Logic
+    should_fetch_kr = force or is_kr_market_open()
+    if not should_fetch_kr:
+        # Check if 1 hour has passed since last fetch
+        if last_kr_fetch_time is None or (now - last_kr_fetch_time) >= timedelta(hours=1):
+            should_fetch_kr = True
+            
+    if should_fetch_kr:
+        print(f"[{now}] Fetching KR stocks (Market Open: {is_kr_market_open()})...")
+        # Fetch Top 100/100 (ETFs are already filtered out in fetcher side)
+        kr_stocks = fetch_top_stocks(limit=STOCK_LIMIT)
         
-    # Fetch Market Indices
-    indices = fetch_indices()
-    if indices:
-        latest_indices = indices
+        # --- Mandatory/Existing Symbol Coverage ---
+        # Collect all symbols that MUST be updated
+        mandatory_symbols = set(held_stocks_cache)
+        
+        # Add existing RTDB symbols to ensure they are updated if present
+        try:
+            existing_stocks = rtdb_admin.reference('stocks').get() or {}
+            # Only include KR stocks (approx 6-digit numeric symbol)
+            for s in existing_stocks:
+                if s.isdigit():
+                    mandatory_symbols.add(s)
+        except Exception as e:
+            print(f"Error fetching existing RTDB symbols: {e}")
+            
+        # Identify missing symbols from the top fetch
+        missing_kr = mandatory_symbols - set(kr_stocks.keys())
+        if missing_kr:
+            print(f"[{now}] Fetching {len(missing_kr)} additional/existing KR stocks individually...")
+            for symbol in missing_kr:
+                st = fetch_single_stock(symbol)
+                if st:
+                    kr_stocks[symbol] = st
+        
+        last_kr_fetch_time = now
+    else:
+        # Reuse existing KR stocks from latest_snapshot
+        kr_stocks = {s: st for s, st in latest_snapshot.items() if st.currency == 'KRW'}
+        # print(f"[{now}] Skipping KR fetch (off-hours). Reusing {len(kr_stocks)} stocks.")
 
-    # Merge
+    # 2. US Stocks Fetch Logic
+    should_fetch_us = force or is_us_market_open()
+    if not should_fetch_us:
+        if last_us_fetch_time is None or (now - last_us_fetch_time) >= timedelta(hours=1):
+            should_fetch_us = True
+            
+    if should_fetch_us:
+        print(f"[{now}] Fetching US stocks (Market Open: {is_us_market_open()})...")
+        us_stocks = fetch_us_stocks()
+        last_us_fetch_time = now
+    else:
+        us_stocks = {s: st for s, st in latest_snapshot.items() if st.currency == 'USD'}
+        # print(f"[{now}] Skipping US fetch (off-hours). Reusing {len(us_stocks)} stocks.")
+
+    # 3. Exchange Rate & Indices (Following KR fetch cycle or 1 hour)
+    should_fetch_indices = force or should_fetch_kr
+    if should_fetch_indices:
+        rate = fetch_exchange_rate()
+        if rate:
+            latest_exchange_rate = rate
+            
+        indices = fetch_indices()
+        if indices:
+            latest_indices = indices
+        last_indices_fetch_time = now
+
     # Merge
     all_stocks = {**kr_stocks, **us_stocks}
 
-    # Filter out stocks with price 0 (typically due to trading suspension, e.g., Taeyoung E&C)
+    # Filter out stocks with price 0
     latest_snapshot = {s: stock for s, stock in all_stocks.items() if stock.price > 0}
     
-    dropped_count = len(all_stocks) - len(latest_snapshot)
-    if dropped_count > 0:
-        print(f"[{now_kst()}] Filtered {dropped_count} stocks with 0 price.")
-
-    print(f"[{now_kst()}] Total stocks fetched: {len(latest_snapshot)}. Exchange Rate: {latest_exchange_rate}")
+    print(f"[{now}] Total snapshot: {len(latest_snapshot)}. KR: {len(kr_stocks)}, US: {len(us_stocks)}. Rate: {latest_exchange_rate}")
 
 import math
 import numpy as np

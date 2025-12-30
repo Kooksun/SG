@@ -4,21 +4,32 @@ from firebase_admin import db as rtdb_admin
 from firebase_admin import firestore, auth
 import firestore_client  # Initializes Firebase app
 from firestore_client import db as firestore_db
+from supabase_client import get_supabase
 
-def delete_collection(coll_ref, batch_size):
+def delete_collection(coll_ref, batch_size, dry_run=False):
     """
-    Recursively delete a collection in batches.
+    Recursively delete a collection and all its documents and subcollections in batches.
     """
     docs = coll_ref.limit(batch_size).stream()
     deleted = 0
 
     for doc in docs:
+        # First, recursively delete all subcollections of this document
+        subcollections = doc.reference.collections()
+        for sub_coll in subcollections:
+            if not dry_run:
+                print(f"    Processing subcollection: {doc.id}/{sub_coll.id}")
+                delete_collection(sub_coll, batch_size, dry_run)
+            else:
+                print(f"    [Dry Run] Would process subcollection: {doc.id}/{sub_coll.id}")
+
         print(f"    Deleting document {doc.id}...")
-        doc.reference.delete()
+        if not dry_run:
+            doc.reference.delete()
         deleted += 1
 
     if deleted >= batch_size:
-        return deleted + delete_collection(coll_ref, batch_size)
+        return deleted + delete_collection(coll_ref, batch_size, dry_run)
     return deleted
 
 def delete_auth_users(dry_run=False):
@@ -57,10 +68,11 @@ def delete_all_firestore_collections(dry_run=False):
     for coll_ref in collections:
         print(f"Processing collection: {coll_ref.id}")
         if not dry_run:
-            deleted_items = delete_collection(coll_ref, 100)
+            deleted_items = delete_collection(coll_ref, 100, dry_run=False)
             print(f"  - Deleted {deleted_items} documents from '{coll_ref.id}'.")
         else:
-            print(f"  [Dry Run] Would delete all documents in collection '{coll_ref.id}'.")
+            deleted_items = delete_collection(coll_ref, 100, dry_run=True)
+            print(f"  [Dry Run] Would delete {deleted_items} documents and their subcollections in '{coll_ref.id}'.")
         count += 1
     
     if count == 0:
@@ -86,6 +98,27 @@ def delete_rtdb_nodes(dry_run=False):
         else:
             ref.delete()
             print(f"Deleted '{node}' node from RTDB.")
+
+def delete_supabase_data(dry_run=False):
+    print("Connecting to Supabase...")
+    supabase = get_supabase()
+    if not supabase:
+        print("Supabase client not initialized. Skipping.")
+        return
+
+    table = "user_ranking_history"
+    print(f"Checking Supabase table: {table}")
+    
+    if not dry_run:
+        try:
+            # PostgREST requires a filter to perform a delete. 
+            # We'll delete all rows where 'uid' is not empty (which should be all rows).
+            response = supabase.table(table).delete().neq("uid", "").execute()
+            print(f"  - Deleted rows from Supabase table '{table}'.")
+        except Exception as e:
+            print(f"  - Error deleting from Supabase: {e}")
+    else:
+        print(f"  [Dry Run] Would delete all rows from Supabase table '{table}'.")
 
 def main():
     parser = argparse.ArgumentParser(description="RESET SEASON: Deletes all user data to start a new season.")
@@ -117,6 +150,9 @@ def main():
     
     print("\n--- Step 3: Cleaning RTDB User Data ---")
     delete_rtdb_nodes(dry_run=args.dry_run)
+    
+    print("\n--- Step 4: Cleaning Supabase Ranking History ---")
+    delete_supabase_data(dry_run=args.dry_run)
     
     print("\n" + "="*60)
     if args.dry_run:
