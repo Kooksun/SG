@@ -15,7 +15,7 @@ export default function StockList() {
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [watchlist, setWatchlist] = useState<string[]>([]);
-    const [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
+    const [filterMode, setFilterMode] = useState<'all' | 'watchlist' | 'holdings'>('all');
     const [userBalance, setUserBalance] = useState(0);
     const [userCreditLimit, setUserCreditLimit] = useState(0);
     const [userUsedCredit, setUserUsedCredit] = useState(0);
@@ -182,8 +182,9 @@ export default function StockList() {
         if (activeTab === 'domestic' && isUS) return false;
         if (activeTab === 'overseas' && !isUS) return false;
 
-        // Filter by Watchlist
-        if (showWatchlistOnly && !watchlist.includes(s.symbol)) return false;
+        // Filter by Watchlist / Holdings
+        if (filterMode === 'watchlist' && !watchlist.includes(s.symbol)) return false;
+        if (filterMode === 'holdings' && (portfolio[s.symbol] || 0) === 0) return false;
 
         return true;
     });
@@ -302,10 +303,18 @@ export default function StockList() {
                 <div className="flex gap-2">
                     {user && (
                         <button
-                            onClick={() => setShowWatchlistOnly(!showWatchlistOnly)}
-                            className={`px-3 py-1 rounded text-sm ${showWatchlistOnly ? "bg-yellow-600 text-white" : "bg-gray-700 text-gray-300"}`}
+                            onClick={() => {
+                                setFilterMode(prev => {
+                                    if (prev === 'all') return 'watchlist';
+                                    if (prev === 'watchlist') return 'holdings';
+                                    return 'all';
+                                });
+                            }}
+                            className={`px-3 py-1 rounded text-sm transition-colors ${filterMode === 'all' ? "bg-gray-700 text-gray-300" :
+                                filterMode === 'watchlist' ? "bg-yellow-600 text-white" : "bg-emerald-600 text-white"
+                                }`}
                         >
-                            {showWatchlistOnly ? "Show All" : "Show Watchlist"}
+                            {filterMode === 'all' ? "Show All" : filterMode === 'watchlist' ? "Watchlist" : "Holdings"}
                         </button>
                     )}
                 </div>
