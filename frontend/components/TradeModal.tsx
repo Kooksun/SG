@@ -29,6 +29,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
     const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">("MARKET");
     const [limitPrice, setLimitPrice] = useState(0);
     const [chartLoading, setChartLoading] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
 
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartInfoRef = useRef<HTMLDivElement>(null);
@@ -105,6 +106,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                 console.error("Failed to fetch history from Supabase:", e?.message || e);
             } finally {
                 setChartLoading(false);
+                setIsGenerating(false);
             }
         };
 
@@ -115,10 +117,13 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
             const snapshot = await get(historyReqRef);
 
             if (!snapshot.exists() || snapshot.val().status === 'error') {
+                setIsGenerating(true);
                 await set(historyReqRef, {
                     status: 'pending',
                     requestedAt: new Date().toISOString()
                 });
+            } else if (snapshot.val().status === 'pending') {
+                setIsGenerating(true);
             }
 
             // Listen for completion to re-fetch
@@ -126,8 +131,11 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                 const val = snap.val();
                 if (val && val.status === 'completed') {
                     console.log(`History fetch completed for ${stock.symbol}. Re-fetching...`);
+                    setIsGenerating(false);
                     unsubscribe(); // stop listening
                     fetchHistory(); // Try again
+                } else if (val && val.status === 'pending') {
+                    setIsGenerating(true);
                 }
             });
         };
@@ -419,15 +427,23 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                     <div className="w-full md:w-[600px] mb-6 md:mb-0 shrink-0 flex flex-col gap-2 relative">
                         <div className="relative">
                             <div ref={chartContainerRef} className="w-full h-[300px] md:h-[450px] bg-gray-900 rounded border border-gray-700 overflow-hidden relative" />
-                            {chartLoading && (
+                            {(chartLoading || isGenerating) && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/60 backdrop-blur-[2px] z-20 pointer-events-none transition-opacity duration-300">
                                     <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
-                                    <div className="text-sm font-medium text-blue-200 animate-pulse">차트 데이터를 불러오는 중...</div>
+                                    <div className="text-sm font-medium text-blue-200 animate-pulse text-center px-4">
+                                        {isGenerating
+                                            ? "신규 종목의 차트 데이터를 생성 중입니다.\n잠시만 기다려 주세요... (약 10~20초)"
+                                            : "차트 데이터를 불러오는 중..."
+                                        }
+                                    </div>
                                 </div>
                             )}
                         </div>
                         <div ref={chartInfoRef} className="min-h-[60px] bg-gray-900/50 p-2 rounded border border-gray-700 text-xs text-gray-400 flex flex-col justify-center">
-                            차트 위에 마우스를 올리면 상세 정보를 확인할 수 있습니다.
+                            {isGenerating
+                                ? "현재 백엔드에서 주가 정보를 수집하고 있습니다. 완료되면 차트가 자동으로 표시됩니다."
+                                : "차트 위에 마우스를 올리면 상세 정보를 확인할 수 있습니다."
+                            }
                         </div>
                     </div>
 
