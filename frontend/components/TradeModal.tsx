@@ -64,13 +64,13 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                 if (error) {
                     console.error("Supabase query error:", error);
                     // If permission denied or other error, treat as "missing data" and request fetch if no data yet
-                    if (!data || data.length === 0) {
+                    if (!data || (Array.isArray(data) && data.length === 0)) {
                         await requestBackendFetch();
                     }
                     throw error;
                 }
 
-                if (data && data.length > 0 && chartRef.current && seriesRef.current && volumeSeriesRef.current && ma5SeriesRef.current && ma20SeriesRef.current) {
+                if (data && Array.isArray(data) && data.length > 0 && chartRef.current && seriesRef.current && volumeSeriesRef.current && ma5SeriesRef.current && ma20SeriesRef.current) {
                     // ... (데이터 세팅 로직)
                     const candlestickData = data.map(d => ({
                         time: d.time,
@@ -99,7 +99,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
                     ma5SeriesRef.current.setData(calculateMA(5));
                     ma20SeriesRef.current.setData(calculateMA(20));
-                } else if ((!data || data.length === 0) && stock.symbol) {
+                } else if ((!data || (Array.isArray(data) && data.length === 0)) && stock.symbol) {
                     await requestBackendFetch();
                 }
             } catch (e: any) {
