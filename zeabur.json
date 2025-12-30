@@ -1,0 +1,10 @@
+{
+    "resources": {
+        "cpu": 0.5,
+        "memory": "512Mi",
+        "ephemeral-storage": "2Gi"
+    },
+    "service": {
+        "name": "stockgame-data-engine"
+    }
+}

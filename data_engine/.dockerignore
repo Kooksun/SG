@@ -1,0 +1,26 @@
+# Exclude virtual environment
+venv/
+.venv/
+env/
+
+# Exclude python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Exclude git directory
+.git/
+.gitignore
+
+# Exclude environment variables
+.env
+
+# Exclude logs and temporary files
+*.log
+chart_*.png
+debug_*.py
+test_*.py
+
+# Exclude frontend node_modules if accidentally included
+node_modules/
