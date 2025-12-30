@@ -238,14 +238,28 @@ def fetch_us_stocks() -> Dict[str, Stock]:
     return snapshot
 
 def fetch_exchange_rate() -> float:
+    """
+    Fetch USD/KRW exchange rate via Naver Finance API.
+    """
     try:
-        # USD/KRW
+        url = "https://api.stock.naver.com/marketindex/majors/part1"
+        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            for item in data.get('majors', []):
+                if item.get('reutersCode') == 'FX_USDKRW':
+                    return float(str(item.get('closePrice', '1400.0')).replace(',', ''))
+    except Exception as e:
+        print(f"Error fetching exchange rate from Naver: {e}")
+    
+    # Fallback to fdr if Naver fails (since we decided to keep fdr for now)
+    try:
         df = fdr.DataReader('USD/KRW', start=(datetime.now() - pd.Timedelta(days=5)).strftime('%Y-%m-%d'))
         if not df.empty:
             return float(df.iloc[-1]['Close'])
     except Exception as e:
-        print(f"Error fetching exchange rate: {e}")
-    return 1400.0 # Fallback
+        print(f"Error fetching exchange rate from fdr: {e}")
+    return 1400.0 # Extreme fallback
 
 def fetch_single_stock(symbol: str) -> Optional[Stock]:
     """
@@ -363,46 +377,96 @@ if __name__ == "__main__":
 
 def fetch_indices() -> Dict[str, Dict]:
     """
-    Fetch major market indices: KOSPI, KOSDAQ, S&P 500, Nasdaq, Dow Jones.
+    Fetch major market indices and indicators: KOSPI, KOSDAQ, S&P 500, Nasdaq, Dow Jones, Gold, Bitcoin.
     """
-    indices = {
-        'KOSPI': 'KS11',
-        'KOSDAQ': 'KQ11',
-        'S&P 500': 'US500',
-        'Nasdaq': 'IXIC',
-        'Dow Jones': 'DJI'
+    results = {}
+    headers = {"User-Agent": "Mozilla/5.0"}
+    
+    # 1. Domestic & Global Indices
+    index_map = {
+        'KOSPI': 'https://m.stock.naver.com/api/index/KOSPI/price',
+        'KOSDAQ': 'https://m.stock.naver.com/api/index/KOSDAQ/price',
+        'S&P 500': 'https://api.stock.naver.com/index/.INX/basic',
+        'Nasdaq': 'https://api.stock.naver.com/index/.IXIC/basic',
+        'Dow Jones': 'https://api.stock.naver.com/index/.DJI/basic'
     }
     
-    results = {}
-    print(f"Fetching latest market indices...")
-    for name, sym in indices.items():
+    print(f"Fetching latest market indices via Naver API...")
+    for name, url in index_map.items():
         try:
-            # Fetch last few days to ensure we have data to calculate change
-            df = fdr.DataReader(sym, start=(datetime.now() - pd.Timedelta(days=5)).strftime('%Y-%m-%d'))
-            if df.empty:
-                continue
-                
-            last_row = df.iloc[-1]
-            if len(df) >= 2:
-                prev_close = float(df.iloc[-2]['Close'])
-                price = float(last_row['Close'])
-                change = float(price - prev_close)
-                change_percent = float((change / prev_close) * 100)
-            else:
-                price = float(last_row['Close'])
-                change = 0.0
-                change_percent = 0.0
+            resp = requests.get(url, headers=headers, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                # Local and Global have slightly different structures
+                if 'KOSPI' in url or 'KOSDAQ' in url:
+                    # m.stock.naver.com/api/index/... returns a list of history
+                    if isinstance(data, list) and len(data) > 0:
+                        snapshot = data[0]
+                        price = float(str(snapshot.get('closePrice', '0')).replace(',', ''))
+                        change = float(str(snapshot.get('compareToPreviousClosePrice', '0')).replace(',', ''))
+                        ratio = float(snapshot.get('fluctuationsRatio', 0))
+                    else: continue
+                else:
+                    # api.stock.naver.com/index/... returns a basic object
+                    price = float(str(data.get('closePrice', '0')).replace(',', ''))
+                    change = float(str(data.get('compareToPreviousClosePrice', '0')).replace(',', ''))
+                    ratio = float(data.get('fluctuationsRatio', 0))
 
-            results[name] = {
-                'symbol': sym,
-                'name': name,
-                'price': price,
-                'change': change,
-                'change_percent': change_percent,
-                'updated_at': datetime.now(MARKET_TZ).isoformat()
-            }
+                results[name] = {
+                    'symbol': name,
+                    'name': name,
+                    'price': price,
+                    'change': change,
+                    'change_percent': ratio,
+                    'updated_at': datetime.now(MARKET_TZ).isoformat()
+                }
         except Exception as e:
-            print(f"Error fetching index {name} ({sym}): {e}")
+            print(f"Error fetching index {name}: {e}")
+
+    # 2. Gold (Naver Majors Part 1 or 2)
+    try:
+        url = "https://api.stock.naver.com/marketindex/majors/part1"
+        resp = requests.get(url, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            for item in data.get('majors', []):
+                if item.get('reutersCode') == 'GCcv1': # 국제 금
+                    results['Gold'] = {
+                        'symbol': 'GOLD',
+                        'name': '국제 금',
+                        'price': float(str(item.get('closePrice', '0')).replace(',', '')),
+                        'change': float(str(item.get('fluctuations', '0')).replace(',', '')),
+                        'change_percent': float(item.get('fluctuationsRatio', 0)),
+                        'updated_at': datetime.now(MARKET_TZ).isoformat()
+                    }
+    except Exception as e:
+        print(f"Error fetching Gold index: {e}")
+
+    # 3. Bitcoin (Upbit API)
+    try:
+        url = "https://api.upbit.com/v1/ticker?markets=KRW-BTC"
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data:
+                btc = data[0]
+                results['Bitcoin'] = {
+                    'symbol': 'BTC',
+                    'name': '비트코인',
+                    'price': float(btc.get('trade_price', 0)),
+                    'change': float(btc.get('change_val', 0)) * (1 if btc.get('change') == 'RISE' else -1),
+                    'change_percent': float(btc.get('change_rate', 0)) * 100 * (1 if btc.get('change') == 'RISE' else -1),
+                    'updated_at': datetime.now(MARKET_TZ).isoformat()
+                }
+    except Exception as e:
+        print(f"Error fetching Bitcoin index: {e}")
+
+    # Future Indicators (Commented out as requested)
+    """
+    # WTI Oil (CLcv1), US 10Y Bond (US10YT=RR), VIX (.VIX)
+    # url_p2 = "https://api.stock.naver.com/marketindex/majors/part2"
+    # url_vix = "https://api.stock.naver.com/index/.VIX/basic"
+    """
             
     return results
 
