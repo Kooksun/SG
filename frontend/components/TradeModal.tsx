@@ -62,11 +62,15 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
                 if (error) {
                     console.error("Supabase query error:", error);
+                    // If permission denied or other error, treat as "missing data" and request fetch if no data yet
+                    if (!data || data.length === 0) {
+                        await requestBackendFetch();
+                    }
                     throw error;
                 }
 
                 if (data && data.length > 0 && chartRef.current && seriesRef.current && volumeSeriesRef.current && ma5SeriesRef.current && ma20SeriesRef.current) {
-                    // ... (기존 데이터 세팅 로직)
+                    // ... (데이터 세팅 로직)
                     const candlestickData = data.map(d => ({
                         time: d.time,
                         open: d.open,
@@ -95,33 +99,37 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                     ma5SeriesRef.current.setData(calculateMA(5));
                     ma20SeriesRef.current.setData(calculateMA(20));
                 } else if ((!data || data.length === 0) && stock.symbol) {
-                    // Trigger history fetch request to backend via RTDB
-                    console.log(`History data empty for ${stock.symbol}. Requesting fetch...`);
-                    const historyReqRef = ref(rtdb, `history_requests/${stock.symbol}`);
-                    const snapshot = await get(historyReqRef);
-
-                    if (!snapshot.exists() || snapshot.val().status === 'error') {
-                        await set(historyReqRef, {
-                            status: 'pending',
-                            requestedAt: new Date().toISOString()
-                        });
-                    }
-
-                    // Listen for completion to re-fetch
-                    const unsubscribe = onValue(historyReqRef, (snap) => {
-                        const val = snap.val();
-                        if (val && val.status === 'completed') {
-                            console.log(`History fetch completed for ${stock.symbol}. Re-fetching...`);
-                            unsubscribe(); // stop listening
-                            fetchHistory(); // Try again
-                        }
-                    });
+                    await requestBackendFetch();
                 }
             } catch (e: any) {
                 console.error("Failed to fetch history from Supabase:", e?.message || e);
             } finally {
                 setChartLoading(false);
             }
+        };
+
+        const requestBackendFetch = async () => {
+            // Trigger history fetch request to backend via RTDB
+            console.log(`History data missing or inaccessible for ${stock.symbol}. Requesting fetch...`);
+            const historyReqRef = ref(rtdb, `history_requests/${stock.symbol}`);
+            const snapshot = await get(historyReqRef);
+
+            if (!snapshot.exists() || snapshot.val().status === 'error') {
+                await set(historyReqRef, {
+                    status: 'pending',
+                    requestedAt: new Date().toISOString()
+                });
+            }
+
+            // Listen for completion to re-fetch
+            const unsubscribe = onValue(historyReqRef, (snap) => {
+                const val = snap.val();
+                if (val && val.status === 'completed') {
+                    console.log(`History fetch completed for ${stock.symbol}. Re-fetching...`);
+                    unsubscribe(); // stop listening
+                    fetchHistory(); // Try again
+                }
+            });
         };
 
         fetchHistory();

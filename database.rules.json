@@ -35,7 +35,7 @@
         "history_requests": {
             "$symbol": {
                 ".read": true,
-                ".write": "auth != null"
+                ".write": true
             }
         },
         "custom_symbols": {

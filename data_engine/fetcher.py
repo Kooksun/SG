@@ -1,6 +1,5 @@
 import FinanceDataReader as fdr
 import requests
-import yfinance as yf
 from bs4 import BeautifulSoup
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -470,57 +469,88 @@ def fetch_indices() -> Dict[str, Dict]:
             
     return results
 
-def fetch_stock_history(symbol: str, days: int = 90) -> List[Dict]:
+def fetch_stock_history(symbol: str, days: int = 365) -> List[Dict]:
     """
-    Fetches historical daily data using yfinance.
+    Fetches historical daily data using Naver Finance API with paging.
     Returns a list of dicts suitable for Lightweight Charts:
-    [{ 'time': '2023-01-01', 'open': 100, 'high': 110, 'low': 90, 'close': 105 }, ...]
+    [{ 'time': '2023-01-01', 'open': 100, 'high': 110, 'low': 90, 'close': 105, 'volume': 1000 }, ...]
     """
-    yf_symbol = symbol
+    is_us = any(c.isalpha() for c in symbol)
+    headers = {"User-Agent": "Mozilla/5.0"}
     
-    # Identify if it should be treated as KR
-    # If it is NOT in our US map, we treat it as KR (KOSPI first)
-    is_known_us = symbol in US_TICKER_MAP
-    
-    if not is_known_us:
-        yf_symbol = f"{symbol}.KS"
-    
-    print(f"Fetching history for {yf_symbol}...")
+    # Naver API has a limit on pageSize (around 60). We use paging to get more days.
+    pageSize = 60
+    # 5 pages * 60 = 300 items, which is enough for ~1 year of trading days.
+    max_pages = 5
+    all_history_data = []
+
     try:
-        ticker = yf.Ticker(yf_symbol)
-        # Fetch slightly more than needed to ensure we have enough trading days
-        hist = ticker.history(period="1y", interval="1d")
-        
-        if hist.empty and not is_known_us:
-             # Fallback to KQ if KS failed (only for implicit KR stocks)
-             yf_symbol = f"{symbol}.KQ"
-             print(f"Retrying with {yf_symbol}...")
-             ticker = yf.Ticker(yf_symbol)
-             hist = ticker.history(period="1y", interval="1d")
-        
-        if hist.empty:
+        def parse_val(v):
+            if v is None: return 0.0
+            return float(str(v).replace(',', ''))
+
+        for page in range(1, max_pages + 1):
+            if not is_us:
+                # KR Stock
+                url = f"https://m.stock.naver.com/api/stock/{symbol}/price?pageSize={pageSize}&page={page}"
+                resp = requests.get(url, headers=headers, timeout=5)
+                if resp.status_code == 200:
+                    page_data = resp.json()
+                    if isinstance(page_data, list) and len(page_data) > 0:
+                        all_history_data.extend(page_data)
+                    else: break
+                else: break
+            else:
+                # US Stock - Try suffixes
+                suffixes = ['', '.O', '.N', '.A']
+                page_data_found = False
+                for suffix in suffixes:
+                    url = f"https://api.stock.naver.com/stock/{symbol}{suffix}/price?pageSize={pageSize}&page={page}"
+                    resp = requests.get(url, headers=headers, timeout=5)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if isinstance(data, list) and len(data) > 0:
+                            all_history_data.extend(data)
+                            page_data_found = True
+                            break
+                if not page_data_found: break
+            
+            # Throttle between pages
+            time.sleep(0.1)
+
+        if not all_history_data:
             print(f"No history found for {symbol}")
             return []
-            
-        # Format for lightweight-charts
+
         formatted_data = []
-        for date, row in hist.iterrows():
-            # Check for NaNs
-            if pd.isna(row['Open']) or pd.isna(row['High']) or pd.isna(row['Low']) or pd.isna(row['Close']):
+        # Naver returns latest first, reverse it for lightweight-charts
+        for item in reversed(all_history_data):
+            try:
+                raw_date = item.get('localTradedAt', '')
+                if not raw_date: continue
+                date_str = raw_date[:10] # YYYY-MM-DD
+                
+                formatted_data.append({
+                    'time': date_str,
+                    'open': parse_val(item.get('openPrice')),
+                    'high': parse_val(item.get('highPrice')),
+                    'low': parse_val(item.get('lowPrice')),
+                    'close': parse_val(item.get('closePrice')),
+                    'volume': parse_val(item.get('accumulatedTradingVolume', 0))
+                })
+            except Exception:
                 continue
                 
-            # date is Timestamp, convert to 'YYYY-MM-DD' string
-            formatted_data.append({
-                'time': date.strftime('%Y-%m-%d'),
-                'open': float(row['Open']),
-                'high': float(row['High']),
-                'low': float(row['Low']),
-                'close': float(row['Close']),
-                'volume': float(row['Volume'])
-            })
-            
-        return formatted_data
-        
+        # Remove potential duplicates if paging overlapped (rare but safe)
+        seen_times = set()
+        unique_data = []
+        for d in formatted_data:
+            if d['time'] not in seen_times:
+                unique_data.append(d)
+                seen_times.add(d['time'])
+                
+        return unique_data
+
     except Exception as e:
-        print(f"Error fetching history for {symbol}: {e}")
+        print(f"Error fetching history for {symbol} from Naver: {e}")
         return []

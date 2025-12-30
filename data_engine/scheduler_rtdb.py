@@ -927,17 +927,28 @@ def history_job(force: bool = False):
     print(f"[{now_kst()}] History Job Completed. Updated {success_count}/{len(stocks_to_process)} stocks in Supabase.")
 
 def update_single_stock_history(symbol: str) -> bool:
+    success, _ = update_single_stock_history_v2(symbol)
+    return success
+
+def update_single_stock_history_v2(symbol: str) -> (bool, str):
     """
     Fetch and store historical data for a single stock to Supabase.
-    Returns True if success, False otherwise.
+    Returns (True, "") if success, (False, "error message") otherwise.
     """
     from supabase_client import get_supabase
     supabase = get_supabase()
     if not supabase:
-        return False
+        msg = "Supabase client not initialized. Check SUPABASE_URL/KEY."
+        print(f"Error for {symbol}: {msg}")
+        return False, msg
 
-    history_data = fetch_stock_history(symbol)
-    if history_data:
+    try:
+        history_data = fetch_stock_history(symbol)
+        if not history_data:
+            msg = f"yfinance returned no data for {symbol}."
+            print(f"Error for {symbol}: {msg}")
+            return False, msg
+            
         # Prepare rows for Supabase insertion
         rows = []
         for item in history_data:
@@ -951,14 +962,14 @@ def update_single_stock_history(symbol: str) -> bool:
                 "volume": item.get("volume", 0)
             })
         
-        try:
-            # Upsert to prevent duplicate errors
-            supabase.table("stock_history").upsert(rows, on_conflict="symbol,time").execute()
-            return True
-        except Exception as e:
-            print(f"Error saving history for {symbol} to Supabase: {e}")
-            return False
-    return False
+        # Upsert to prevent duplicate errors
+        supabase.table("stock_history").upsert(rows, on_conflict="symbol,time").execute()
+        print(f"Successfully updated history for {symbol} ({len(rows)} rows).")
+        return True, ""
+    except Exception as e:
+        msg = f"Exception during history update for {symbol}: {str(e)}"
+        print(msg)
+        return False, msg
 
 def process_search_requests():
     """
@@ -1152,7 +1163,7 @@ def process_history_requests():
             print(f"[{now_kst()}] Processing History request for symbol: {symbol}")
             try:
                 # Reuse the existing update_single_stock_history
-                success = update_single_stock_history(symbol)
+                success, error_msg = update_single_stock_history_v2(symbol)
                 if success:
                     ref.child(symbol).set({
                         'status': 'completed',
@@ -1161,7 +1172,7 @@ def process_history_requests():
                 else:
                     ref.child(symbol).update({
                         'status': 'error',
-                        'error': 'Fetch returned no data or failed'
+                        'error': error_msg or 'Fetch returned no data or failed'
                     })
             except Exception as e:
                 print(f"Error processing History request for {symbol}: {e}")
