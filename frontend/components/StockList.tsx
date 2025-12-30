@@ -141,7 +141,11 @@ export default function StockList() {
     }, [user, searchTerm]);
 
     const triggerServerSearch = async () => {
-        if (!user || !searchTerm.trim()) return;
+        if (!user) {
+            alert("검색 기능은 로그인 후 이용하실 수 있습니다.");
+            return;
+        }
+        if (!searchTerm.trim()) return;
         setIsSearchingServer(true);
         const requestRef = ref(rtdb, `search_requests/${user.uid}`);
         const { set } = await import("firebase/database");
