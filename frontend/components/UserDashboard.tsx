@@ -353,6 +353,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                             aiResult={aiResult}
                             aiTimestamp={aiTimestamp}
                             onAiRequest={handleRequestAiAnalysis}
+                            isOwner={currentUser?.uid === uid}
                         />
                     )}
 

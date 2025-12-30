@@ -16,6 +16,7 @@ interface DashboardOverviewProps {
     aiResult: string | null;
     aiTimestamp: string | null;
     onAiRequest: () => void;
+    isOwner: boolean;
 }
 
 export default function DashboardOverview({
@@ -27,7 +28,8 @@ export default function DashboardOverview({
     aiStatus,
     aiResult,
     aiTimestamp,
-    onAiRequest
+    onAiRequest,
+    isOwner
 }: DashboardOverviewProps) {
 
     // Calculate safely
@@ -182,7 +184,7 @@ export default function DashboardOverview({
                                     Your personal investment assistant analyzing real-time data.
                                 </p>
                             </div>
-                            {(aiStatus !== 'pending' && aiStatus !== 'processing') && (
+                            {isOwner && (aiStatus !== 'pending' && aiStatus !== 'processing') && (
                                 <button
                                     onClick={onAiRequest}
                                     className="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded shadow transition text-sm font-medium"
