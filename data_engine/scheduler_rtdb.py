@@ -720,6 +720,11 @@ def process_ai_requests():
             ref.child(uid).update({'status': 'processing'})
             
             print(f"[{now_kst()}] Processing AI request for user {uid}...")
+            
+            # Initialize response variables
+            result_text = "AI 분석 요청을 처리하는 중입니다."
+            used_model = "n/a"
+            last_error = None
             portfolio_signature = None
             
             try:
@@ -834,9 +839,7 @@ def process_ai_requests():
                     )
                     
                     # 4. Generate Content (Primary: Groq, Secondary: Gemini)
-                    result_text = ""
                     used_model = "openai/gpt-oss-120b"
-                    last_error = None
                     #print(prompt) # Reduced noise
 
                     if groq_client:
