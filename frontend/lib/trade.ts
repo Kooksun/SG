@@ -302,7 +302,7 @@ export async function sellStock(uid: string, symbol: string, name: string, price
     }
 }
 
-export async function placeLimitOrder(uid: string, symbol: string, name: string, type: "BUY" | "SELL", targetPrice: number, quantity: number, market: string = "KRX") {
+export async function placeLimitOrder(uid: string, symbol: string, name: string, type: "BUY" | "SELL", targetPrice: number, quantity: number, market: string = "KRX", currency: string = "KRW") {
     if (quantity <= 0) throw new Error("Quantity must be positive");
     if (targetPrice <= 0) throw new Error("Target price must be positive");
 
@@ -316,6 +316,7 @@ export async function placeLimitOrder(uid: string, symbol: string, name: string,
         targetPrice,
         quantity,
         market,
+        currency,
         status: "PENDING",
         timestamp: serverTimestamp()
     });

@@ -391,7 +391,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                     await sellStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity, stock.market);
                 }
             } else {
-                await placeLimitOrder(user.uid, stock.symbol, stock.name, mode, limitPrice, quantity, stock.market);
+                await placeLimitOrder(user.uid, stock.symbol, stock.name, mode, limitPrice, quantity, stock.market, stock.currency);
             }
             onClose();
         } catch (err: any) {
@@ -493,7 +493,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                                     <button
                                         onClick={() => {
                                             setOrderType("LIMIT");
-                                            setLimitPrice(effectivePrice);
+                                            setLimitPrice(isUS ? stock.price : effectivePrice);
                                         }}
                                         className={`flex-1 py-1 text-sm rounded ${orderType === "LIMIT" ? "bg-gray-700 text-white" : "text-gray-500 hover:text-gray-300"}`}
                                     >
@@ -522,15 +522,23 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                                                 <div className="flex items-center gap-2">
                                                     <input
                                                         type="number"
+                                                        step={isUS ? "0.01" : "1"}
                                                         value={limitPrice}
-                                                        onChange={(e) => setLimitPrice(parseInt(e.target.value) || 0)}
+                                                        onChange={(e) => setLimitPrice(isUS ? parseFloat(e.target.value) || 0 : parseInt(e.target.value) || 0)}
                                                         className="w-full bg-gray-700 rounded p-2 text-white font-bold"
                                                     />
-                                                    <span className="text-sm">KRW</span>
+                                                    <span className="text-sm">{isUS ? "USD" : "KRW"}</span>
                                                 </div>
                                                 <div className="text-xs text-gray-500">
-                                                    Current: {effectivePrice.toLocaleString()} KRW
+                                                    Current: {isUS
+                                                        ? `$${stock.price.toLocaleString(undefined, { minimumFractionDigits: 2 })} (≈ ${effectivePrice.toLocaleString()} KRW)`
+                                                        : `${effectivePrice.toLocaleString()} KRW`}
                                                 </div>
+                                                {isUS && (
+                                                    <div className="text-xs text-blue-400">
+                                                        Estimated Target: ≈ {Math.floor(limitPrice * exchangeRate).toLocaleString()} KRW
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                         {isUS && orderType === "MARKET" && (

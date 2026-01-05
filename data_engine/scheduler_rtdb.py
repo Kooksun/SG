@@ -605,6 +605,7 @@ def process_limit_orders():
             target_price = order_data.get("targetPrice")
             quantity = order_data.get("quantity")
             order_type = order_data.get("type") # BUY or SELL
+            currency = order_data.get("currency", "KRW")
             
             stock_info = latest_snapshot.get(symbol)
             if not stock_info:
@@ -612,20 +613,33 @@ def process_limit_orders():
                 
             current_price = stock_info.price
             
+            # Comparison logic: Ensure we compare in the same currency
+            # If the order is in KRW but the stock is USD, convert current_price for comparison
+            compare_price = current_price
+            if currency == "KRW" and stock_info.currency == "USD":
+                compare_price = current_price * latest_exchange_rate
+            
             execute = False
-            if order_type == "BUY" and current_price <= target_price:
+            if order_type == "BUY" and compare_price <= target_price:
                 execute = True
-            elif order_type == "SELL" and current_price >= target_price:
+            elif order_type == "SELL" and compare_price >= target_price:
                 execute = True
                 
             if execute:
                 try:
-                    print(f"  -> Executing LIMIT {order_type} for user {uid}: {symbol} @ {current_price} (Target: {target_price})")
+                    print(f"  -> Executing LIMIT {order_type} for user {uid}: {symbol} @ {current_price} {stock_info.currency} (Target: {target_price} {currency})")
                     market = stock_info.market
+                    
+                    # Convert to KRW for the executor which expects base currency (KRW)
+                    # Note: buy_stock/sell_stock logic in trade_executor.py uses the passed price as the actual KRW cost basis.
+                    exec_price = current_price
+                    if stock_info.currency == "USD":
+                        exec_price = math.floor(current_price * latest_exchange_rate)
+                    
                     if order_type == "BUY":
-                        buy_stock(uid, symbol, name, current_price, quantity, order_type="LIMIT", market=market)
+                        buy_stock(uid, symbol, name, exec_price, quantity, order_type="LIMIT", market=market)
                     else:
-                        sell_stock(uid, symbol, name, current_price, quantity, order_type="LIMIT", market=market)
+                        sell_stock(uid, symbol, name, exec_price, quantity, order_type="LIMIT", market=market)
                     
                     orders_ref.document(order_doc.id).update({
                         "status": "COMPLETED",

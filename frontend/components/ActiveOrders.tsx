@@ -14,6 +14,7 @@ interface Order {
     type: "BUY" | "SELL";
     targetPrice: number;
     quantity: number;
+    currency?: string;
     status: "PENDING" | "COMPLETED" | "CANCELLED" | "FAILED";
     timestamp: any;
 }
@@ -88,10 +89,14 @@ export default function ActiveOrders({ stocks = {}, exchangeRate = 1400 }: Activ
                     <tbody>
                         {orders.map(order => {
                             const stockInfo = stocks[order.symbol];
-                            const isUS = stockInfo?.currency === 'USD';
-                            const currentPrice = stockInfo
-                                ? (isUS ? Math.floor(stockInfo.price * exchangeRate) : stockInfo.price)
+                            const orderCurrency = order.currency || 'KRW';
+                            const isUSDOrder = orderCurrency === 'USD';
+
+                            // For USD orders, use USD price directly for comparison
+                            const displayCurrentPrice = stockInfo
+                                ? (isUSDOrder ? stockInfo.price : stockInfo.price) // stockInfo.price is USD for US stocks
                                 : null;
+
                             const priceChange = stockInfo?.change || 0;
 
                             return (
@@ -106,16 +111,16 @@ export default function ActiveOrders({ stocks = {}, exchangeRate = 1400 }: Activ
                                         </span>
                                     </td>
                                     <td className="text-right py-2 font-mono">
-                                        {currentPrice !== null ? (
+                                        {displayCurrentPrice !== null ? (
                                             <span className={priceChange > 0 ? "text-red-500" : priceChange < 0 ? "text-blue-500" : "text-white"}>
-                                                {currentPrice.toLocaleString()}
+                                                {isUSDOrder ? "$" : ""}{displayCurrentPrice.toLocaleString(undefined, isUSDOrder ? { minimumFractionDigits: 2 } : {})}
                                             </span>
                                         ) : (
                                             <span className="text-gray-600">-</span>
                                         )}
                                     </td>
                                     <td className="text-right py-2 font-mono">
-                                        {order.targetPrice.toLocaleString()}
+                                        {isUSDOrder ? "$" : ""}{order.targetPrice.toLocaleString(undefined, isUSDOrder ? { minimumFractionDigits: 2 } : {})}
                                     </td>
                                     <td className="text-right py-2">
                                         {order.quantity.toLocaleString()}
