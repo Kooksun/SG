@@ -165,6 +165,12 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
             },
             localization: {
                 dateFormat: 'yyyy-MM-dd',
+                priceFormatter: (price: number) => {
+                    if (stock.currency === 'KRW') {
+                        return Math.floor(price).toLocaleString();
+                    }
+                    return price.toLocaleString(undefined, { minimumFractionDigits: 2 });
+                },
             },
             grid: {
                 vertLines: { color: '#374151' },
