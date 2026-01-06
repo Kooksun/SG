@@ -33,16 +33,17 @@ export default function StockHoldersModal({
 
     if (!isOpen || !symbol) return null;
 
+    const isUS = stock?.currency === 'USD';
+    const currentPriceRaw = stock?.price || 0;
+    const currentPrice = (isUS ? currentPriceRaw * exchangeRate : currentPriceRaw);
+
     const holders = users
         .map((user) => {
             const portfolio = portfolios[user.uid] || [];
             const item = portfolio.find((p) => p.symbol === symbol);
             if (!item || item.quantity === 0) return null;
 
-            const currentPriceRaw = stock?.price || 0;
-            const currentPrice = (stock?.currency === 'USD' ? currentPriceRaw * exchangeRate : currentPriceRaw);
-            const avgPriceRaw = item.averagePrice || 0;
-            const avgPrice = (stock?.currency === 'USD' ? avgPriceRaw * exchangeRate : avgPriceRaw);
+            const avgPrice = item.averagePrice || 0; // averagePrice is already stored in KRW
 
             // Profit calculation
             // For long: (current - avg) * quantity
@@ -83,9 +84,16 @@ export default function StockHoldersModal({
                         <h2 className="text-xl font-bold text-white">
                             Top Holders: {stock?.name || symbol}
                         </h2>
-                        <p className="text-sm text-gray-400">
-                            Price: {stock?.price.toLocaleString()} {stock?.currency === 'USD' ? 'USD' : 'KRW'}
-                        </p>
+                        <div className="flex items-center gap-3">
+                            <p className="text-sm text-gray-400">
+                                Price: {stock?.price.toLocaleString(undefined, isUS ? { minimumFractionDigits: 2 } : {})} {isUS ? 'USD' : 'KRW'}
+                            </p>
+                            {isUS && (
+                                <p className="text-xs text-gray-500">
+                                    (≈ {currentPrice.toLocaleString()} KRW)
+                                </p>
+                            )}
+                        </div>
                     </div>
                     <button
                         onClick={onClose}
@@ -101,7 +109,7 @@ export default function StockHoldersModal({
                             <tr className="border-b border-gray-700">
                                 <th className="p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">User</th>
                                 <th className="p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Quantity</th>
-                                <th className="p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Avg Price</th>
+                                <th className="p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Avg Price (KRW)</th>
                                 <th className="p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Profit/Loss</th>
                             </tr>
                         </thead>
@@ -129,9 +137,13 @@ export default function StockHoldersModal({
                                     <td className="p-4 text-right">
                                         {Math.floor(holder.averagePrice).toLocaleString()}
                                     </td>
-                                    <td className={`p-4 text-right font-medium ${holder.returnPct >= 0 ? "text-red-400" : "text-blue-400"}`}>
-                                        {holder.returnPct >= 0 ? "+" : ""}
-                                        {holder.returnPct.toFixed(2)}%
+                                    <td className="p-4 text-right">
+                                        <div className={`flex flex-col items-end font-medium ${holder.profit >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                                            <span>{holder.profit >= 0 ? "+" : ""}{Math.floor(holder.profit).toLocaleString()} KRW</span>
+                                            <span className="text-xs">
+                                                ({holder.returnPct >= 0 ? "+" : ""}{holder.returnPct.toFixed(2)}%)
+                                            </span>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

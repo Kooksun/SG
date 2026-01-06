@@ -379,6 +379,117 @@ export default function Leaderboard() {
                 )}
             </div>
 
+            {/* Top/Bottom Performance Ranking */}
+            <div className="mt-8 border-t border-gray-700 pt-8">
+                <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                    📈 종목별 수익률 랭킹
+                    <span className="text-xs font-normal text-gray-500">(전체 사용자 합산 기준)</span>
+                </h3>
+
+                {(() => {
+                    // Calculate performance per stock
+                    const stockPerf: Record<string, { cost: number; profit: number }> = {};
+
+                    Object.values(portfolios).forEach((portfolio) => {
+                        portfolio.forEach((item) => {
+                            const stock = stocks[item.symbol];
+                            if (!stock) return;
+
+                            const isUS = stock.currency === 'USD';
+                            const currentPrice = isUS ? stock.price * exchangeRate : stock.price;
+                            const avgPrice = item.averagePrice || 0;
+                            const absQty = Math.abs(item.quantity);
+
+                            const cost = avgPrice * absQty;
+                            const value = currentPrice * absQty;
+                            const profit = item.quantity > 0 ? (value - cost) : (cost - value);
+
+                            if (!stockPerf[item.symbol]) {
+                                stockPerf[item.symbol] = { cost: 0, profit: 0 };
+                            }
+                            stockPerf[item.symbol].cost += cost;
+                            stockPerf[item.symbol].profit += profit;
+                        });
+                    });
+
+                    const ranking = Object.entries(stockPerf)
+                        .map(([symbol, data]) => ({
+                            symbol,
+                            name: stocks[symbol]?.name || symbol,
+                            profitPct: data.cost > 0 ? (data.profit / data.cost) * 100 : 0,
+                            profit: data.profit
+                        }))
+                        .sort((a, b) => b.profitPct - a.profitPct);
+
+                    const top5 = ranking.slice(0, 5);
+                    const bottom5 = [...ranking].reverse().slice(0, 5).reverse(); // Reverse ranking then take top 5 (which are originally bottom) then reverse back to keep worst-first
+
+                    if (ranking.length === 0) return <p className="text-gray-400 text-sm">집계된 종목 데이터가 없습니다.</p>;
+
+                    return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Top 5 Box */}
+                            <div className="bg-gray-900/40 rounded-xl p-4 border border-red-900/20">
+                                <div className="text-red-400 font-bold mb-3 flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                                    수익률 상위 종목
+                                </div>
+                                <div className="space-y-2">
+                                    {top5.map((item, idx) => (
+                                        <div
+                                            key={item.symbol}
+                                            className="flex items-center justify-between p-2 rounded hover:bg-gray-700/50 cursor-pointer transition-colors"
+                                            onClick={() => {
+                                                setSelectedSymbol(item.symbol);
+                                                setIsHoldersModalOpen(true);
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-gray-500 font-mono text-xs w-4">{idx + 1}</span>
+                                                <span className="text-gray-200 font-medium">{item.name}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-red-400 font-bold">+{item.profitPct.toFixed(2)}%</div>
+                                                <div className="text-[10px] text-gray-500">{Math.floor(item.profit).toLocaleString()} KRW</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Bottom 5 Box */}
+                            <div className="bg-gray-900/40 rounded-xl p-4 border border-blue-900/20">
+                                <div className="text-blue-400 font-bold mb-3 flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                    수익률 하위 종목
+                                </div>
+                                <div className="space-y-2">
+                                    {bottom5.reverse().map((item, idx) => (
+                                        <div
+                                            key={item.symbol}
+                                            className="flex items-center justify-between p-2 rounded hover:bg-gray-700/50 cursor-pointer transition-colors"
+                                            onClick={() => {
+                                                setSelectedSymbol(item.symbol);
+                                                setIsHoldersModalOpen(true);
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-gray-500 font-mono text-xs w-4">{idx + 1}</span>
+                                                <span className="text-gray-200 font-medium">{item.name}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-blue-400 font-bold">{item.profitPct.toFixed(2)}%</div>
+                                                <div className="text-[10px] text-gray-500">{Math.floor(item.profit).toLocaleString()} KRW</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+            </div>
+
             <RankingHistoryModal
                 isOpen={isHistoryOpen}
                 onClose={() => setIsHistoryOpen(false)}

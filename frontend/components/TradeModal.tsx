@@ -152,6 +152,9 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                 background: { type: ColorType.Solid, color: '#1f2937' }, // gray-800
                 textColor: 'rgba(255, 255, 255, 0.9)',
             },
+            localization: {
+                dateFormat: 'yyyy-MM-dd',
+            },
             grid: {
                 vertLines: { color: '#374151' },
                 horzLines: { color: '#374151' },
@@ -159,8 +162,12 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
             width: chartContainerRef.current.clientWidth,
             height: 300,
             timeScale: {
-                timeVisible: true,
+                timeVisible: false,
                 secondsVisible: false,
+                tickMarkFormatter: (time: any) => {
+                    const d = typeof time === 'string' ? new Date(time) : new Date((time as number) * 1000);
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                },
             },
         });
 
@@ -209,7 +216,17 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
         if (!legend) return;
 
         const setLegendText = (data: any) => {
-            const dateStr = data.time.toString();
+            let dateStr = "";
+            const t = data.time;
+            if (typeof t === 'string') {
+                dateStr = t.split(/[\sT]/)[0]; // yyyy-MM-dd
+            } else if (typeof t === 'number') {
+                const d = new Date(t * 1000);
+                dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            } else if (t && typeof t === 'object' && 'year' in t) {
+                // BusinessDay object
+                dateStr = `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
+            }
             const volume = data.volume !== undefined ? data.volume : (data.value || 0);
             const isKR = stock.currency === 'KRW';
 
@@ -264,6 +281,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
             if (candle && vol) {
                 setLegendText({
                     ...candle,
+                    time: param.time,
                     volume: vol.value,
                     ma5: ma5?.value,
                     ma20: ma20?.value
