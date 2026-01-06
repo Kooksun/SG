@@ -171,7 +171,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                 horzLines: { color: '#374151' },
             },
             width: chartContainerRef.current.clientWidth,
-            height: 300,
+            height: chartContainerRef.current.clientHeight,
             timeScale: {
                 timeVisible: false,
                 secondsVisible: false,
@@ -308,7 +308,10 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
         const handleResize = () => {
             if (chartContainerRef.current) {
-                chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+                chart.applyOptions({
+                    width: chartContainerRef.current.clientWidth,
+                    height: chartContainerRef.current.clientHeight
+                });
             }
         };
 
