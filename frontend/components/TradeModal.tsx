@@ -71,8 +71,19 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                 }
 
                 if (data && (data as any).length > 0 && chartRef.current && seriesRef.current && volumeSeriesRef.current && ma5SeriesRef.current && ma20SeriesRef.current) {
-                    // ... (데이터 세팅 로직)
-                    const candlestickData = data.map(d => ({
+                    // Sanitize data: fill missing OHLC with close
+                    const sanitizedData = data.map(d => {
+                        const close = d.close;
+                        return {
+                            ...d,
+                            open: d.open || close,
+                            high: d.high || close,
+                            low: d.low || close,
+                            close: close
+                        };
+                    });
+
+                    const candlestickData = sanitizedData.map(d => ({
                         time: d.time,
                         open: d.open,
                         high: d.high,
@@ -82,7 +93,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
                     seriesRef.current.setData(candlestickData);
 
-                    volumeSeriesRef.current.setData(data.map(d => ({
+                    volumeSeriesRef.current.setData(sanitizedData.map(d => ({
                         time: d.time,
                         value: d.volume,
                         color: d.close >= d.open ? 'rgba(239, 68, 68, 0.5)' : 'rgba(59, 130, 246, 0.5)'
@@ -90,9 +101,9 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
 
                     // Calculate Moving Averages
                     const calculateMA = (period: number) => {
-                        return data.map((d, i) => {
+                        return sanitizedData.map((d, i) => {
                             if (i < period - 1) return null;
-                            const sum = data.slice(i - period + 1, i + 1).reduce((acc, curr) => acc + curr.close, 0);
+                            const sum = sanitizedData.slice(i - period + 1, i + 1).reduce((acc, curr) => acc + curr.close, 0);
                             return { time: d.time, value: sum / period };
                         }).filter(d => d !== null) as { time: string, value: number }[];
                     };
