@@ -7,7 +7,7 @@ import { ref, onValue } from "firebase/database";
 import { auth, db, rtdb } from "@/lib/firebase";
 import { UserProfile, Stock } from "@/types";
 import { useRouter } from "next/navigation";
-import { History } from "lucide-react";
+import { History, MessageCircle } from "lucide-react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import RankingHistoryModal from "./RankingHistoryModal";
 import StockHoldersModal from "./StockHoldersModal";
@@ -22,6 +22,7 @@ export default function Leaderboard() {
     const { user: currentUser } = useAuth();
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [stocks, setStocks] = useState<Record<string, Stock>>({});
+    const [userComments, setUserComments] = useState<Record<string, string>>({});
     const [portfolios, setPortfolios] = useState<Record<string, PortfolioItem[]>>({});
     const [globalHoldingsLong, setGlobalHoldingsLong] = useState<Record<string, number>>({});
     const [globalHoldingsShort, setGlobalHoldingsShort] = useState<Record<string, number>>({});
@@ -47,7 +48,6 @@ export default function Leaderboard() {
             snapshot.forEach((docSnap) => {
                 const data = docSnap.data() as UserProfile;
                 const uid = docSnap.id;
-                // Ensure uid is consistent with document ID
                 data.uid = uid;
 
                 if (typeof data.startingBalance !== "number") {
@@ -56,7 +56,6 @@ export default function Leaderboard() {
                     }
                     data.startingBalance = 500000000;
                 }
-                // Ensure data.uid is also set if missing from document
                 if (!data.uid) data.uid = uid;
                 userData.push(data);
             });
@@ -93,7 +92,23 @@ export default function Leaderboard() {
     }, []);
 
     useEffect(() => {
-        // Remove portfolios for users no longer on the board
+        const commentsRef = ref(rtdb, 'users');
+        const unsubscribe = onValue(commentsRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                const comments: Record<string, string> = {};
+                Object.keys(data).forEach(uid => {
+                    if (data[uid].comment) {
+                        comments[uid] = data[uid].comment;
+                    }
+                });
+                setUserComments(comments);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
         setPortfolios((prev) => {
             const active = new Set(users.map((user) => user.uid));
             const next: Record<string, PortfolioItem[]> = {};
@@ -163,13 +178,9 @@ export default function Leaderboard() {
                 const stock = stocks[item.symbol];
                 if (!stock) return total;
                 const price = stock.currency === 'USD' ? stock.price * exchangeRate : stock.price;
-                return total + price * item.quantity; // item.quantity is negative for shorts
+                return total + price * item.quantity;
             }, 0);
 
-            // For short positions, usedCredit includes a liability (margin) equal to the initial sell value.
-            // To get net equity, we must add back that margin because 'holdingsValue' already subtracted the current cost to cover.
-            // Equity = Cash + LongValue - ShortValue - (TotalUsedCredit - ShortInitialValue)
-            // Equity = balance + LongValue - ShortValue - TotalUsedCredit + ShortInitialValue
             const shortInitialValue = holdings.reduce((total, item) => {
                 if (item.quantity < 0) {
                     return total + (Math.abs(item.quantity) * (item.averagePrice || 0));
@@ -179,7 +190,6 @@ export default function Leaderboard() {
 
             const usedCredit = typeof user.usedCredit === "number" ? user.usedCredit : 0;
 
-            // totalAssets for display: Cash + LongValue
             const longValue = holdings.reduce((total, item) => {
                 if (item.quantity <= 0) return total;
                 const stock = stocks[item.symbol];
@@ -278,7 +288,25 @@ export default function Leaderboard() {
                                 onClick={() => router.push(`/user?uid=${user.uid}`)}
                             >
                                 <td className="py-2">{index + 1}</td>
-                                <td className="py-2">{user.displayName}</td>
+                                <td className="py-2 px-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-medium">{user.displayName}</span>
+                                        {userComments[user.uid] && (
+                                            <div className="group relative flex items-center">
+                                                <MessageCircle
+                                                    size={14}
+                                                    className="text-gray-500 group-hover:text-blue-400 transition-colors cursor-help"
+                                                />
+                                                <div className="absolute left-full ml-2 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 min-w-[150px] max-w-[300px] overflow-hidden">
+                                                    <div className="whitespace-nowrap inline-block animate-marquee-slow hover:pause text-xs text-blue-300 font-medium">
+                                                        {userComments[user.uid]}
+                                                    </div>
+                                                    <div className="absolute right-full top-1/2 -translate-y-1/2 border-8 border-transparent border-right-gray-800"></div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </td>
                                 <td className="py-2">
                                     <div className="flex flex-col">
                                         <span>{user.equity.toLocaleString()} KRW</span>
@@ -301,11 +329,11 @@ export default function Leaderboard() {
                     </tbody>
                 </table>
             </div>
+
             <div className="mt-8">
                 <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-4">
                     <h3 className="text-xl font-semibold text-white">전체 포트폴리오 비중</h3>
                     <div className="flex flex-wrap gap-2 text-sm justify-end">
-                        {/* Position Mode Toggle */}
                         <div className="flex bg-gray-700 p-1 rounded-lg border border-gray-600">
                             <button
                                 onClick={() => setPositionMode("long")}
@@ -321,7 +349,6 @@ export default function Leaderboard() {
                             </button>
                         </div>
 
-                        {/* Metric Toggle */}
                         <div className="flex bg-gray-700 p-1 rounded-lg border border-gray-600">
                             <button
                                 onClick={() => setGlobalChartMetric("value")}
@@ -379,7 +406,6 @@ export default function Leaderboard() {
                 )}
             </div>
 
-            {/* Top/Bottom Performance Ranking */}
             <div className="mt-8 border-t border-gray-700 pt-8">
                 <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
                     📈 종목별 수익률 랭킹
@@ -387,7 +413,6 @@ export default function Leaderboard() {
                 </h3>
 
                 {(() => {
-                    // Calculate performance per stock
                     const stockPerf: Record<string, { cost: number; profit: number }> = {};
 
                     Object.values(portfolios).forEach((portfolio) => {
@@ -422,13 +447,12 @@ export default function Leaderboard() {
                         .sort((a, b) => b.profitPct - a.profitPct);
 
                     const top5 = ranking.slice(0, 5);
-                    const bottom5 = [...ranking].reverse().slice(0, 5).reverse(); // Reverse ranking then take top 5 (which are originally bottom) then reverse back to keep worst-first
+                    const bottom5 = [...ranking].reverse().slice(0, 5).reverse();
 
                     if (ranking.length === 0) return <p className="text-gray-400 text-sm">집계된 종목 데이터가 없습니다.</p>;
 
                     return (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Top 5 Box */}
                             <div className="bg-gray-900/40 rounded-xl p-4 border border-red-900/20">
                                 <div className="text-red-400 font-bold mb-3 flex items-center gap-2">
                                     <span className="w-2 h-2 bg-red-500 rounded-full"></span>
@@ -457,7 +481,6 @@ export default function Leaderboard() {
                                 </div>
                             </div>
 
-                            {/* Bottom 5 Box */}
                             <div className="bg-gray-900/40 rounded-xl p-4 border border-blue-900/20">
                                 <div className="text-blue-400 font-bold mb-3 flex items-center gap-2">
                                     <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -505,6 +528,20 @@ export default function Leaderboard() {
                 portfolios={portfolios}
                 exchangeRate={exchangeRate}
             />
+
+            <style jsx>{`
+                @keyframes marquee-slow {
+                    0% { transform: translateX(50%); }
+                    100% { transform: translateX(-100%); }
+                }
+                .animate-marquee-slow {
+                    animation: marquee-slow 10s linear infinite;
+                    padding-left: 10px;
+                }
+                .border-right-gray-800 {
+                    border-right-color: #1f2937;
+                }
+            `}</style>
         </div>
     );
 }

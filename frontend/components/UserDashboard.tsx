@@ -13,7 +13,7 @@ import MissionModal from "@/components/MissionModal";
 import { UserProfile, Stock } from "@/types";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { applyDailyInterestAndAutoLiquidate } from "@/lib/credit";
-import { LayoutDashboard, PieChart, History, Coins, Gift } from "lucide-react";
+import { LayoutDashboard, PieChart, History, Coins, Gift, MessageCircle, Save } from "lucide-react";
 
 interface PortfolioItem {
     symbol: string;
@@ -40,6 +40,8 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     const [pendingSymbols, setPendingSymbols] = useState<Set<string>>(new Set());
     const [isMissionOpen, setIsMissionOpen] = useState(false);
     const [hasUnclaimed, setHasUnclaimed] = useState(false);
+    const [comment, setComment] = useState("");
+    const [isSavingComment, setIsSavingComment] = useState(false);
     const interestAppliedRef = useRef(false);
 
     // Security: Reset to overview if active tab is private and not the owner
@@ -181,6 +183,19 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     }, [uid]);
 
     useEffect(() => {
+        if (!uid) return;
+        const commentRef = ref(rtdb, `users/${uid}/comment`);
+        const unsubscribe = onValue(commentRef, (snapshot) => {
+            if (snapshot.exists()) {
+                setComment(snapshot.val());
+            } else {
+                setComment("");
+            }
+        });
+        return () => unsubscribe();
+    }, [uid]);
+
+    useEffect(() => {
         const stocksRef = ref(rtdb, 'stocks');
         const unsubscribe = onValue(stocksRef, (snapshot) => {
             const data = snapshot.val();
@@ -227,6 +242,18 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
             });
         } catch (error) {
             console.error("Failed to request AI analysis:", error);
+        }
+    };
+
+    const handleSaveComment = async () => {
+        if (!uid || currentUser?.uid !== uid) return;
+        setIsSavingComment(true);
+        try {
+            await set(ref(rtdb, `users/${uid}/comment`), comment);
+        } catch (error) {
+            console.error("Failed to save comment:", error);
+        } finally {
+            setIsSavingComment(false);
         }
     };
 
@@ -306,6 +333,44 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
                                         Orders
                                     </button>
                                 </>
+                            )}
+                        </div>
+
+                        <div className="h-6 w-px bg-gray-600 hidden md:block"></div>
+
+                        {/* Comment Section */}
+                        <div className="flex-1 flex items-center min-w-[200px] max-w-md">
+                            {currentUser?.uid === uid ? (
+                                <div className="flex items-center gap-2 w-full bg-gray-900/50 rounded-lg px-3 py-1 border border-gray-700 focus-within:border-blue-500 transition-all">
+                                    <MessageCircle size={16} className="text-gray-500 shrink-0" />
+                                    <input
+                                        type="text"
+                                        value={comment}
+                                        onChange={(e) => setComment(e.target.value)}
+                                        onBlur={handleSaveComment}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSaveComment()}
+                                        placeholder="한마디 남기기..."
+                                        className="bg-transparent border-none focus:ring-0 text-sm text-gray-300 placeholder:text-gray-600 w-full py-1"
+                                    />
+                                    {isSavingComment ? (
+                                        <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full shrink-0" />
+                                    ) : (
+                                        <button onClick={handleSaveComment} className="text-gray-500 hover:text-blue-400 transition-colors shrink-0">
+                                            <Save size={16} />
+                                        </button>
+                                    )}
+                                </div>
+                            ) : (
+                                comment && (
+                                    <div className="flex items-center gap-2 overflow-hidden bg-blue-500/5 rounded-lg px-4 py-1.5 border border-blue-500/20 w-full group">
+                                        <MessageCircle size={16} className="text-blue-400 shrink-0" />
+                                        <div className="overflow-hidden relative flex-1">
+                                            <div className="whitespace-nowrap inline-block animate-marquee-slow hover:pause text-sm text-blue-200/80 font-medium">
+                                                {comment}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
                             )}
                         </div>
                     </div>

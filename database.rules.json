@@ -41,6 +41,14 @@
         "custom_symbols": {
             ".read": "auth != null",
             ".write": "auth != null"
+        },
+        "users": {
+            ".read": true,
+            "$uid": {
+                "comment": {
+                    ".write": "auth != null && auth.uid == $uid"
+                }
+            }
         }
     }
 }
