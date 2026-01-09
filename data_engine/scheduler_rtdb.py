@@ -209,6 +209,8 @@ def sync_job(force: bool = False):
         
         ref.update(updates)
         print(f"[{now_kst()}] Updated {len(updates)} stocks in RTDB.")
+        # Update specific stocks timestamp
+        rtdb_admin.reference('system/stocksUpdatedAt').set(now_kst().isoformat())
     else:
         print(f"[{now_kst()}] No stock changes detected.")
 
@@ -296,7 +298,11 @@ def sync_job(force: bool = False):
     # Sync Indices
     if latest_indices:
         rtdb_admin.reference('system/indices').set(latest_indices)
+        rtdb_admin.reference('system/indicesUpdatedAt').set(now_kst().isoformat())
         print(f"[{now_kst()}] Synced Market Indices.")
+
+    # Global Last Updated At
+    rtdb_admin.reference('system/updatedAt').set(now_kst().isoformat())
 
     last_written_snapshot = {symbol: stock for symbol, stock in latest_snapshot.items()}
 

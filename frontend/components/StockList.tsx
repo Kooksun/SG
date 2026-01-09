@@ -25,6 +25,11 @@ export default function StockList() {
     const [sortField, setSortField] = useState<'price' | 'change' | 'name'>('price');
     const [sortDesc, setSortDesc] = useState(true);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [systemTimes, setSystemTimes] = useState<{
+        updatedAt: Date | null;
+        stocksUpdatedAt: Date | null;
+        indicesUpdatedAt: Date | null;
+    }>({ updatedAt: null, stocksUpdatedAt: null, indicesUpdatedAt: null });
 
 
 
@@ -75,6 +80,21 @@ export default function StockList() {
 
         return () => unsubscribe();
     }, [sortField, sortDesc]);
+
+    useEffect(() => {
+        const systemRef = ref(rtdb, 'system');
+        const unsubscribe = onValue(systemRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                setSystemTimes({
+                    updatedAt: data.updatedAt ? new Date(data.updatedAt) : null,
+                    stocksUpdatedAt: data.stocksUpdatedAt ? new Date(data.stocksUpdatedAt) : null,
+                    indicesUpdatedAt: data.indicesUpdatedAt ? new Date(data.indicesUpdatedAt) : null
+                });
+            }
+        });
+        return () => unsubscribe();
+    }, []);
 
     useEffect(() => {
         if (!user) {
@@ -244,13 +264,47 @@ export default function StockList() {
                         {isSearchingServer ? "..." : "검색"}
                     </button>
                 </div>
-                <div className="text-sm text-gray-400 text-right sm:w-24 leading-tight">
+                <div className="text-sm text-gray-400 text-right sm:w-28 leading-tight relative group cursor-help">
                     최종 갱신:<br />
-                    {lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit"
-                    }) : "-"}
+                    <span className="font-mono">
+                        {systemTimes.updatedAt ? systemTimes.updatedAt.toLocaleTimeString("ko-KR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit"
+                        }) : (lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit"
+                        }) : "-")}
+                    </span>
+
+                    {/* 상세 갱신 시각 툴팁 */}
+                    <div className="absolute right-0 top-full mt-2 w-48 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl hidden group-hover:block z-50 text-xs text-left backdrop-blur-md bg-opacity-95">
+                        <div className="font-bold text-blue-400 mb-2 border-b border-gray-700 pb-1">데이터 갱신 상세</div>
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between items-center gap-2">
+                                <span className="text-gray-500">시스템 전체</span>
+                                <span className="text-gray-300 font-mono">
+                                    {systemTimes.updatedAt?.toLocaleTimeString("ko-KR", { hour: '2-digit', minute: '2-digit', second: '2-digit' }) || "-"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center gap-2">
+                                <span className="text-gray-500">종목 데이터</span>
+                                <span className="text-gray-300 font-mono">
+                                    {(systemTimes.stocksUpdatedAt || lastUpdated)?.toLocaleTimeString("ko-KR", { hour: '2-digit', minute: '2-digit', second: '2-digit' }) || "-"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center gap-2">
+                                <span className="text-gray-500">환율/지수</span>
+                                <span className="text-gray-300 font-mono">
+                                    {systemTimes.indicesUpdatedAt?.toLocaleTimeString("ko-KR", { hour: '2-digit', minute: '2-digit', second: '2-digit' }) || "-"}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-gray-800 text-[10px] text-gray-600 italic">
+                            * 서버 스케줄러가 1분마다 동기화합니다.
+                        </div>
+                    </div>
                 </div>
             </div>
 
