@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS user_ranking_history (
     uid TEXT NOT NULL,
     total_assets BIGINT NOT NULL,
     rank INTEGER NOT NULL,
-    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    comment TEXT
 );
 
 -- Index for faster queries

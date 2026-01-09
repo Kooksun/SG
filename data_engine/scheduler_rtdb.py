@@ -996,57 +996,44 @@ def process_search_requests():
     if not requests:
         return
 
-    # Cache for fdr listing to avoid redundant calls within one poll
-    _cached_listing = None
-
     for uid, data in requests.items():
         if isinstance(data, dict) and data.get('status') == 'pending':
             query = data.get('query', '').strip()
             print(f"[{now_kst()}] Processing Search request for user {uid}: query='{query}'")
             
             try:
+                import requests as py_requests
                 results = []
                 if query:
-                    # 1. KR Stocks Search
-                    if _cached_listing is None:
-                        import FinanceDataReader as fdr
-                        _cached_listing = fdr.StockListing('KRX')
-                        _cached_listing['Code'] = _cached_listing['Code'].astype(str)
+                    # Naver Unified Search API (Stock target)
+                    url = f"https://ac.stock.naver.com/ac?q={query}&target=stock"
+                    headers = {"User-Agent": "Mozilla/5.0"}
                     
-                    # Filter by Symbol or Name
-                    mask = (
-                        _cached_listing['Code'].str.contains(query, case=False) |
-                        _cached_listing['Name'].str.contains(query, case=False)
-                    )
-                    matches = _cached_listing[mask].sort_values(by='Marcap', ascending=False).head(15)
-                    
-                    for _, row in matches.iterrows():
-                        results.append({
-                            'symbol': row['Code'],
-                            'name': row['Name'],
-                            'market': row['Market'],
-                            'type': 'KR'
-                        })
-                    
-                    # 2. US Stocks Search (Simple match from US_TICKER_MAP)
-                    from fetcher import US_TICKER_MAP
-                    us_matches = []
-                    for ticker, kor_name in US_TICKER_MAP.items():
-                        if query.lower() in ticker.lower() or query in kor_name:
-                            us_matches.append({
-                                'symbol': ticker,
-                                'name': kor_name,
-                                'market': 'US',
-                                'type': 'US'
+                    resp = py_requests.get(url, headers=headers, timeout=5)
+                    if resp.status_code == 200:
+                        search_data = resp.json()
+                        items = search_data.get('items', [])
+                        
+                        # Naver returns a list of result objects
+                        for item in items:
+                            # Map Naver fields to our internal format
+                            # KR: typeCode (KOSPI/KOSDAQ), nationCode (KOR)
+                            # US: typeCode (NASDAQ/NYSE/AMEX), nationCode (USA)
+                            nation = item.get('nationCode', 'KOR')
+                            market_type = 'KR' if nation == 'KOR' else 'US'
+                            
+                            results.append({
+                                'symbol': item.get('code'),
+                                'name': item.get('name'),
+                                'market': item.get('typeCode'),
+                                'type': market_type
                             })
-                    
-                    # Combine results, prioritizing US if explicitly searched by ticker
-                    results = us_matches + results
-                    results = results[:20] # Limit total results
+                    else:
+                        print(f"Warning: Naver search API returned HTTP {resp.status_code}")
 
                 # Update Results and Status
                 rtdb_admin.reference(f'search_results/{uid}').set({
-                    'results': results,
+                    'results': results[:20], # UI limit
                     'query': query,
                     'updatedAt': now_kst().isoformat()
                 })
