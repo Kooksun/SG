@@ -16,7 +16,9 @@ export default function WhatsNewModal({ isOpen, onClose }: WhatsNewModalProps) {
     useEffect(() => {
         if (isOpen) {
             setLoading(true);
-            fetch("/WHATS_NEW.md")
+            const isProd = process.env.NODE_ENV === "production";
+            const basePath = isProd ? "/SG" : "";
+            fetch(`${basePath}/WHATS_NEW.md`)
                 .then((res) => res.text())
                 .then((text) => {
                     setContent(text);
