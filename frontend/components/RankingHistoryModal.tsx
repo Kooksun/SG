@@ -198,7 +198,7 @@ export default function RankingHistoryModal({
                                                 {/* Comment Overlay */}
                                                 {isVisible && userRankingMap[uid]?.comment && (
                                                     <div className="absolute inset-0 flex items-center justify-center px-4 pointer-events-none overflow-hidden">
-                                                        <span className="text-white/40 text-[10px] font-medium whitespace-nowrap italic truncate max-w-full">
+                                                        <span className="text-white/60 text-s font-medium whitespace-nowrap truncate max-w-full drop-shadow-md">
                                                             {userRankingMap[uid].comment}
                                                         </span>
                                                     </div>
