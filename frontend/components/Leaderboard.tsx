@@ -298,7 +298,7 @@ export default function Leaderboard() {
                                                     className="text-gray-500 group-hover:text-blue-400 transition-colors cursor-help"
                                                 />
                                                 <div className="absolute left-full ml-2 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 min-w-[150px] max-w-[300px] overflow-hidden">
-                                                    <div className="whitespace-nowrap inline-block animate-marquee-slow hover:pause text-xs text-blue-300 font-medium">
+                                                    <div className="whitespace-nowrap inline-block animate-marquee-slow hover:pause text-sm text-blue-300 font-medium">
                                                         {userComments[user.uid]}
                                                     </div>
                                                     <div className="absolute right-full top-1/2 -translate-y-1/2 border-8 border-transparent border-right-gray-800"></div>

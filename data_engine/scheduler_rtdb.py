@@ -1131,15 +1131,27 @@ def record_ranking_history():
         # 4. Sort by equity descending
         ranking_list.sort(key=lambda x: x['equity'], reverse=True)
         
-        # 5. Assign ranks and prepare rows for Supabase
+        # 1. Fetch user comments from RTDB
+        user_comments = {}
+        try:
+            comments_data = rtdb_admin.reference('users').get() or {}
+            for uid, data in comments_data.items():
+                if isinstance(data, dict) and 'comment' in data:
+                    user_comments[uid] = data['comment']
+        except Exception as e:
+            print(f"Error fetching user comments for ranking history: {e}")
+
+        # 2. Assign ranks and prepare rows for Supabase
         rows = []
         recorded_at = now_kst().isoformat()
         for i, item in enumerate(ranking_list):
+            uid = item['uid']
             rows.append({
-                'uid': item['uid'],
+                'uid': uid,
                 'total_assets': int(item['equity']),
                 'rank': i + 1,
-                'recorded_at': recorded_at
+                'recorded_at': recorded_at,
+                'comment': user_comments.get(uid, "")
             })
             
         # 6. Insert into Supabase

@@ -9,6 +9,7 @@ interface RankingHistoryEntry {
     uid: string;
     rank: number;
     total_assets: number;
+    comment?: string;
 }
 
 interface UserMap {
@@ -81,10 +82,10 @@ export default function RankingHistoryModal({
 
     // Current rankings for all known users
     const userRankingMap = useMemo(() => {
-        const map: Record<string, { rank: number; assets: number }> = {};
+        const map: Record<string, { rank: number; assets: number; comment?: string }> = {};
         const entries = history.filter((h) => h.recorded_at === currentTimestamp);
         entries.forEach(e => {
-            map[e.uid] = { rank: e.rank, assets: e.total_assets };
+            map[e.uid] = { rank: e.rank, assets: e.total_assets, comment: e.comment };
         });
         return map;
     }, [history, currentTimestamp]);
@@ -193,6 +194,15 @@ export default function RankingHistoryModal({
                                                         {assets.toLocaleString()} <span className="text-[10px] opacity-60">KRW</span>
                                                     </span>
                                                 </div>
+
+                                                {/* Comment Overlay */}
+                                                {isVisible && userRankingMap[uid]?.comment && (
+                                                    <div className="absolute inset-0 flex items-center justify-center px-4 pointer-events-none overflow-hidden">
+                                                        <span className="text-white/40 text-[10px] font-medium whitespace-nowrap italic truncate max-w-full">
+                                                            {userRankingMap[uid].comment}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
