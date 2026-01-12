@@ -5,7 +5,7 @@ from firebase_admin import firestore, db as rtdb_admin
 from google.cloud.firestore_v1.base_transaction import BaseTransaction
 from firestore_client import db
 
-def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int, order_type: str = "MARKET", market: str = None):
+def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int, order_type: str = "MARKET", market: str = None, original_price: float = None, original_currency: str = "KRW"):
     """
     Executes a buy order for a user.
     Replicates the logic from frontend/lib/trade.ts
@@ -118,6 +118,8 @@ def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int, ord
             "profit": profit,
             "orderType": order_type,
             "market": market,
+            "originalPrice": original_price if original_price is not None else price,
+            "originalCurrency": original_currency,
             "timestamp": firestore.SERVER_TIMESTAMP
         })
         
@@ -133,7 +135,7 @@ def buy_stock(uid: str, symbol: str, name: str, price: float, quantity: int, ord
 
     return update_in_transaction(transaction)
 
-def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int, order_type: str = "MARKET", market: str = None):
+def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int, order_type: str = "MARKET", market: str = None, original_price: float = None, original_currency: str = "KRW"):
     """
     Executes a sell order for a user.
     Replicates the logic from frontend/lib/trade.ts
@@ -281,6 +283,8 @@ def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int, or
                 "profit": sell_profit,
                 "orderType": order_type,
                 "market": market,
+                "originalPrice": original_price if original_price is not None else price,
+                "originalCurrency": original_currency,
                 "creditUsed": 0,
                 "creditRepaid": credit_repayment if short_qty == 0 else 0, # Simplify: attach repayment to the last record or split? 
                 # Actually, let's just make it clear.
@@ -306,6 +310,8 @@ def sell_stock(uid: str, symbol: str, name: str, price: float, quantity: int, or
                 "profit": 0,
                 "orderType": order_type,
                 "market": market,
+                "originalPrice": original_price if original_price is not None else price,
+                "originalCurrency": original_currency,
                 "creditUsed": short_amount,
                 "creditRepaid": credit_repayment if sellable_qty == 0 else 0,
                 "timestamp": firestore.SERVER_TIMESTAMP

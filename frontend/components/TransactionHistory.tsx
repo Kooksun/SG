@@ -17,6 +17,8 @@ interface Transaction {
     points?: number;
     fee?: number;
     profit?: number;
+    originalPrice?: number;
+    originalCurrency?: string;
     timestamp: Timestamp;
 }
 
@@ -94,7 +96,18 @@ export default function TransactionHistory({
                                         {tx.type}
                                     </td>
                                     <td className="py-2">
-                                        {tx.price !== undefined ? tx.price.toLocaleString() : "-"}
+                                        {tx.originalPrice !== undefined ? (
+                                            tx.originalCurrency === "USD" ? (
+                                                <div className="flex flex-col">
+                                                    <span className="text-white font-mono">${tx.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                    <span className="text-[10px] text-gray-500">≈ {tx.price?.toLocaleString()} KRW</span>
+                                                </div>
+                                            ) : (
+                                                tx.originalPrice.toLocaleString()
+                                            )
+                                        ) : (
+                                            tx.price !== undefined ? tx.price.toLocaleString() : "-"
+                                        )}
                                     </td>
                                     <td className="py-2">
                                         {tx.quantity !== undefined ? tx.quantity : "-"}

@@ -429,7 +429,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                     await sellStock(user.uid, stock.symbol, stock.name, effectivePrice, quantity, stock.market);
                 }
             } else {
-                await placeLimitOrder(user.uid, stock.symbol, stock.name, mode, limitPrice, quantity, stock.market, stock.currency);
+                await placeLimitOrder(user.uid, stock.symbol, stock.name, mode, limitPrice, quantity, stock.market, isUS ? "USD" : "KRW");
             }
             onClose();
         } catch (err: any) {
@@ -655,12 +655,18 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                                             </div>
                                         )}
                                         {orderType === "LIMIT" && (
-                                            (mode === "BUY" && limitPrice >= effectivePrice) || (mode === "SELL" && limitPrice <= effectivePrice)
+                                            (mode === "BUY" && limitPrice >= (isUS ? stock.price : effectivePrice)) ||
+                                            (mode === "SELL" && limitPrice <= (isUS ? stock.price : effectivePrice))
                                         ) && (
                                                 <div className="mt-2 p-2 bg-orange-900 border border-orange-600 rounded text-sm text-orange-200">
                                                     ⚠️ Current price satisfies your limit. This order will likely execute immediately.
                                                 </div>
                                             )}
+                                        {mode === "SELL" && holdingQuantity < 0 && (
+                                            <div className="mt-2 p-2 bg-blue-900 border border-blue-600 rounded text-xs text-blue-200">
+                                                💡 Tip: You are currently shorting this stock. To close your position at a lower price (take profit), use <b>Buy</b> mode with a <b>Limit</b> order.
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -678,7 +684,7 @@ export default function TradeModal({ isOpen, onClose, stock, balance = 0, credit
                                         disabled={loading || quantity <= 0 || (mode === "BUY" && amount > totalBuyingPower) || (mode === "SELL" && quantity > maxSellQuantity)}
                                         className={`flex-1 py-2 rounded ${mode === "BUY" ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"} disabled:opacity-50 disabled:cursor-not-allowed`}
                                     >
-                                        {loading ? "Processing..." : orderType === "LIMIT" ? "Limit Order" : isShorting ? "Short" : isCovering ? "Buy to Cover" : mode}
+                                        {loading ? "Processing..." : orderType === "LIMIT" ? (isCovering ? "Limit Buy to Cover" : isShorting ? "Limit Short" : `Limit ${mode}`) : isShorting ? "Short" : isCovering ? "Buy to Cover" : mode}
                                     </button>
                                 </div>
                             </>

@@ -645,9 +645,9 @@ def process_limit_orders():
                         exec_price = math.floor(current_price * latest_exchange_rate)
                     
                     if order_type == "BUY":
-                        buy_stock(uid, symbol, name, exec_price, quantity, order_type="LIMIT", market=market)
+                        buy_stock(uid, symbol, name, exec_price, quantity, order_type="LIMIT", market=market, original_price=current_price, original_currency=stock_info.currency)
                     else:
-                        sell_stock(uid, symbol, name, exec_price, quantity, order_type="LIMIT", market=market)
+                        sell_stock(uid, symbol, name, exec_price, quantity, order_type="LIMIT", market=market, original_price=current_price, original_currency=stock_info.currency)
                     
                     orders_ref.document(order_doc.id).update({
                         "status": "COMPLETED",
