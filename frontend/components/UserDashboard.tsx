@@ -208,9 +208,8 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
         return () => unsubscribe();
     }, []);
 
-    // Automated AI Refresh Trigger
     useEffect(() => {
-        if (!uid || aiStatus === ('init' as any) || aiStatus === 'pending' || aiStatus === 'processing' || portfolio.length === 0) return;
+        if (!uid || !currentUser || currentUser.uid !== uid || aiStatus === ('init' as any) || aiStatus === 'pending' || aiStatus === 'processing' || portfolio.length === 0) return;
 
         const currentSignature = [...portfolio]
             .sort((a, b) => a.symbol.localeCompare(b.symbol))
@@ -231,7 +230,7 @@ export default function UserDashboard({ uid }: UserDashboardProps) {
     }, [uid, portfolio, aiSignature, aiTimestamp, aiStatus]);
 
     const handleRequestAiAnalysis = async () => {
-        if (!uid) return;
+        if (!uid || !currentUser || currentUser.uid !== uid) return;
         try {
             // Use IMPORT update directly to avoid name collision or misunderstanding
             const { update: rtdbUpdate } = await import("firebase/database");
