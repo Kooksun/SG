@@ -502,7 +502,7 @@ def fetch_stock_history(symbol: str, days: int = 365) -> List[Dict]:
                 else: break
             else:
                 # US Stock - Try suffixes
-                suffixes = ['', '.O', '.N', '.A']
+                suffixes = ['', '.O', '.N', '.A', '.K']
                 page_data_found = False
                 for suffix in suffixes:
                     url = f"https://api.stock.naver.com/stock/{symbol}{suffix}/price?pageSize={pageSize}&page={page}"

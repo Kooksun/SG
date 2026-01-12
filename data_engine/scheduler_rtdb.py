@@ -965,7 +965,7 @@ def update_single_stock_history_v2(symbol: str) -> (bool, str):
     try:
         history_data = fetch_stock_history(symbol)
         if not history_data:
-            msg = f"yfinance returned no data for {symbol}."
+            msg = f"Naver returned no data for {symbol}."
             print(f"Error for {symbol}: {msg}")
             return False, msg
             
