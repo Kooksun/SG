@@ -185,9 +185,10 @@ def sanitize_for_firebase(data):
 def sync_job(force: bool = False):
     global last_written_snapshot
     if not latest_snapshot:
-        print("No latest snapshot available yet.")
+        print(f"[{now_kst()}] No latest snapshot available yet. Skipping sync.")
         return
 
+    print(f"[{now_kst()}] Starting sync_job...")
     changed: Dict[str, Stock] = {}
     for symbol, stock in latest_snapshot.items():
         prev = last_written_snapshot.get(symbol)
@@ -305,6 +306,7 @@ def sync_job(force: bool = False):
     rtdb_admin.reference('system/updatedAt').set(now_kst().isoformat())
 
     last_written_snapshot = {symbol: stock for symbol, stock in latest_snapshot.items()}
+    print(f"[{now_kst()}] Completed sync_job.")
 
 def diff_in_days(last_date_str: str) -> int:
     if not last_date_str:
@@ -737,7 +739,11 @@ def process_ai_requests():
     for uid, data in requests.items():
         if isinstance(data, dict) and data.get('status') == 'pending':
             # 0. Immediate Lock: Set status to processing to avoid double execution
-            ref.child(uid).update({'status': 'processing'})
+            try:
+                ref.child(uid).update({'status': 'processing'})
+            except Exception as lock_e:
+                print(f"Error locking request for {uid}: {lock_e}")
+                continue
             
             print(f"[{now_kst()}] Processing AI request for user {uid}...")
             
@@ -870,6 +876,7 @@ def process_ai_requests():
                                     {"role": "user", "content": prompt}
                                 ],
                                 max_tokens=8192,
+                                timeout=20.0, # 20 second timeout for Groq
                             )
                             result_text = completion.choices[0].message.content
                         except Exception as ge:
@@ -878,7 +885,7 @@ def process_ai_requests():
                                 # Failover to Gemini
                                 used_model = "gemini-3-pro-preview"
                                 model = genai.GenerativeModel(used_model)
-                                response = model.generate_content(prompt)
+                                response = model.generate_content(prompt, request_options={'timeout': 20}) # 20 second timeout
                                 result_text = response.text
                             except Exception as gemini_e:
                                 print(f"  -> Gemini Analysis failed: {gemini_e}")
@@ -1047,6 +1054,7 @@ def process_search_requests():
                     'status': 'completed',
                     'completedAt': now_kst().isoformat()
                 })
+                print(f"[{now_kst()}] Completed Search request for user {uid}: found {len(results)} items.")
                 
             except Exception as e:
                 print(f"Error processing Search request for {uid}: {e}")
@@ -1188,11 +1196,13 @@ def process_history_requests():
                         'status': 'completed',
                         'updatedAt': now_kst().isoformat()
                     })
+                    print(f"[{now_kst()}] Completed History request for: {symbol}")
                 else:
                     ref.child(symbol).update({
                         'status': 'error',
                         'error': error_msg or 'Fetch returned no data or failed'
                     })
+                    print(f"[{now_kst()}] Failed History request for {symbol}: {error_msg}")
             except Exception as e:
                 print(f"Error processing History request for {symbol}: {e}")
                 ref.child(symbol).update({

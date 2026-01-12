@@ -11,6 +11,12 @@ SCRIPT_PATH="$REMOTE_DIR/data_engine/$SCRIPT_NAME"
 LOG_FILE="$REMOTE_DIR/scheduler.log"
 PID_FILE="$REMOTE_DIR/scheduler.pid"
 
+# SSH Connection Multiplexing to reduce password prompts
+SOCKET_DIR="/tmp/ssh_mux"
+mkdir -p "$SOCKET_DIR"
+CONTROL_PATH="$SOCKET_DIR/%r@%h:%p"
+SSH_OPTS="-o ControlMaster=auto -o ControlPath=$CONTROL_PATH -o ControlPersist=600"
+
 # Colors for output
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -23,7 +29,7 @@ function usage() {
 
 function stop_process() {
     echo "Stopping existing process if any..."
-    ssh "$REMOTE_USER@$REMOTE_HOST" "
+    ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "
         if [ -f $PID_FILE ]; then
             PID=\$(cat $PID_FILE)
             if kill -0 \$PID 2>/dev/null; then
@@ -52,7 +58,7 @@ function stop_process() {
 
 function start_process() {
     echo "Starting process..."
-    ssh "$REMOTE_USER@$REMOTE_HOST" "
+    ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "
         cd $REMOTE_DIR
         source $VENV_DIR/bin/activate
         nohup $PYTHON_BIN -u $SCRIPT_PATH >> $LOG_FILE 2>&1 &
@@ -65,13 +71,13 @@ case "$1" in
     deploy)
         echo "Deploying files to $REMOTE_HOST..."
         # Sync the entire data_engine directory, excluding virtual environments
-        rsync -avz --exclude 'test_venv' --exclude '__pycache__' ./data_engine/ "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_DIR/data_engine/"
+        rsync -avz -e "ssh $SSH_OPTS" --exclude 'test_venv' --exclude '__pycache__' ./data_engine/ "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_DIR/data_engine/"
         
         # Optionally sync requirements if needed
         if [ -f "data_engine/requirements.txt" ]; then
-            scp data_engine/requirements.txt "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_DIR/requirements.txt"
+            scp $SSH_OPTS data_engine/requirements.txt "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_DIR/requirements.txt"
             echo "Installing/Updating requirements..."
-            ssh "$REMOTE_USER@$REMOTE_HOST" "cd $REMOTE_DIR && $VENV_DIR/bin/pip install -r requirements.txt"
+            ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "cd $REMOTE_DIR && $VENV_DIR/bin/pip install -r requirements.txt"
         fi
 
         stop_process
@@ -88,7 +94,7 @@ case "$1" in
         start_process
         ;;
     status)
-        ssh "$REMOTE_USER@$REMOTE_HOST" "
+        ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "
             if [ -f $PID_FILE ]; then
                 PID=\$(cat $PID_FILE)
                 if kill -0 \$PID 2>/dev/null; then
@@ -100,15 +106,15 @@ case "$1" in
             else
                 PID=\$(pgrep -f $SCRIPT_NAME)
                 if [ ! -z \"\$PID\" ]; then
-                    echo -e \"${GREEN}Status: Running (PID: \$PID, found by name)${NC}\"
+                    echo -e \"\${GREEN}Status: Running (PID: \$PID, found by name)\${NC}\"
                 else
-                    echo -e \"${RED}Status: NOT running${NC}\"
+                    echo -e \"\${RED}Status: NOT running\${NC}\"
                 fi
             fi
         "
         ;;
     log)
-        ssh "$REMOTE_USER@$REMOTE_HOST" "tail -f $LOG_FILE"
+        ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "tail -f $LOG_FILE"
         ;;
     *)
         usage
