@@ -32,9 +32,9 @@ def restore_user():
     # This effectively "undoes" the bad liquidations' impact on debt.
     
     restore_data = {
-        "balance": 0,
-        "usedCredit": 500000000,
-        "totalAssetValue": 500000000, # Estimated equity before bad liquidations
+        "balance": 500000000,
+        "usedCredit": 0,
+        "totalAssetValue": 500000000, 
         "lastInterestDate": datetime.now(MARKET_TZ).strftime("%Y-%m-%d")
     }
     
