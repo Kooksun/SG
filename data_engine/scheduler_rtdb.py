@@ -401,6 +401,9 @@ def process_daily_interest_and_liquidation():
                     continue
                     
                 current_price = stock_info.price
+                if stock_info.currency == "USD":
+                    current_price *= latest_exchange_rate
+
                 owned_qty = portfolio_map[symbol].get("quantity", 0)
                 
                 if owned_qty <= 0:
@@ -413,8 +416,8 @@ def process_daily_interest_and_liquidation():
                 shares_to_sell = min(shares_needed, owned_qty)
                 
                 try:
-                    print(f"  -> Selling {shares_to_sell} of {symbol} @ {current_price}")
-                    proceeds = sell_stock(uid, symbol, stock_info.name, current_price, shares_to_sell)
+                    print(f"  -> Selling {shares_to_sell} of {symbol} @ {current_price} (KRW converted if US)")
+                    proceeds = sell_stock(uid, symbol, stock_info.name, current_price, shares_to_sell, market=stock_info.market, original_price=stock_info.price, original_currency=stock_info.currency)
                     
                     # Update local tracking
                     liquidated_amount += proceeds
@@ -436,18 +439,19 @@ def process_daily_interest_and_liquidation():
                     stock_info = latest_snapshot.get(symbol)
                     if not stock_info: continue
                     
-                    current_price = stock_info.price
-                    remaining_excess = excess_credit - liquidated_amount
-
                     if qty > 0:
                         # Long position
+                        current_price = stock_info.price
+                        if stock_info.currency == "USD":
+                            current_price *= latest_exchange_rate
+                        
                         net_price = current_price * 0.999 # 0.1% fee
                         shares_needed = int(remaining_excess / net_price) + 1
                         shares_to_sell = min(shares_needed, qty)
                         
                         try:
-                            print(f"  -> [Fallback] Selling {shares_to_sell} of {symbol} @ {current_price}")
-                            proceeds = sell_stock(uid, symbol, stock_info.name, current_price, shares_to_sell)
+                            print(f"  -> [Fallback] Selling {shares_to_sell} of {symbol} @ {current_price} (KRW converted if US)")
+                            proceeds = sell_stock(uid, symbol, stock_info.name, current_price, shares_to_sell, market=stock_info.market, original_price=stock_info.price, original_currency=stock_info.currency)
                             liquidated_amount += proceeds
                             count_liquidated += 1
                         except Exception as e:
@@ -457,6 +461,10 @@ def process_daily_interest_and_liquidation():
                         abs_qty = abs(qty)
                         avg_sell_price = item.get("averagePrice", 0)
                         
+                        current_price = stock_info.price
+                        if stock_info.currency == "USD":
+                            current_price *= latest_exchange_rate
+
                         # Covering releases original sell price from usedCredit
                         # But it costs current_price * shares to cover
                         # The net impact on 'usedCredit - credit_limit' (excess) is reduction by avg_sell_price per share?
@@ -468,8 +476,8 @@ def process_daily_interest_and_liquidation():
                         # Safety check: do we have enough balance to cover?
                         # If not, we might be stuck, but let's try.
                         try:
-                            print(f"  -> [Fallback] Covering {shares_to_cover} of short {symbol} @ {current_price}")
-                            buy_stock(uid, symbol, stock_info.name, current_price, shares_to_cover)
+                            print(f"  -> [Fallback] Covering {shares_to_cover} of short {symbol} @ {current_price} (KRW converted if US)")
+                            buy_stock(uid, symbol, stock_info.name, current_price, shares_to_cover, market=stock_info.market, original_price=stock_info.price, original_currency=stock_info.currency)
                             
                             # Release the margin from our local tracking
                             released = avg_sell_price * shares_to_cover
