@@ -39,16 +39,20 @@ export default function RankingHistoryModal({
 
     const fetchHistory = async () => {
         setLoading(true);
+        // Fetch latest 2000 records (descending by recorded_at)
         const { data, error } = await supabase
             .from("user_ranking_history")
             .select("*")
-            .order("recorded_at", { ascending: true });
+            .order("recorded_at", { ascending: false })
+            .limit(2000);
 
         if (error) {
             console.error("Error fetching ranking history:", error);
         } else if (data) {
-            setHistory(data);
-            const ts = Array.from(new Set(data.map((h: any) => h.recorded_at)));
+            // Reverse to ascending order for chronological animation
+            const sortedData = [...data].reverse();
+            setHistory(sortedData);
+            const ts = Array.from(new Set(sortedData.map((h: any) => h.recorded_at)));
             setTimestamps(ts);
             setCurrentIndex(ts.length - 1);
         }
