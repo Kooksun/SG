@@ -134,6 +134,20 @@ def fetch_job(force: bool = False):
     if should_fetch_us:
         print(f"[{now}] Fetching US stocks (Market Open: {is_us_market_open()})...")
         us_stocks = fetch_us_stocks()
+        
+        # --- Mandatory/Existing Symbol Coverage for US ---
+        # Identify US symbols (heuristically those with letters) in the held cache
+        held_us_symbols = {s for s in held_stocks_cache if any(c.isalpha() for c in s)}
+        
+        # Identify missing symbols from the popular fetch
+        missing_us = held_us_symbols - set(us_stocks.keys())
+        if missing_us:
+            print(f"[{now}] Fetching {len(missing_us)} additional held US stocks individually...")
+            for symbol in missing_us:
+                st = fetch_single_stock(symbol)
+                if st:
+                    us_stocks[symbol] = st
+        
         last_us_fetch_time = now
     else:
         us_stocks = {s: st for s, st in latest_snapshot.items() if st.currency == 'USD'}
@@ -1127,15 +1141,32 @@ def record_ranking_history():
         
         # 3. Calculate total assets (Equity) and prepare for ranking
         ranking_list = []
+        batch = firestore_db.batch()
+        
         for uid, data in user_data_map.items():
-            # Equity = Cash + PortfolioNetValue - (TotalUsedCredit - ShortMarginLock)
-            # This matches frontend/components/Leaderboard.tsx calculation
-            equity = data['balance'] + data['portfolio_value'] - (data['usedCredit'] - data['short_initial_value'])
+            # Corrected Equity Formula:
+            # Equity = Cash + LongValue - CurrentShortValue - LongDebt
+            # Cash = balance + short_initial_value (since proceeds are held)
+            # LongDebt = usedCredit - short_initial_value
+            # Equity = (balance + short_initial_value) + portfolio_value - (usedCredit - short_initial_value)
+            # where portfolio_value = LongValue - CurrentShortValue
+            equity = data['balance'] + data['portfolio_value'] - (data['usedCredit'] - data['short_initial_value']) + data['short_initial_value']
+            
+            # Update Firestore totalAssetValue for real-time consistency
+            user_ref = firestore_db.collection("users").document(uid)
+            batch.update(user_ref, {"totalAssetValue": int(equity)})
             
             ranking_list.append({
                 'uid': uid,
                 'equity': equity
             })
+            
+        # Execute Firestore batch update
+        try:
+            batch.commit()
+            print(f"[{now_kst()}] Updated totalAssetValue for {len(user_data_map)} users in Firestore.")
+        except Exception as e:
+            print(f"Error committing totalAssetValue batch: {e}")
             
         # 4. Sort by equity descending
         ranking_list.sort(key=lambda x: x['equity'], reverse=True)
@@ -1149,7 +1180,7 @@ def record_ranking_history():
                     user_comments[uid] = data['comment']
         except Exception as e:
             print(f"Error fetching user comments for ranking history: {e}")
-
+            
         # 2. Assign ranks and prepare rows for Supabase
         rows = []
         recorded_at = now_kst().isoformat()

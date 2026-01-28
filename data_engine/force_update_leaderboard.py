@@ -21,6 +21,10 @@ def force_update_leaderboard():
     
     print(f"[{now_kst()}] Force updating leaderboard/ranking history...")
     
+    # 0. Refresh held stocks cache
+    from scheduler_rtdb import refresh_held_stocks
+    refresh_held_stocks()
+    
     # 1. We need latest prices for equity calculation
     print("Fetching latest prices first...")
     fetch_job(force=True)

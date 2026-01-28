@@ -42,7 +42,7 @@ export default function DashboardOverview({
     // Net Worth = Cash + Long Value - Short Value - (Debt from Longs)
     // Debt from Longs = Total Used Credit - Initial Short Margin
     const debtFromLongs = Math.max(0, usedCredit - shortInitialValue);
-    const netWorth = userProfile.balance + stockValue - shortValue - debtFromLongs;
+    const netWorth = userProfile.balance + stockValue - shortValue - usedCredit + (shortInitialValue * 2);
 
     return (
         <div className="space-y-6 animate-fade-in">
