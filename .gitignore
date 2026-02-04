@@ -11,6 +11,7 @@ venv/
 .pytest_cache/
 params.txt
 data_engine/serviceAccountKey.json
+backend/*.json
 
 # Node.js / Frontend
 node_modules/
@@ -24,3 +25,8 @@ pnpm-debug.log*
 .vercel
 *.tsbuildinfo
 next-env.d.ts
+api_response.bin
+api_response.json
+.gitignore
+check_api_debug.py
+check_api2_debug.py
