@@ -8,6 +8,9 @@ from .fetcher import MARKET_TZ
 
 # Constants
 FEE_RATE_SELL = 0.002  # 0.2% (SELL only)
+TICKER_THRESHOLD = 50000000 # 50M KRW
+PROFIT_RATIO_THRESHOLD = 0.1 # 10%
+MAX_TICKERS = 20
 
 def get_latest_price(symbol: str) -> tuple[float, str]:
     """Fetch latest price from KOSPI/KOSDAQ RTDB."""
@@ -42,7 +45,7 @@ def calculate_fee(side: str, market: str, amount: float) -> tuple[float, float, 
     
     return float(raw_fee), float(discount), float(final_fee)
 
-def record_to_supabase(uid, symbol, name, tx_type, price, quantity, amount, raw_fee, discount, final_fee, balance_change, stock_change):
+def record_to_supabase(uid, symbol, name, tx_type, price, quantity, amount, raw_fee, discount, final_fee, balance_change, stock_change, **kwargs):
     """Logs the trade to Supabase."""
     supabase = get_supabase()
     if not supabase: return
@@ -65,6 +68,41 @@ def record_to_supabase(uid, symbol, name, tx_type, price, quantity, amount, raw_
         supabase.table("trade_records").insert(data).execute()
     except Exception as e:
         print(f"Error logging to Supabase: {e}")
+
+def broadcast_ticker(display_name, symbol, name, tx_type, amount, profit_ratio=None):
+    """Broadcasts large trade to Main RTDB system/tickers."""
+    try:
+        ticker_ref = main_db.child('system/tickers')
+        current_tickers = ticker_ref.child('list').get() or []
+        
+        new_ticker = {
+            "displayName": display_name,
+            "symbol": symbol,
+            "name": name,
+            "type": tx_type,
+            "amount": float(amount),
+            "timestamp": datetime.now(MARKET_TZ).isoformat()
+        }
+        
+        if profit_ratio is not None:
+            new_ticker["profitRatio"] = round(profit_ratio * 100, 2)
+        
+        # Prepend and slice
+        updated_list = [new_ticker] + current_tickers
+        updated_list = updated_list[:MAX_TICKERS]
+        
+        ticker_ref.set({
+            "list": updated_list,
+            "lastUpdate": datetime.now(MARKET_TZ).isoformat()
+        })
+        
+        tag = "[TICKER]"
+        if profit_ratio is not None:
+            tag = f"[TICKER][{profit_ratio*100:+.1f}%]"
+            
+        print(f"  {tag} Broadcasted: {display_name} | {tx_type} {name} ({amount:,.0f} KRW)")
+    except Exception as e:
+        print(f"Error broadcasting ticker: {e}")
 
 def process_order(uid: str, order_id: str, order_data: dict):
     """Executes order with Firestore Transaction and RTDB status update."""
@@ -118,6 +156,7 @@ def process_order(uid: str, order_id: str, order_data: dict):
         total_amount = math.floor(curr_price * req_quantity)
         raw_fee, disc, final_fee = calculate_fee(side, market, total_amount)
         
+        kwargs_out = {}
         if side == 'BUY':
             total_cost = total_amount + final_fee
             if balance < total_cost: return "Insufficient Balance"
@@ -140,6 +179,8 @@ def process_order(uid: str, order_id: str, order_data: dict):
             if curr_qty < req_quantity: return "Insufficient Stock Quantity"
             
             proceeds = total_amount - final_fee
+            profit_ratio = (curr_price - avg_price) / avg_price if avg_price > 0 else 0
+            
             transaction.update(user_ref, {'balance': firestore.Increment(proceeds)})
             new_qty = curr_qty - req_quantity
             if new_qty == 0:
@@ -152,7 +193,8 @@ def process_order(uid: str, order_id: str, order_data: dict):
             
             balance_change = proceeds
             stock_change = -req_quantity
-
+            kwargs_out = {"profit_ratio": profit_ratio}
+        
         # Record Transaction to Firestore (Audit)
         tx_ref = main_firestore.collection('transactions').document()
         transaction.set(tx_ref, {
@@ -164,9 +206,11 @@ def process_order(uid: str, order_id: str, order_data: dict):
 
         return {
             "uid": uid, "symbol": symbol, "name": order_data.get('name', symbol),
+            "displayName": user_data.get('displayName', 'Anonymous'),
             "tx_type": side, "price": curr_price, "quantity": req_quantity,
             "amount": total_amount, "raw_fee": raw_fee, "discount": disc,
-            "final_fee": final_fee, "balance_change": balance_change, "stock_change": stock_change
+            "final_fee": final_fee, "balance_change": balance_change, "stock_change": stock_change,
+            **kwargs_out
         }
 
     try:
@@ -186,6 +230,20 @@ def process_order(uid: str, order_id: str, order_data: dict):
             # Log to Supabase
             record_to_supabase(**result)
             print(f"  -> SUCCESS: {uid} | {side} {symbol} @ {curr_price}")
+            
+            # Ticker for large trades or high profit/loss
+            is_large_trade = result['amount'] >= TICKER_THRESHOLD
+            is_high_profit = result['tx_type'] == 'SELL' and abs(result.get('profit_ratio', 0)) >= PROFIT_RATIO_THRESHOLD
+            
+            if is_large_trade or is_high_profit:
+                broadcast_ticker(
+                    result.get('displayName', 'Anonymous'),
+                    result['symbol'], 
+                    result['name'], 
+                    result['tx_type'], 
+                    result['amount'],
+                    profit_ratio=result.get('profit_ratio')
+                )
             
     except Exception as e:
         print(f"Error executing transaction: {e}")
