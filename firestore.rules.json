@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database
+    }/documents {
+        // 유저는 자신의 잔고 및 프로필을 읽을 수만 있음 (쓰기는 서버 데몬만 가능)
+    match /users/{uid
+        } {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; 
+      
+      // 하위 컬렉션(포트폴리오) 규칙
+      match /portfolio/{symbol
+            } {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+            }
+        }
+        // 거래 내역 조회 (본인 것만 가능)
+    match /transactions/{txid
+        } {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow write: if false;
+        }
+        // 기타 수집 요청 등 (필요 시 확장)
+    match /{path=**
+        }/search_requests/{uid
+        } {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+        }
+    }
+}

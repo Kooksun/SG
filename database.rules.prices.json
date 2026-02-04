@@ -1,0 +1,12 @@
+{
+    "rules": {
+        "stocks": {
+            ".read": true,
+            ".write": false
+        },
+        "system": {
+            ".read": true,
+            ".write": false
+        }
+    }
+}

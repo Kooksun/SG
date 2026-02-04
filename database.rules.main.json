@@ -1,0 +1,38 @@
+{
+    "rules": {
+        "system": {
+            ".read": true,
+            ".write": false
+        },
+        "users": {
+            "$uid": {
+                ".read": "auth != null && auth.uid === $uid",
+                ".write": false
+            }
+        },
+        "user_activities": {
+            "$uid": {
+                ".read": "auth != null && auth.uid === $uid",
+                ".write": "auth != null && auth.uid === $uid"
+            }
+        },
+        "ai_requests": {
+            "$uid": {
+                ".read": "auth != null && auth.uid === $uid",
+                ".write": "auth != null && auth.uid === $uid"
+            }
+        },
+        "search_requests": {
+            "$uid": {
+                ".read": "auth != null && auth.uid === $uid",
+                ".write": "auth != null && auth.uid === $uid"
+            }
+        },
+        "search_results": {
+            "$uid": {
+                ".read": "auth != null && auth.uid === $uid",
+                ".write": false
+            }
+        }
+    }
+}
