@@ -1,0 +1,144 @@
+.ticker-wrapper {
+    width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: rgba(13, 15, 20, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--card-border);
+}
+
+/* 시장 지수 바 */
+.market-indices-bar {
+    display: flex;
+    align-items: center;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    overflow: hidden;
+}
+
+.indices-track {
+    display: flex;
+    white-space: nowrap;
+    animation: scroll-ticker 60s linear infinite;
+}
+
+.index-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 40px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.index-name {
+    color: var(--text-secondary);
+}
+
+.index-value {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.index-change.up {
+    color: var(--accent-emerald);
+}
+
+.index-change.down {
+    color: var(--accent-rose);
+}
+
+/* 대형 거래 티커 바 */
+.trade-ticker-bar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+
+.ticker-track {
+    display: flex;
+    white-space: nowrap;
+    animation: scroll-ticker 40s linear infinite;
+}
+
+@keyframes scroll-ticker {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+.ticker-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-xl);
+    font-size: 0.85rem;
+    border-right: 1px solid var(--card-border);
+}
+
+.trade-type-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.trade-type-badge.buy {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--accent-emerald);
+}
+
+.trade-type-badge.sell {
+    background: rgba(244, 63, 94, 0.1);
+    color: var(--accent-rose);
+}
+
+.ticker-text {
+    color: var(--text-secondary);
+}
+
+.ticker-text .user {
+    color: var(--text-primary);
+    margin-right: 4px;
+}
+
+.ticker-text .stock {
+    color: var(--text-primary);
+    margin: 0 4px;
+}
+
+.ticker-text .amount {
+    color: var(--accent-blue);
+    font-weight: 600;
+    margin-left: 2px;
+}
+
+.profit-tag {
+    font-size: 0.75rem;
+    margin-left: 6px;
+    font-weight: 600;
+}
+
+.profit-tag.up {
+    color: var(--accent-emerald);
+}
+
+.profit-tag.down {
+    color: var(--accent-rose);
+}
+
+@media (max-width: 768px) {
+    .market-indices-bar {
+        justify-content: flex-start;
+        gap: var(--spacing-lg);
+    }
+}

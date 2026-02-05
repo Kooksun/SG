@@ -1,0 +1,233 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    overflow-x: hidden;
+    height: 100vh;
+}
+
+#root {
+    height: 100%;
+}
+
+.app-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.main-wrapper {
+    flex: 1;
+    margin-left: 80px;
+    /* Sidebar width */
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    /* Prevents flex items from overflowing */
+}
+
+@media (max-width: 768px) {
+    .main-wrapper {
+        margin-left: 0;
+        margin-bottom: 64px;
+        /* Bottom nav height */
+    }
+}
+
+/* Scrollbar Style */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--card-border);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+h1,
+h2,
+h3,
+h4 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+button {
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+/* Dashboard Layout */
+.dashboard {
+    flex: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    padding-top: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+}
+
+.dashboard-header {
+    padding-bottom: var(--spacing-md);
+}
+
+.header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.logout-btn:hover {
+    background: rgba(244, 63, 94, 0.1);
+    border-color: var(--accent-rose);
+    color: var(--accent-rose);
+}
+
+.welcome-text {
+    font-size: 2rem;
+    margin-bottom: var(--spacing-xs);
+}
+
+.welcome-text .highlight {
+    color: var(--accent-blue);
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 1rem;
+}
+
+.asset-overview {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-lg);
+}
+
+@media (max-width: 1024px) {
+    .asset-overview {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .asset-overview {
+        grid-template-columns: 1fr;
+    }
+}
+
+.asset-value {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.asset-value .icon {
+    width: 48px;
+    height: 48px;
+    padding: 10px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.asset-value .icon.blue {
+    color: var(--accent-blue);
+    background: var(--glow-blue);
+}
+
+.asset-value .icon.emerald {
+    color: var(--accent-emerald);
+    background: var(--glow-emerald);
+}
+
+.asset-value .icon.secondary {
+    color: var(--text-secondary);
+}
+
+.value-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.value-info .amount {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.value-info .amount small {
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.change {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.change.positive {
+    color: var(--accent-emerald);
+}
+
+.change.negative {
+    color: var(--accent-rose);
+}
+
+.main-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--spacing-lg);
+}
+
+@media (max-width: 1024px) {
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+}
+
+.placeholder-content {
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    border: 1px dashed var(--card-border);
+    border-radius: var(--radius-md);
+}

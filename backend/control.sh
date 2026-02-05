@@ -5,7 +5,16 @@
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/backend"
-VENV_PYTHON="$PROJECT_ROOT/myenv/bin/python"
+
+# Find Virtual Environment (Local: venv, Server: myenv)
+if [ -d "$PROJECT_ROOT/venv" ]; then
+    VENV_PYTHON="$PROJECT_ROOT/venv/bin/python"
+elif [ -d "$PROJECT_ROOT/myenv" ]; then
+    VENV_PYTHON="$PROJECT_ROOT/myenv/bin/python"
+else
+    VENV_PYTHON="python3"
+fi
+
 PID_DIR="$BACKEND_DIR/pids"
 LOG_DIR="$BACKEND_DIR/logs"
 
@@ -32,7 +41,8 @@ function start_app() {
 
     echo "[+] Starting $app..."
     export PYTHONPATH="$PROJECT_ROOT"
-    nohup "$VENV_PYTHON" -m "backend.$app" >> "$log_file" 2>&1 &
+    # Use -u for unbuffered output to see logs in real-time
+    nohup "$VENV_PYTHON" -u -m "backend.$app" > "$log_file" 2>&1 &
     echo $! > "$pid_file"
     echo "[!] $app started with PID $!"
 }

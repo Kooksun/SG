@@ -1,0 +1,91 @@
+.stock-list-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.stock-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.stock-table th {
+    text-align: left;
+    padding: var(--spacing-md) var(--spacing-sm);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.stock-table td {
+    padding: var(--spacing-md) var(--spacing-sm);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    font-size: 0.95rem;
+}
+
+.stock-row {
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.stock-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.stock-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.stock-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.stock-symbol {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.text-right {
+    text-align: right !important;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.font-medium {
+    font-weight: 500;
+}
+
+.price-change {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+}
+
+.price-change.up {
+    color: var(--accent-emerald);
+}
+
+.price-change.down {
+    color: var(--accent-rose);
+}
+
+.up {
+    color: var(--accent-emerald);
+}
+
+.down {
+    color: var(--accent-rose);
+}
+
+.empty-message {
+    padding: var(--spacing-xl) !important;
+    text-align: center;
+    color: var(--text-secondary);
+}
