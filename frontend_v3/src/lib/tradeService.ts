@@ -6,7 +6,8 @@ import {
     serverTimestamp,
     writeBatch,
     getDoc,
-    collection
+    collection,
+    deleteDoc
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -104,5 +105,19 @@ export const tradeService = {
         });
 
         await batch.commit();
+    },
+
+    // Watchlist 토글
+    async toggleWatchlist(uid: string, symbol: string, isWatched: boolean) {
+        const watchlistRef = doc(db, "users", uid, "watchlist", symbol);
+
+        if (isWatched) {
+            await setDoc(watchlistRef, {
+                symbol,
+                createdAt: serverTimestamp()
+            });
+        } else {
+            await deleteDoc(watchlistRef);
+        }
     }
 };

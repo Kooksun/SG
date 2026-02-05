@@ -36,6 +36,7 @@ def fetch_kr_stocks(kospi_limit: int = 500, kosdaq_limit: int = 700) -> Dict[str
                         price=float(item.get('nv', 0)),
                         change=float(item.get('cv', 0)),
                         change_percent=float(item.get('cr', 0)),
+                        volume=float(item.get('aq', 0)),
                         updated_at=datetime.now(MARKET_TZ),
                         currency='KRW',
                         market=market_name
@@ -67,6 +68,7 @@ def fetch_etf_stocks(limit: int = 200) -> Dict[str, Stock]:
                     price=float(item.get('nowVal', 0)),
                     change=float(item.get('changeVal', 0)),
                     change_percent=float(item.get('changeRate', 0)),
+                    volume=float(item.get('accTrdVol', 0)),
                     updated_at=datetime.now(MARKET_TZ),
                     currency='KRW',
                     market='ETF'
@@ -126,3 +128,41 @@ def fetch_indices() -> Dict[str, Dict]:
                 }
         except: pass
     return results
+
+def fetch_stock_chart(symbol: str, page_size: int = 60, page: int = 1) -> List[List]:
+    """
+    Fetch historical stock data from Naver and compress it into an array format.
+    Format: [Date(YYYY-MM-DD), Open, High, Low, Close, Volume]
+    """
+    headers = {"User-Agent": "Mozilla/5.0"}
+    url = f"https://m.stock.naver.com/api/stock/{symbol}/price?pageSize={page_size}&page={page}"
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if not isinstance(data, list):
+                return []
+            
+            compressed = []
+            for item in data:
+                # Naver fields: localTradedAt, openPrice, highPrice, lowPrice, closePrice, accumulatedTradingVolume
+                # Dates are like "2024-02-05 00:00:00"
+                date_str = item.get('localTradedAt', '')[:10] 
+                
+                def p(val):
+                    if isinstance(val, str):
+                        return float(val.replace(',', ''))
+                    return float(val or 0)
+
+                compressed.append([
+                    date_str,
+                    p(item.get('openPrice')),
+                    p(item.get('highPrice')),
+                    p(item.get('lowPrice')),
+                    p(item.get('closePrice')),
+                    p(item.get('accumulatedTradingVolume'))
+                ])
+            return compressed
+    except Exception as e:
+        print(f"Error fetching chart for {symbol}: {e}")
+    return []

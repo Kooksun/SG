@@ -2,7 +2,20 @@
     "rules": {
         "system": {
             ".read": true,
-            ".write": false
+            ".write": false,
+            "requests": {
+                "chart": {
+                    "$symbol": {
+                        ".write": "auth != null"
+                    }
+                }
+            }
+        },
+        "orders": {
+            "$uid": {
+                ".read": "auth != null && auth.uid === $uid",
+                ".write": "auth != null && auth.uid === $uid"
+            }
         },
         "users": {
             "$uid": {

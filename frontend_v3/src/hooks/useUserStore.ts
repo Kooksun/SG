@@ -8,8 +8,11 @@ interface UserState {
     totalPnl: number;
     pnlRate: number;
     stocks: number;
+    watchlist: string[]; // List of symbols
+    holdings: string[]; // List of symbols
     hasSeenPrologue: boolean;
     setUserInfo: (info: Partial<UserState>) => void;
+    toggleWatchlist: (symbol: string) => void;
 }
 
 export const useUserStore = create<UserState>((set) => ({
@@ -20,6 +23,14 @@ export const useUserStore = create<UserState>((set) => ({
     totalPnl: 0,
     pnlRate: 0,
     stocks: 0,
-    hasSeenPrologue: true, // 기본값은 노출 안 함으로 설정 (로그인 전)
+    watchlist: [],
+    holdings: [],
+    hasSeenPrologue: true,
     setUserInfo: (info) => set((state) => ({ ...state, ...info })),
+    toggleWatchlist: (symbol) => set((state) => ({
+        ...state,
+        watchlist: state.watchlist.includes(symbol)
+            ? state.watchlist.filter(s => s !== symbol)
+            : [...state.watchlist, symbol]
+    })),
 }));

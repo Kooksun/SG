@@ -1,10 +1,10 @@
 import React from 'react';
 import './Navigation.css';
-import { Globe, User, LayoutDashboard } from 'lucide-react';
+import { Globe, User, LayoutDashboard, Trophy } from 'lucide-react';
 
 interface NavigationProps {
-    currentView: 'global' | 'my';
-    onViewChange: (view: 'global' | 'my') => void;
+    currentView: 'leaderboard' | 'market' | 'my';
+    onViewChange: (view: 'leaderboard' | 'market' | 'my') => void;
 }
 
 const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
@@ -16,21 +16,30 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
 
             <div className="nav-items">
                 <button
-                    className={`nav-item ${currentView === 'global' ? 'active' : ''}`}
-                    onClick={() => onViewChange('global')}
-                    title="글로벌 대시보드"
+                    className={`nav-item ${currentView === 'leaderboard' ? 'active' : ''}`}
+                    onClick={() => onViewChange('leaderboard')}
+                    title="리더보드"
+                >
+                    <Trophy size={24} />
+                    <span>리더보드</span>
+                </button>
+
+                <button
+                    className={`nav-item ${currentView === 'market' ? 'active' : ''}`}
+                    onClick={() => onViewChange('market')}
+                    title="시세 탐색"
                 >
                     <Globe size={24} />
-                    <span>글로벌</span>
+                    <span>시세탐색</span>
                 </button>
 
                 <button
                     className={`nav-item ${currentView === 'my' ? 'active' : ''}`}
                     onClick={() => onViewChange('my')}
-                    title="마이 대시보드"
+                    title="마이페이지"
                 >
                     <User size={24} />
-                    <span>마이</span>
+                    <span>마이페이지</span>
                 </button>
             </div>
 

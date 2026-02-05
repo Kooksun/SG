@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import './StockSearch.css';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 interface StockSearchProps {
     onSearch: (query: string) => void;
@@ -15,6 +15,11 @@ const StockSearch: React.FC<StockSearchProps> = ({ onSearch }) => {
         onSearch(val);
     };
 
+    const handleClear = () => {
+        setQuery('');
+        onSearch('');
+    };
+
     return (
         <div className="search-container">
             <Search className="search-icon" size={18} />
@@ -25,6 +30,11 @@ const StockSearch: React.FC<StockSearchProps> = ({ onSearch }) => {
                 value={query}
                 onChange={handleChange}
             />
+            {query && (
+                <button className="search-clear-btn" onClick={handleClear} title="검색어 초기화">
+                    <X size={16} />
+                </button>
+            )}
         </div>
     );
 };

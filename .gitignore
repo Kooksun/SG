@@ -30,3 +30,10 @@ api_response.json
 .gitignore
 check_api_debug.py
 check_api2_debug.py
+backend/logs/
+backend/pids/chart_gateway.pid
+backend/pids/leaderboard_manager.pid
+backend/pids/price_updater.pid
+backend/pids/trade_engine.pid
+backend/logs/leaderboard_manager.log
+backend/logs/price_updater.log

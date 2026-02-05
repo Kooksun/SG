@@ -45,11 +45,11 @@
 }
 
 .index-change.up {
-    color: var(--accent-emerald);
+    color: var(--accent-up);
 }
 
 .index-change.down {
-    color: var(--accent-rose);
+    color: var(--accent-down);
 }
 
 /* 대형 거래 티커 바 */
@@ -93,13 +93,13 @@
 }
 
 .trade-type-badge.buy {
-    background: rgba(16, 185, 129, 0.1);
-    color: var(--accent-emerald);
+    background: rgba(244, 63, 94, 0.1);
+    color: var(--accent-up);
 }
 
 .trade-type-badge.sell {
-    background: rgba(244, 63, 94, 0.1);
-    color: var(--accent-rose);
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-down);
 }
 
 .ticker-text {
@@ -129,11 +129,11 @@
 }
 
 .profit-tag.up {
-    color: var(--accent-emerald);
+    color: var(--accent-up);
 }
 
 .profit-tag.down {
-    color: var(--accent-rose);
+    color: var(--accent-down);
 }
 
 @media (max-width: 768px) {

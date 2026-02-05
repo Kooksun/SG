@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import TopTicker from './components/TopTicker'
 import Navigation from './components/Navigation'
-import GlobalDashboard from './pages/GlobalDashboard'
-import MyDashboard from './pages/MyDashboard'
+import LeaderboardPage from './pages/LeaderboardPage'
+import MarketPage from './pages/MarketPage'
+import MyPage from './pages/MyPage'
 import AuthPage from './components/AuthPage'
 import ProloguePage from './components/ProloguePage'
 import { Loader2 } from 'lucide-react'
@@ -13,7 +14,7 @@ import { useUserStore } from './hooks/useUserStore'
 function App() {
     const { user, loading: authLoading } = useAuth();
     const { hasSeenPrologue } = useUserStore();
-    const [currentView, setCurrentView] = useState<'global' | 'my'>('global');
+    const [currentView, setCurrentView] = useState<'leaderboard' | 'market' | 'my'>('market');
 
     // 유저 자산 동기화
     useUserAsset(user?.uid || null);
@@ -34,15 +35,28 @@ function App() {
         );
     }
 
-    // 마이 대시보드 접근 시 로그인이 안 되어 있으면 가입/로그인 화면 노출
-    const renderMyDashboard = () => {
+    // 마이페이지 접근 시 로그인이 안 되어 있으면 가입/로그인 화면 노출
+    const renderMyPage = () => {
         if (!user) {
             return <AuthPage onSuccess={() => setCurrentView('my')} />;
         }
         if (!hasSeenPrologue) {
             return <ProloguePage uid={user.uid} onComplete={() => { }} />;
         }
-        return <MyDashboard />;
+        return <MyPage />;
+    };
+
+    const renderView = () => {
+        switch (currentView) {
+            case 'leaderboard':
+                return <LeaderboardPage />;
+            case 'market':
+                return <MarketPage />;
+            case 'my':
+                return renderMyPage();
+            default:
+                return <MarketPage />;
+        }
     };
 
     return (
@@ -56,11 +70,7 @@ function App() {
                 <TopTicker />
 
                 <div className="content-area">
-                    {currentView === 'global' ? (
-                        <GlobalDashboard />
-                    ) : (
-                        renderMyDashboard()
-                    )}
+                    {renderView()}
                 </div>
             </div>
         </div>

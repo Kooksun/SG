@@ -34,6 +34,33 @@
     background: rgba(255, 255, 255, 0.03);
 }
 
+.stock-info-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.star-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.star-btn:hover {
+    color: var(--accent-amber);
+    transform: scale(1.1);
+}
+
+.star-btn.active {
+    color: var(--accent-amber);
+}
+
 .stock-info {
     display: flex;
     flex-direction: column;
@@ -61,31 +88,75 @@
     font-weight: 500;
 }
 
-.price-change {
+.volume-cell {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-family: var(--font-mono);
+}
+
+.price-change-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.price-change-row {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
     gap: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
 }
 
-.price-change.up {
-    color: var(--accent-emerald);
+.change-icon {
+    font-size: 0.75rem;
 }
 
-.price-change.down {
-    color: var(--accent-rose);
+.price-change-percent {
+    font-size: 0.75rem;
+    opacity: 0.8;
 }
 
 .up {
-    color: var(--accent-emerald);
+    color: var(--accent-up);
 }
 
 .down {
-    color: var(--accent-rose);
+    color: var(--accent-down);
 }
 
 .empty-message {
     padding: var(--spacing-xl) !important;
     text-align: center;
     color: var(--text-secondary);
+}
+
+/* Flash Animations */
+@keyframes flash-up-bg {
+    0% {
+        background-color: rgba(244, 63, 94, 0.2);
+    }
+
+    100% {
+        background-color: transparent;
+    }
+}
+
+@keyframes flash-down-bg {
+    0% {
+        background-color: rgba(59, 130, 246, 0.2);
+    }
+
+    100% {
+        background-color: transparent;
+    }
+}
+
+.stock-row.flash-up {
+    animation: flash-up-bg 1s ease-out;
+}
+
+.stock-row.flash-down {
+    animation: flash-down-bg 1s ease-out;
 }

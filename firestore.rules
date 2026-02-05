@@ -27,6 +27,12 @@ service cloud.firestore {
         // Only the owner can access their missions
         allow read, write: if isSignedIn() && request.auth.uid == uid;
       }
+      
+      // Watchlist sub-collection
+      match /watchlist/{symbol} {
+        // Only the owner can access their watchlist
+        allow read, write: if isSignedIn() && request.auth.uid == uid;
+      }
     }
 
     // Transactions collection (Top-level)

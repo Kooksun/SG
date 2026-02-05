@@ -24,6 +24,7 @@ export function useRealtimeData() {
     const [exchangeRate, setExchangeRate] = useState<number>(0);
     const [tickers, setTickers] = useState<BroadcastTrade[]>([]);
     const [isMarketOpen, setIsMarketOpen] = useState<boolean>(false);
+    const [updatedAt, setUpdatedAt] = useState<string>('');
 
     useEffect(() => {
         // 1. 시장 지수 및 환율 구독
@@ -34,6 +35,7 @@ export function useRealtimeData() {
                 setIndices(data.indices || {});
                 setExchangeRate(data.exchange_rate || 0);
                 setIsMarketOpen(data.market_open || false);
+                setUpdatedAt(data.updateAt || data.updatedAt || '');
             }
         });
 
@@ -52,5 +54,5 @@ export function useRealtimeData() {
         };
     }, []);
 
-    return { indices, exchangeRate, tickers, isMarketOpen };
+    return { indices, exchangeRate, tickers, isMarketOpen, updatedAt };
 }

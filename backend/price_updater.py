@@ -29,7 +29,7 @@ def has_stock_changed(new_dict: dict, old_dict: dict) -> bool:
     """Compare key fields to determine if an update is needed."""
     if not old_dict: return True
     # Compare core price fields
-    for field in ['price', 'change', 'change_percent']:
+    for field in ['price', 'change', 'change_percent', 'volume']:
         if new_dict.get(field) != old_dict.get(field):
             return True
     return False

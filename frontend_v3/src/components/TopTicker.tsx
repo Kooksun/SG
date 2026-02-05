@@ -27,8 +27,9 @@ const TopTicker: React.FC = () => {
                                 {idx.name === 'USD/KRW' ? idx.price?.toLocaleString() : idx.price?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </span>
                             {idx.change_percent !== 0 && (
-                                <span className={`index-change ${idx.change_percent > 0 ? 'up' : 'down'}`}>
-                                    {idx.change_percent > 0 ? '▲' : '▼'} {Math.abs(idx.change_percent).toFixed(2)}%
+                                <span className={`index-change ${idx.change_percent >= 0 ? 'up' : 'down'}`}>
+                                    {idx.change_percent > 0 ? '▲' : (idx.change_percent < 0 ? '▼' : '')}
+                                    {Math.abs(idx.change_percent).toFixed(2)}%
                                 </span>
                             )}
                         </div>
@@ -51,8 +52,8 @@ const TopTicker: React.FC = () => {
                                     <strong className="stock">{trade.name}</strong>
                                     <span className="amount">{(trade.amount / 100000000).toFixed(1)}억</span> 체결
                                     {trade.profitRatio !== undefined && (
-                                        <span className={`profit-tag ${trade.profitRatio > 0 ? 'up' : 'down'}`}>
-                                            ({trade.profitRatio > 0 ? '+' : ''}{trade.profitRatio}%)
+                                        <span className={`profit-tag ${trade.profitRatio >= 0 ? 'up' : 'down'}`}>
+                                            ({trade.profitRatio >= 0 ? '▲' : '▼'}{Math.abs(trade.profitRatio).toFixed(1)}%)
                                         </span>
                                     )}
                                 </span>

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import Chart from 'react-apexcharts';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { ref, onValue, set, get } from 'firebase/database';
+import { rtdb } from '../lib/firebase';
 import './StockChart.css';
 
 interface ChartDataPoint {
@@ -19,45 +21,77 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        const fetchChartData = async () => {
+        if (!symbol) return;
+
+        let unsubData: () => void;
+        let unsubRequest: () => void;
+
+        const startRelayFlow = async () => {
             setLoading(true);
             setError('');
+
+            const requestRef = ref(rtdb, `system/requests/chart/${symbol}`);
+            const dataRef = ref(rtdb, `system/data/chart/${symbol}`);
+
             try {
-                // allorigins 프록시 사용 (CORS 우회)
-                // 최근 60일 데이터 (pageSize=60)
-                const targetUrl = `https://m.stock.naver.com/api/stock/${symbol}/price?pageSize=60&page=1`;
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-
-                const response = await fetch(proxyUrl);
-                const rawData = await response.json();
-                const jsonContent = JSON.parse(rawData.contents);
-
-                if (!Array.isArray(jsonContent) || jsonContent.length === 0) {
-                    throw new Error('차트 데이터를 불러올 수 없습니다.');
+                // 1. Check if data already exists in RTDB
+                const dataSnap = await get(dataRef);
+                if (dataSnap.exists()) {
+                    const relayData = dataSnap.val();
+                    renderChart(relayData.data);
+                    return;
                 }
 
-                const formattedData: ChartDataPoint[] = jsonContent.map((item: any) => ({
-                    x: new Date(item.localTradedAt.substring(0, 10)),
-                    y: [
-                        parseInt(item.openPrice.replace(/,/g, '')),
-                        parseInt(item.highPrice.replace(/,/g, '')),
-                        parseInt(item.lowPrice.replace(/,/g, '')),
-                        parseInt(item.closePrice.replace(/,/g, ''))
-                    ]
-                })).reverse(); // 네이버는 최신순이므로 역순 정렬
+                // 2. Data doesn't exist, request it
+                const reqSnap = await get(requestRef);
+                if (!reqSnap.exists() || reqSnap.val().status === 'FAILED') {
+                    await set(requestRef, {
+                        status: 'PENDING',
+                        requestedAt: new Date().toISOString()
+                    });
+                }
 
-                setData(formattedData);
+                // 3. Listen for data arrival
+                unsubData = onValue(dataRef, (snapshot) => {
+                    const val = snapshot.val();
+                    if (val && val.data) {
+                        renderChart(val.data);
+                    }
+                });
+
+                // 4. Listen for request status (to handle errors)
+                unsubRequest = onValue(requestRef, (snapshot) => {
+                    const val = snapshot.val();
+                    if (val && val.status === 'FAILED') {
+                        setError(val.errorMessage || '데이터 수집에 실패했습니다.');
+                        setLoading(false);
+                    }
+                });
+
             } catch (err: any) {
-                console.error('Chart Fetch Error:', err);
-                setError('차트 정보를 불러오는 데 실패했습니다.');
-            } finally {
+                console.error('Relay Flow Error:', err);
+                setError('서버 연결 중 오류가 발생했습니다.');
                 setLoading(false);
             }
         };
 
-        if (symbol) {
-            fetchChartData();
-        }
+        const renderChart = (compressed: any[]) => {
+            // Compressed format: [Date, Open, High, Low, Close, Volume]
+            const formattedData: ChartDataPoint[] = compressed.map((item: any) => ({
+                x: new Date(item[0]),
+                y: [item[1], item[2], item[3], item[4]] as [number, number, number, number]
+            })).reverse(); // Naver is latest first, reverse for ApexCharts
+
+            setData(formattedData);
+            setLoading(false);
+        };
+
+        startRelayFlow();
+
+        return () => {
+            if (unsubData) unsubData();
+            if (unsubRequest) unsubRequest();
+        };
     }, [symbol]);
 
     const chartOptions: ApexCharts.ApexOptions = {
@@ -108,7 +142,7 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
         return (
             <div className="chart-loading">
                 <Loader2 className="animate-spin" size={32} />
-                <span>데이터를 불러오는 중...</span>
+                <span>서버에서 차트 데이터를 수집 중입니다...</span>
             </div>
         );
     }

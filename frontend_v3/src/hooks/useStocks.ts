@@ -29,6 +29,7 @@ export function useStocks() {
                     price: stock.price,
                     change: stock.change,
                     changePercent: stock.change_percent,
+                    volume: stock.volume || 0,
                     market: stock.market
                 }));
                 handleUpdate();
@@ -44,6 +45,7 @@ export function useStocks() {
                     price: stock.price,
                     change: stock.change,
                     changePercent: stock.change_percent,
+                    volume: stock.volume || 0,
                     market: stock.market
                 }));
                 handleUpdate();
