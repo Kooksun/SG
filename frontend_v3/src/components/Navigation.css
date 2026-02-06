@@ -16,10 +16,6 @@
     transition: width 0.3s ease;
 }
 
-.nav-logo {
-    margin-bottom: var(--spacing-2xl);
-}
-
 .nav-items {
     flex: 1;
     display: flex;

@@ -1,6 +1,6 @@
 import React from 'react';
 import './Navigation.css';
-import { Globe, User, LayoutDashboard, Trophy } from 'lucide-react';
+import { Globe, User, Trophy } from 'lucide-react';
 
 interface NavigationProps {
     currentView: 'leaderboard' | 'market' | 'my';
@@ -10,9 +10,6 @@ interface NavigationProps {
 const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
     return (
         <nav className="side-navigation">
-            <div className="nav-logo">
-                <LayoutDashboard size={28} color="var(--accent-blue)" />
-            </div>
 
             <div className="nav-items">
                 <button
