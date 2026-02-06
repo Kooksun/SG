@@ -12,19 +12,19 @@ TICKER_THRESHOLD = 50000000 # 50M KRW
 PROFIT_RATIO_THRESHOLD = 0.1 # 10%
 MAX_TICKERS = 20
 
-def get_latest_price(symbol: str) -> tuple[float, str]:
-    """Fetch latest price from KOSPI/KOSDAQ RTDB."""
+def get_latest_price(symbol: str) -> tuple[float, str, float]:
+    """Fetch latest price and change_percent from KOSPI/KOSDAQ RTDB."""
     # 1. Try KOSPI (includes ETF)
     stock = kospi_db.child(f'stocks/{symbol}').get()
     if stock:
-        return float(stock.get('price', 0)), stock.get('market', 'KOSPI')
+        return float(stock.get('price', 0)), stock.get('market', 'KOSPI'), float(stock.get('change_percent', 0))
     
     # 2. Try KOSDAQ
     stock = kosdaq_db.child(f'stocks/{symbol}').get()
     if stock:
-        return float(stock.get('price', 0)), stock.get('market', 'KOSDAQ')
+        return float(stock.get('price', 0)), stock.get('market', 'KOSDAQ'), float(stock.get('change_percent', 0))
     
-    return 0.0, None
+    return 0.0, None, 0.0
 
 def calculate_fee(side: str, market: str, amount: float) -> tuple[float, float, float]:
     """
@@ -117,12 +117,21 @@ def process_order(uid: str, order_id: str, order_data: dict):
         return
 
     # 1. Price Check
-    curr_price, market = get_latest_price(symbol)
+    curr_price, market, change_percent = get_latest_price(symbol)
     if curr_price <= 0:
         main_db.child(f'orders/{uid}/{order_id}').update({
             'status': 'FAILED',
             'errorMessage': 'Stock price not found.'
         })
+        return
+
+    # [Reality Engine] Market Limit Protection (±29.5%)
+    if abs(change_percent) >= 29.5:
+        main_db.child(f'orders/{uid}/{order_id}').update({
+            'status': 'FAILED',
+            'errorMessage': '상/하한가 도달 종목은 거래가 제한됩니다.'
+        })
+        print(f"  !! BLOCKED: {symbol} at {change_percent}% limit.")
         return
 
     # 2. LIMIT Check

@@ -10,8 +10,11 @@ import { Loader2 } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
 import { useUserAsset } from './hooks/useUserAsset'
 import { useUserStore } from './hooks/useUserStore'
+import { ToastProvider } from './context/ToastContext'
+import { useOrderToast } from './hooks/useOrderToast'
+import './components/Toast.css'
 
-function App() {
+function AppContent() {
     const { user, loading: authLoading } = useAuth();
     const { hasSeenPrologue } = useUserStore();
     const [currentView, setCurrentView] = useState<'leaderboard' | 'market' | 'my'>('market');
@@ -19,10 +22,11 @@ function App() {
     // 유저 자산 동기화
     useUserAsset(user?.uid || null);
 
+    // 매매 결과 알림 리스너
+    useOrderToast(user?.uid || null);
+
     useEffect(() => {
         if (!authLoading && user) {
-            // 로그인 상태이면 글로벌에서 마이로 전환 유도 (옵션)
-            // 여기서는 사용자가 강제로 페이지를 열었을 때 상황만 고려
         }
     }, [user, authLoading]);
 
@@ -35,7 +39,6 @@ function App() {
         );
     }
 
-    // 마이페이지 접근 시 로그인이 안 되어 있으면 가입/로그인 화면 노출
     const renderMyPage = () => {
         if (!user) {
             return <AuthPage onSuccess={() => setCurrentView('my')} />;
@@ -74,6 +77,14 @@ function App() {
                 </div>
             </div>
         </div>
+    );
+}
+
+function App() {
+    return (
+        <ToastProvider>
+            <AppContent />
+        </ToastProvider>
     )
 }
 
