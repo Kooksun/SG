@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Card from '../components/Card';
 import { LogOut, Wallet, TrendingUp, Briefcase, CircleDollarSign, User, History, PieChart as PieIcon } from 'lucide-react';
 import { useUserStore } from '../hooks/useUserStore';
@@ -14,9 +14,18 @@ import './MyPage.css';
 
 const MyPage: React.FC = () => {
     const { user } = useAuth();
-    const { nickname, balance, equity, totalPnl, pnlRate } = useUserStore();
+    const { nickname, balance, uid } = useUserStore();
+    const { detailedHoldings } = useDetailedHoldings(uid);
 
-    const stockValue = equity - balance;
+    const assetStats = useMemo(() => {
+        const stockValue = detailedHoldings.reduce((sum, h) => sum + h.marketValue, 0);
+        const equity = balance + stockValue;
+        const totalPnl = detailedHoldings.reduce((sum, h) => sum + (h.currentPrice - h.averagePrice) * h.quantity, 0);
+        const investmentCost = detailedHoldings.reduce((sum, h) => sum + (h.averagePrice * h.quantity), 0);
+        const pnlRate = investmentCost > 0 ? (totalPnl / investmentCost) * 100 : 0;
+
+        return { stockValue, equity, totalPnl, pnlRate };
+    }, [balance, detailedHoldings]);
 
     return (
         <main className="dashboard my-page">
@@ -33,13 +42,13 @@ const MyPage: React.FC = () => {
                             <div className="asset-summary-content">
                                 <div className="asset-primary-value">
                                     <div className="value-row">
-                                        <span className="amount">{equity.toLocaleString()}</span>
+                                        <span className="amount">{assetStats.equity.toLocaleString()}</span>
                                         <span className="unit">원</span>
                                     </div>
-                                    <div className={`asset-pnl-chip ${totalPnl >= 0 ? 'up' : 'down'}`}>
-                                        {totalPnl >= 0 ? <TrendingUp size={14} /> : <TrendingUp size={14} className="flip-v" />}
+                                    <div className={`asset-pnl-chip ${assetStats.totalPnl >= 0 ? 'up' : 'down'}`}>
+                                        {assetStats.totalPnl >= 0 ? <TrendingUp size={14} /> : <TrendingUp size={14} className="flip-v" />}
                                         <span>
-                                            {pnlRate >= 0 ? '+' : ''}{pnlRate.toFixed(2)}% ({totalPnl >= 0 ? '+' : ''}{totalPnl.toLocaleString()}원)
+                                            {assetStats.pnlRate >= 0 ? '+' : ''}{assetStats.pnlRate.toFixed(2)}% ({assetStats.totalPnl >= 0 ? '+' : ''}{assetStats.totalPnl.toLocaleString()}원)
                                         </span>
                                     </div>
                                 </div>
@@ -60,7 +69,7 @@ const MyPage: React.FC = () => {
                                         <Briefcase size={18} className="stock-icon" />
                                         <span>주식 평가금</span>
                                     </div>
-                                    <span className="row-value">{stockValue.toLocaleString()}원</span>
+                                    <span className="row-value">{assetStats.stockValue.toLocaleString()}원</span>
                                 </div>
                             </div>
                         </Card>
