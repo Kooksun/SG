@@ -35,21 +35,19 @@ const MyPage: React.FC = () => {
             <div className="mypage-content-grid">
                 {/* 1열: 자산 정보 */}
                 <section className="mypage-column">
-                    <Card className="unified-asset-card" glow="blue">
-                        <div className="asset-header">
-                            <div className="asset-label">
-                                <Wallet className="icon" size={20} />
-                                <span>총 자산</span>
-                            </div>
-                            <div className="asset-value-wrapper">
-                                <span className="amount">{equity.toLocaleString()}</span>
-                                <span className="unit">원</span>
-                            </div>
-                            <div className={`asset-pnl-chip ${totalPnl >= 0 ? 'up' : 'down'}`}>
-                                {totalPnl >= 0 ? <TrendingUp size={16} /> : <TrendingUp size={16} className="flip-v" />}
-                                <span>
-                                    {pnlRate >= 0 ? '+' : ''}{pnlRate.toFixed(2)}% ({totalPnl >= 0 ? '+' : ''}{totalPnl.toLocaleString()}원)
-                                </span>
+                    <Card title="자산 현황" className="unified-asset-card" glow="blue">
+                        <div className="asset-summary-content">
+                            <div className="asset-primary-value">
+                                <div className="value-row">
+                                    <span className="amount">{equity.toLocaleString()}</span>
+                                    <span className="unit">원</span>
+                                </div>
+                                <div className={`asset-pnl-chip ${totalPnl >= 0 ? 'up' : 'down'}`}>
+                                    {totalPnl >= 0 ? <TrendingUp size={14} /> : <TrendingUp size={14} className="flip-v" />}
+                                    <span>
+                                        {pnlRate >= 0 ? '+' : ''}{pnlRate.toFixed(2)}% ({totalPnl >= 0 ? '+' : ''}{totalPnl.toLocaleString()}원)
+                                    </span>
+                                </div>
                             </div>
                         </div>
 

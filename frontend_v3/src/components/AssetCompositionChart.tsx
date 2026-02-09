@@ -56,7 +56,7 @@ const AssetCompositionChart: React.FC = () => {
     };
 
     return (
-        <Card title="자산 구성" className="asset-composition-card" glow="none">
+        <Card title="자산 구성" className="asset-composition-card" glow="blue">
             <div style={{ width: '100%', height: 300 }}>
                 {chartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">

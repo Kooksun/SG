@@ -23,7 +23,8 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--spacing-lg);
-    align-items: start;
+    align-items: stretch;
+    /* Align heights */
 }
 
 .mypage-column {
@@ -34,14 +35,33 @@
 
 /* Unified Asset Card Styles */
 .unified-asset-card {
-    padding: var(--spacing-lg);
+    height: 100%;
 }
 
-.asset-header {
+.unified-asset-card .card-content {
+    padding-top: 24px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.asset-summary-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.asset-primary-value {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+}
+
+.value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
 }
 
 .asset-label {
@@ -57,14 +77,8 @@
     color: var(--accent-blue);
 }
 
-.asset-value-wrapper {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-}
-
-.asset-value-wrapper .amount {
-    font-size: 3rem;
+.value-row .amount {
+    font-size: 2.75rem;
     font-weight: 800;
     letter-spacing: -0.04em;
     background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
@@ -74,8 +88,8 @@
     line-height: 1;
 }
 
-.asset-value-wrapper .unit {
-    font-size: 1.15rem;
+.value-row .unit {
+    font-size: 1.1rem;
     color: var(--text-secondary);
     font-weight: 600;
 }
@@ -108,6 +122,8 @@
     background: linear-gradient(90deg, var(--card-border) 0%, transparent 100%);
     margin: var(--spacing-lg) 0;
     width: 100%;
+    margin-top: auto;
+    /* Push bottom assets down */
 }
 
 .asset-details-rows {
@@ -175,8 +191,15 @@
 
 .asset-composition-card {
     min-height: 400px;
+    height: 100%;
+}
+
+.asset-composition-card .card-content {
+    flex: 1;
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    padding-top: 24px;
 }
 
 .recharts-legend-item {
