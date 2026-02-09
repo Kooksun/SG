@@ -12,18 +12,26 @@ import { useUserAsset } from './hooks/useUserAsset'
 import { useUserStore } from './hooks/useUserStore'
 import { ToastProvider } from './context/ToastContext'
 import { useOrderToast } from './hooks/useOrderToast'
+import PortfolioPage from './pages/PortfolioPage'
+import HistoryPage from './pages/HistoryPage'
+import { useDetailedHoldings } from './hooks/useDetailedHoldings'
+import { useTradeHistory } from './hooks/useTradeHistory'
 import './components/Toast.css'
 
 function AppContent() {
     const { user, loading: authLoading } = useAuth();
-    const { hasSeenPrologue } = useUserStore();
-    const [currentView, setCurrentView] = useState<'leaderboard' | 'market' | 'my'>('market');
+    const { hasSeenPrologue, uid } = useUserStore();
+    const [currentView, setCurrentView] = useState<'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history'>('market');
 
     // 유저 자산 동기화
     useUserAsset(user?.uid || null);
 
     // 매매 결과 알림 리스너
     useOrderToast(user?.uid || null);
+
+    // 데이터 패칭 (포트폴리오, 거래내역용)
+    const { detailedHoldings } = useDetailedHoldings(uid);
+    const { history } = useTradeHistory(uid);
 
     useEffect(() => {
         if (!authLoading && user) {
@@ -41,7 +49,7 @@ function AppContent() {
 
     const renderMyPage = () => {
         if (!user) {
-            return <AuthPage onSuccess={() => setCurrentView('my')} />;
+            return <AuthPage onSuccess={() => setCurrentView('assets')} />;
         }
         if (!hasSeenPrologue) {
             return <ProloguePage uid={user.uid} onComplete={() => { }} />;
@@ -55,10 +63,12 @@ function AppContent() {
                 return <LeaderboardPage />;
             case 'market':
                 return <MarketPage />;
-            case 'my':
+            case 'assets':
                 return renderMyPage();
-            default:
-                return <MarketPage />;
+            case 'portfolio':
+                return user ? <PortfolioPage holdings={detailedHoldings} /> : <AuthPage onSuccess={() => setCurrentView('portfolio')} />;
+            case 'history':
+                return user ? <HistoryPage history={history} /> : <AuthPage onSuccess={() => setCurrentView('history')} />;
         }
     };
 
