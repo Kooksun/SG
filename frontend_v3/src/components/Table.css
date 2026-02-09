@@ -1,0 +1,122 @@
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.data-table th {
+    text-align: left;
+    padding: 12px 16px;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.data-table td {
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    vertical-align: middle;
+}
+
+.data-table tr:last-child td {
+    border-bottom: none;
+}
+
+.data-table tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Common Table Components */
+.symbol-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.symbol-info .name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.symbol-info .code {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.text-right {
+    text-align: right !important;
+}
+
+.text-center {
+    text-align: center !important;
+}
+
+.font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+/* Profit / Loss Colors */
+.up {
+    color: var(--accent-up) !important;
+}
+
+.down {
+    color: var(--accent-down) !important;
+}
+
+.pnl-amount {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    margin-top: 2px;
+}
+
+/* Type Badges */
+.type-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.type-badge.buy {
+    background: rgba(244, 63, 94, 0.1);
+    color: var(--accent-rose);
+    border: 1px solid rgba(244, 63, 94, 0.2);
+}
+
+.type-badge.sell {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-blue);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.no-data {
+    color: var(--text-secondary);
+    padding: var(--spacing-xl) !important;
+    font-style: italic;
+}
+
+@media (max-width: 768px) {
+    .data-table {
+        font-size: 0.85rem;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 10px 8px;
+    }
+}

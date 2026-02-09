@@ -1,5 +1,6 @@
 import React from 'react';
 import { TradeHistoryItem } from '../hooks/useTradeHistory';
+import './Table.css';
 
 interface TradeHistoryTableProps {
     history: TradeHistoryItem[];

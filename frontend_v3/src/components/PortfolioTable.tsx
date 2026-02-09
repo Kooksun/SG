@@ -1,5 +1,6 @@
 import React from 'react';
 import { HoldingItem } from '../hooks/useDetailedHoldings';
+import './Table.css';
 
 interface PortfolioTableProps {
     holdings: HoldingItem[];
