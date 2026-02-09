@@ -18,7 +18,7 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history }) => {
     };
 
     return (
-        <div className="table-container glass-card">
+        <div className="table-container">
             <table className="data-table">
                 <thead>
                     <tr>

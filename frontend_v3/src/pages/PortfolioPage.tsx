@@ -1,6 +1,6 @@
-import React from 'react';
 import PortfolioTable from '../components/PortfolioTable';
 import DashboardHeader from '../components/DashboardHeader';
+import Card from '../components/Card';
 import { useUserStore } from '../hooks/useUserStore';
 import { HoldingItem } from '../hooks/useDetailedHoldings';
 
@@ -19,7 +19,9 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({ holdings }) => {
             />
 
             <div className="tab-content">
-                <PortfolioTable holdings={holdings} />
+                <Card title="보유 종목 내역" glow="blue">
+                    <PortfolioTable holdings={holdings} />
+                </Card>
             </div>
         </main>
     );

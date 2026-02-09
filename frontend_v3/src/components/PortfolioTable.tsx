@@ -7,7 +7,7 @@ interface PortfolioTableProps {
 
 const PortfolioTable: React.FC<PortfolioTableProps> = ({ holdings }) => {
     return (
-        <div className="table-container glass-card">
+        <div className="table-container">
             <table className="data-table">
                 <thead>
                     <tr>
