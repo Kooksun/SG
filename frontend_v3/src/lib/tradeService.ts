@@ -1,15 +1,11 @@
 import {
     doc,
     setDoc,
-    updateDoc,
-    increment,
-    serverTimestamp,
-    writeBatch,
-    getDoc,
-    collection,
+    serverTimestamp as firestoreTimestamp,
     deleteDoc
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { ref, push, serverTimestamp as rtdbTimestamp } from "firebase/database";
+import { db, rtdb } from "./firebase";
 
 export interface TradeRequest {
     uid: string;
@@ -21,90 +17,30 @@ export interface TradeRequest {
 }
 
 export const tradeService = {
-    // 실시간 거래 처리 (전수 정산 방식)
+    // 실시간 거래 처리 (RTDB 주문 요청 방식 - 시즌3 엔진 연동)
     async executeTrade({ uid, symbol, name, type, price, quantity }: TradeRequest) {
-        const userRef = doc(db, "users", uid);
-        const portfolioRef = doc(db, "users", uid, "portfolio", symbol);
-        const totalCost = price * quantity;
+        if (!uid) throw new Error("로그인이 필요합니다.");
 
-        const batch = writeBatch(db);
+        // RTDB orders/{uid} 경로에 주문 추가
+        const ordersRef = ref(rtdb, `orders/${uid}`);
 
-        if (type === 'BUY') {
-            // 1. 잔고 차감 및 보유 주식 수 증가 (기본 데이터)
-            batch.update(userRef, {
-                balance: increment(-totalCost),
-                lastTradeAt: serverTimestamp()
-            });
-
-            // 2. 포트폴리오 업데이트
-            const portfolioSnap = await getDoc(portfolioRef);
-            if (portfolioSnap.exists()) {
-                const data = portfolioSnap.data();
-                const newQuantity = data.quantity + quantity;
-                const newTotalCost = (data.averagePrice * data.quantity) + totalCost;
-                const newAveragePrice = Math.floor(newTotalCost / newQuantity);
-
-                batch.update(portfolioRef, {
-                    quantity: newQuantity,
-                    averagePrice: newAveragePrice,
-                    updatedAt: serverTimestamp()
-                });
-            } else {
-                batch.set(portfolioRef, {
-                    symbol,
-                    name,
-                    quantity,
-                    averagePrice: price,
-                    updatedAt: serverTimestamp()
-                });
-                // 종목 수 증가
-                batch.update(userRef, {
-                    stockCount: increment(1)
-                });
-            }
-        } else {
-            // SELL
-            // 1. 잔고 증가
-            batch.update(userRef, {
-                balance: increment(totalCost),
-                lastTradeAt: serverTimestamp()
-            });
-
-            // 2. 포트폴리오 업데이트
-            const portfolioSnap = await getDoc(portfolioRef);
-            if (!portfolioSnap.exists() || portfolioSnap.data().quantity < quantity) {
-                throw new Error("보유 수량이 부족합니다.");
-            }
-
-            const data = portfolioSnap.data();
-            const newQuantity = data.quantity - quantity;
-
-            if (newQuantity === 0) {
-                batch.delete(portfolioRef);
-                batch.update(userRef, {
-                    stockCount: increment(-1)
-                });
-            } else {
-                batch.update(portfolioRef, {
-                    quantity: newQuantity,
-                    updatedAt: serverTimestamp()
-                });
-            }
-        }
-
-        // 3. 거래 내역 기록 (테이블 보관용)
-        const historyRef = doc(collection(db, "users", uid, "history"));
-        batch.set(historyRef, {
+        const orderData = {
             symbol,
             name,
             type,
-            price,
+            price, // 요청 당시 가격 (시장가 주문의 기준가)
             quantity,
-            totalAmount: totalCost,
-            timestamp: serverTimestamp()
-        });
+            orderType: 'MARKET',
+            status: 'PENDING',
+            createdAt: rtdbTimestamp()
+        };
 
-        await batch.commit();
+        try {
+            await push(ordersRef, orderData);
+        } catch (error: any) {
+            console.error("Order submission failed:", error);
+            throw new Error("주문 요청에 실패했습니다: " + error.message);
+        }
     },
 
     // Watchlist 토글
@@ -114,7 +50,7 @@ export const tradeService = {
         if (isWatched) {
             await setDoc(watchlistRef, {
                 symbol,
-                createdAt: serverTimestamp()
+                createdAt: firestoreTimestamp()
             });
         } else {
             await deleteDoc(watchlistRef);

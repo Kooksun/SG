@@ -33,6 +33,12 @@ service cloud.firestore {
         // Only the owner can access their watchlist
         allow read, write: if isSignedIn() && request.auth.uid == uid;
       }
+
+      // Trade History sub-collection
+      match /history/{id} {
+        // Only the owner can access their history
+        allow read, write: if isSignedIn() && request.auth.uid == uid;
+      }
     }
 
     // Transactions collection (Top-level)

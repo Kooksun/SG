@@ -154,12 +154,22 @@ def fetch_stock_chart(symbol: str, page_size: int = 60, page: int = 1) -> List[L
                         return float(val.replace(',', ''))
                     return float(val or 0)
 
+                # 시가, 고가, 저가가 0인 경우 종가로 대체(시즌2 보정 로직)
+                close_val = p(item.get('closePrice'))
+                open_val = p(item.get('openPrice'))
+                high_val = p(item.get('highPrice'))
+                low_val = p(item.get('lowPrice'))
+
+                if open_val == 0: open_val = close_val
+                if high_val == 0: high_val = close_val
+                if low_val == 0: low_val = close_val
+
                 compressed.append([
                     date_str,
-                    p(item.get('openPrice')),
-                    p(item.get('highPrice')),
-                    p(item.get('lowPrice')),
-                    p(item.get('closePrice')),
+                    open_val,
+                    high_val,
+                    low_val,
+                    close_val,
                     p(item.get('accumulatedTradingVolume'))
                 ])
             return compressed
