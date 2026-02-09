@@ -18,6 +18,60 @@
     letter-spacing: 0.05em;
 }
 
+/* Tabs Navigation */
+.mypage-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 6px;
+    border-radius: 12px;
+    width: fit-content;
+    border: 1px solid var(--card-border);
+}
+
+.tab-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.tab-item:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-item.active {
+    color: var(--accent-blue);
+    background: rgba(56, 189, 248, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.tab-content {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* 2-Column Grid Layout */
 .mypage-content-grid {
     display: grid;
