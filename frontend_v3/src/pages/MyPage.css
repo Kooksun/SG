@@ -1,0 +1,198 @@
+.my-page {
+    padding-bottom: 60px;
+}
+
+.user-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    border-radius: 100px;
+    color: var(--accent-blue);
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* 2-Column Grid Layout */
+.mypage-content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-lg);
+    align-items: start;
+}
+
+.mypage-column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+/* Unified Asset Card Styles */
+.unified-asset-card {
+    padding: var(--spacing-lg);
+}
+
+.asset-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.asset-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.asset-label .icon {
+    color: var(--accent-blue);
+}
+
+.asset-value-wrapper {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.asset-value-wrapper .amount {
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+}
+
+.asset-value-wrapper .unit {
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.asset-pnl-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-top: 4px;
+}
+
+.asset-pnl-chip.up {
+    background: rgba(244, 63, 94, 0.1);
+    color: var(--accent-rose);
+    border: 1px solid rgba(244, 63, 94, 0.2);
+}
+
+.asset-pnl-chip.down {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-down);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.asset-divider {
+    height: 1px;
+    background: linear-gradient(90deg, var(--card-border) 0%, transparent 100%);
+    margin: var(--spacing-lg) 0;
+    width: 100%;
+}
+
+.asset-details-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.asset-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+}
+
+.asset-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateX(4px);
+}
+
+.row-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.row-label span {
+    color: var(--text-secondary);
+}
+
+.cash-icon {
+    color: var(--accent-emerald);
+    background: rgba(16, 185, 129, 0.1);
+    padding: 6px;
+    border-radius: 8px;
+    box-sizing: content-box;
+}
+
+.stock-icon {
+    color: var(--accent-amber);
+    background: rgba(245, 158, 11, 0.1);
+    padding: 6px;
+    border-radius: 8px;
+    box-sizing: content-box;
+}
+
+.row-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.flip-v {
+    transform: rotate(180deg);
+}
+
+.asset-composition-card {
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+.recharts-legend-item {
+    margin-right: 15px !important;
+}
+
+.custom-tooltip {
+    pointer-events: none;
+}
+
+@media (max-width: 1024px) {
+    .mypage-content-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .asset-value-wrapper .amount {
+        font-size: 2.5rem;
+    }
+}

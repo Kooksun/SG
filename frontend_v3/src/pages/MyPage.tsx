@@ -1,110 +1,84 @@
-import React, { useState } from 'react';
+import React from 'react';
 import Card from '../components/Card';
-import { Wallet, Briefcase, Coins, LogOut, History, Clock } from 'lucide-react';
+import { LogOut, Wallet, TrendingUp, Briefcase, CircleDollarSign, User } from 'lucide-react';
 import { useUserStore } from '../hooks/useUserStore';
 import { authService } from '../lib/authService';
 import { useAuth } from '../hooks/useAuth';
+import AssetCompositionChart from '../components/AssetCompositionChart';
+import './MyPage.css';
 
 const MyPage: React.FC = () => {
     const { user } = useAuth();
-    const { nickname, balance, equity, stocks: userStockCount } = useUserStore();
-    const [activeTab, setActiveTab] = useState<'portfolio' | 'history' | 'waitlist'>('portfolio');
+    const { nickname, balance, equity, totalPnl, pnlRate } = useUserStore();
+
+    const stockValue = equity - balance;
 
     return (
-        <main className="dashboard">
+        <main className="dashboard my-page">
             <header className="dashboard-header">
                 <div className="header-main">
                     <div className="welcome-info">
+                        <div className="user-badge">
+                            <User size={16} />
+                            <span>Investor</span>
+                        </div>
                         <h1 className="welcome-text">안녕하세요, <span className="highlight">{nickname}</span>님</h1>
-                        <p className="subtitle">개인 자산 현황과 거래 내역을 관리하세요.</p>
+                        <p className="subtitle">자산 현황을 한눈에 확인하고 전략을 세워보세요.</p>
                     </div>
                     <button className="logout-btn" onClick={() => authService.signOut()} title="로그아웃">
-                        <LogOut size={20} />
+                        <LogOut size={18} />
                         <span>로그아웃</span>
                     </button>
                 </div>
             </header>
 
-            <section className="asset-overview">
-                <Card title="자산 총액" glow="blue" className="asset-card">
-                    <div className="asset-value">
-                        <Wallet className="icon blue" />
-                        <div className="value-info">
-                            <span className="amount">{equity.toLocaleString()} <small>원</small></span>
-                            <span className="change positive">+0.0% (오늘)</span>
+            <div className="mypage-content-grid">
+                {/* 1열: 자산 정보 */}
+                <section className="mypage-column">
+                    <Card className="unified-asset-card" glow="blue">
+                        <div className="asset-header">
+                            <div className="asset-label">
+                                <Wallet className="icon" size={20} />
+                                <span>총 자산</span>
+                            </div>
+                            <div className="asset-value-wrapper">
+                                <span className="amount">{equity.toLocaleString()}</span>
+                                <span className="unit">원</span>
+                            </div>
+                            <div className={`asset-pnl-chip ${totalPnl >= 0 ? 'up' : 'down'}`}>
+                                {totalPnl >= 0 ? <TrendingUp size={16} /> : <TrendingUp size={16} className="flip-v" />}
+                                <span>
+                                    {pnlRate >= 0 ? '+' : ''}{pnlRate.toFixed(2)}% ({totalPnl >= 0 ? '+' : ''}{totalPnl.toLocaleString()}원)
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                </Card>
 
-                <Card title="가용 현금" glow="emerald" className="asset-card">
-                    <div className="asset-value">
-                        <Coins className="icon emerald" />
-                        <div className="value-info">
-                            <span className="amount">{balance.toLocaleString()} <small>원</small></span>
-                            <span className="subtitle">즉시 매수 가능</span>
+                        <div className="asset-divider" />
+
+                        <div className="asset-details-rows">
+                            <div className="asset-row">
+                                <div className="row-label">
+                                    <CircleDollarSign size={18} className="cash-icon" />
+                                    <span>보유 현금</span>
+                                </div>
+                                <span className="row-value">{balance.toLocaleString()}원</span>
+                            </div>
+                            <div className="asset-row">
+                                <div className="row-label">
+                                    <Briefcase size={18} className="stock-icon" />
+                                    <span>주식 평가금</span>
+                                </div>
+                                <span className="row-value">{stockValue.toLocaleString()}원</span>
+                            </div>
                         </div>
-                    </div>
-                </Card>
+                    </Card>
+                </section>
 
-                <Card title="보유 종목" glow="none" className="asset-card">
-                    <div className="asset-value">
-                        <Briefcase className="icon secondary" />
-                        <div className="value-info">
-                            <span className="amount">{userStockCount ?? 0} <small>개</small></span>
-                            <span className="subtitle">평가 금액: {(equity - balance).toLocaleString()}원</span>
-                        </div>
-                    </div>
-                </Card>
-            </section>
-
-            <section className="main-content">
-                <div className="mypage-tabs">
-                    <button
-                        className={`tab-item ${activeTab === 'portfolio' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('portfolio')}
-                    >
-                        <Briefcase size={18} />
-                        <span>보유 포트폴리오</span>
-                    </button>
-                    <button
-                        className={`tab-item ${activeTab === 'history' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('history')}
-                    >
-                        <History size={18} />
-                        <span>거래 내역</span>
-                    </button>
-                    <button
-                        className={`tab-item ${activeTab === 'waitlist' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('waitlist')}
-                    >
-                        <Clock size={18} />
-                        <span>지정가 대기</span>
-                    </button>
-                </div>
-
-                <div className="tab-content">
-                    {activeTab === 'portfolio' && (
-                        <Card title="보유 주식 상세" className="full-width">
-                            <div className="placeholder-content">보유 중인 종목 리스트 (준비 중)</div>
-                            {/* TODO: 보유 주식 리스트 컴포넌트 추가 */}
-                        </Card>
-                    )}
-
-                    {activeTab === 'history' && (
-                        <Card title="최근 거래 기록" className="full-width">
-                            <div className="placeholder-content">최근 매수/매도 내역이 없습니다.</div>
-                            {/* TODO: 거래 내역 리스트 컴포넌트 추가 */}
-                        </Card>
-                    )}
-
-                    {activeTab === 'waitlist' && (
-                        <Card title="미체결 주문" className="full-width">
-                            <div className="placeholder-content">현재 대기 중인 지정가 주문이 없습니다.</div>
-                            {/* TODO: 지정가 대기 목록 컴포넌트 추가 */}
-                        </Card>
-                    )}
-                </div>
-            </section>
+                {/* 2열: 포트폴리오 차트 */}
+                <section className="mypage-column">
+                    <AssetCompositionChart />
+                </section>
+            </div>
         </main>
     );
 };
