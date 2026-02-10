@@ -4,12 +4,13 @@ import './Table.css';
 
 interface PortfolioTableProps {
     holdings: HoldingItem[];
+    onSelect: (holding: HoldingItem) => void;
 }
 
-const PortfolioTable: React.FC<PortfolioTableProps> = ({ holdings }) => {
+const PortfolioTable: React.FC<PortfolioTableProps> = ({ holdings, onSelect }) => {
     return (
         <div className="table-container">
-            <table className="data-table">
+            <table className="data-table selectable">
                 <thead>
                     <tr>
                         <th>종목명</th>
@@ -28,7 +29,7 @@ const PortfolioTable: React.FC<PortfolioTableProps> = ({ holdings }) => {
                             const isPositive = pnl >= 0;
 
                             return (
-                                <tr key={item.symbol}>
+                                <tr key={item.symbol} onClick={() => onSelect(item)} className="clickable-row">
                                     <td>
                                         <div className="symbol-info">
                                             <span className="name">{item.name}</span>

@@ -13,11 +13,12 @@ interface TradeModalProps {
     onClose: () => void;
     userBalance: number;
     uid: string;
+    initialTradeType?: 'BUY' | 'SELL';
 }
 
-const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, uid }) => {
+const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, uid, initialTradeType }) => {
     const [quantity, setQuantity] = useState<number>(1);
-    const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>('BUY');
+    const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>(initialTradeType || 'BUY');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [holdingQty, setHoldingQty] = useState<number>(0);

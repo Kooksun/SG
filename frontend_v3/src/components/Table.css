@@ -110,6 +110,15 @@
     font-style: italic;
 }
 
+.clickable-row {
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.clickable-row:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
 .fee-display {
     display: flex;
     flex-direction: column;

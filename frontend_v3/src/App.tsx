@@ -16,6 +16,7 @@ import PortfolioPage from './pages/PortfolioPage'
 import HistoryPage from './pages/HistoryPage'
 import { useDetailedHoldings } from './hooks/useDetailedHoldings'
 import { useTradeHistory } from './hooks/useTradeHistory'
+import { useStocks } from './hooks/useStocks'
 import './components/Toast.css'
 
 function AppContent() {
@@ -30,6 +31,7 @@ function AppContent() {
     useOrderToast(user?.uid || null);
 
     // 데이터 패칭 (포트폴리오, 거래내역용)
+    const { stocks } = useStocks();
     const { detailedHoldings } = useDetailedHoldings(uid);
     const { history, hasMore, loadingMore, loadMore } = useTradeHistory(uid);
 
@@ -66,7 +68,7 @@ function AppContent() {
             case 'assets':
                 return renderMyPage();
             case 'portfolio':
-                return user ? <PortfolioPage holdings={detailedHoldings} /> : <AuthPage onSuccess={() => setCurrentView('portfolio')} />;
+                return user ? <PortfolioPage holdings={detailedHoldings} stocks={stocks} /> : <AuthPage onSuccess={() => setCurrentView('portfolio')} />;
             case 'history':
                 return user ? (
                     <HistoryPage
