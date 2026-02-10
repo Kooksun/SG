@@ -204,12 +204,12 @@ def process_order(uid: str, order_id: str, order_data: dict):
             stock_change = -req_quantity
             kwargs_out = {"profit_ratio": profit_ratio}
         
-        # Record Transaction to Firestore (Audit)
-        tx_ref = main_firestore.collection('transactions').document()
-        transaction.set(tx_ref, {
-            'uid': uid, 'symbol': symbol, 'name': order_data.get('name', symbol),
+        # Record Transaction to User History sub-collection
+        history_ref = user_ref.collection('history').document()
+        transaction.set(history_ref, {
+            'symbol': symbol, 'name': order_data.get('name', symbol),
             'type': side, 'price': curr_price, 'quantity': req_quantity,
-            'amount': total_amount, 'fee': final_fee, 'orderId': order_id,
+            'totalAmount': total_amount, 'fee': final_fee, 'orderId': order_id,
             'timestamp': firestore.SERVER_TIMESTAMP
         })
 

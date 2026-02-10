@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export interface TradeHistoryItem {
@@ -25,13 +25,25 @@ export function useTradeHistory(uid: string | null) {
         }
 
         const historyRef = collection(db, 'users', uid, 'history');
-        const q = query(historyRef, orderBy('timestamp', 'desc'));
+        const q = query(
+            historyRef,
+            orderBy('timestamp', 'desc')
+        );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const historyData = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            })) as TradeHistoryItem[];
+            const historyData = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    symbol: data.symbol,
+                    name: data.name,
+                    type: data.type,
+                    price: data.price,
+                    quantity: data.quantity,
+                    totalAmount: data.totalAmount || data.amount || 0,
+                    timestamp: data.timestamp
+                } as TradeHistoryItem;
+            });
             setHistory(historyData);
             setLoading(false);
         });
