@@ -6,9 +6,12 @@ import { TradeHistoryItem } from '../hooks/useTradeHistory';
 
 interface HistoryPageProps {
     history: TradeHistoryItem[];
+    hasMore: boolean;
+    loadingMore: boolean;
+    loadMore: () => void;
 }
 
-const HistoryPage: React.FC<HistoryPageProps> = ({ history }) => {
+const HistoryPage: React.FC<HistoryPageProps> = ({ history, hasMore, loadingMore, loadMore }) => {
     const { nickname } = useUserStore();
 
     return (
@@ -20,7 +23,12 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ history }) => {
 
             <div className="tab-content">
                 <Card title="최근 거래 내역" glow="blue">
-                    <TradeHistoryTable history={history} />
+                    <TradeHistoryTable
+                        history={history}
+                        hasMore={hasMore}
+                        loadingMore={loadingMore}
+                        loadMore={loadMore}
+                    />
                 </Card>
             </div>
         </main>

@@ -31,7 +31,7 @@ function AppContent() {
 
     // 데이터 패칭 (포트폴리오, 거래내역용)
     const { detailedHoldings } = useDetailedHoldings(uid);
-    const { history } = useTradeHistory(uid);
+    const { history, hasMore, loadingMore, loadMore } = useTradeHistory(uid);
 
     useEffect(() => {
         if (!authLoading && user) {
@@ -68,7 +68,14 @@ function AppContent() {
             case 'portfolio':
                 return user ? <PortfolioPage holdings={detailedHoldings} /> : <AuthPage onSuccess={() => setCurrentView('portfolio')} />;
             case 'history':
-                return user ? <HistoryPage history={history} /> : <AuthPage onSuccess={() => setCurrentView('history')} />;
+                return user ? (
+                    <HistoryPage
+                        history={history}
+                        hasMore={hasMore}
+                        loadingMore={loadingMore}
+                        loadMore={loadMore}
+                    />
+                ) : <AuthPage onSuccess={() => setCurrentView('history')} />;
         }
     };
 

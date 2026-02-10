@@ -4,9 +4,12 @@ import './Table.css';
 
 interface TradeHistoryTableProps {
     history: TradeHistoryItem[];
+    hasMore: boolean;
+    loadingMore: boolean;
+    loadMore: () => void;
 }
 
-const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history }) => {
+const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore, loadingMore, loadMore }) => {
     const formatDate = (timestamp: any) => {
         if (!timestamp) return '-';
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -54,7 +57,7 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history }) => {
                                 <td className="text-right font-mono text-xs">
                                     <div className="fee-display">
                                         <div>{item.fee.toLocaleString()}원</div>
-                                        {item.discount && item.discount > 0 && (
+                                        {item.discount !== undefined && item.discount > 0 && (
                                             <div className="discount-text">-{item.discount.toLocaleString()} 할인</div>
                                         )}
                                     </div>
@@ -77,6 +80,18 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history }) => {
                     )}
                 </tbody>
             </table>
+
+            {hasMore && (
+                <div className="load-more-container">
+                    <button
+                        className="load-more-btn"
+                        onClick={loadMore}
+                        disabled={loadingMore}
+                    >
+                        {loadingMore ? '로딩 중...' : '더 보기'}
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

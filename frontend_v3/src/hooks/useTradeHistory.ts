@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export interface TradeHistoryItem {
@@ -21,21 +21,39 @@ export interface TradeHistoryItem {
 export function useTradeHistory(uid: string | null) {
     const [history, setHistory] = useState<TradeHistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const [lastDoc, setLastDoc] = useState<any>(null);
 
-    useEffect(() => {
-        if (!uid) {
-            setHistory([]);
-            setLoading(false);
-            return;
+    const PAGE_SIZE = 20;
+
+    const fetchHistory = async (isInitial = true) => {
+        if (!uid) return;
+
+        if (isInitial) {
+            setLoading(true);
+        } else {
+            setLoadingMore(true);
         }
 
-        const historyRef = collection(db, 'users', uid, 'history');
-        const q = query(
-            historyRef,
-            orderBy('timestamp', 'desc')
-        );
+        try {
+            const historyRef = collection(db, 'users', uid, 'history');
+            let q = query(
+                historyRef,
+                orderBy('timestamp', 'desc'),
+                limit(PAGE_SIZE)
+            );
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+            if (!isInitial && lastDoc) {
+                q = query(
+                    historyRef,
+                    orderBy('timestamp', 'desc'),
+                    startAfter(lastDoc),
+                    limit(PAGE_SIZE)
+                );
+            }
+
+            const snapshot = await getDocs(q);
             const historyData = snapshot.docs.map(doc => {
                 const data = doc.data();
                 return {
@@ -54,12 +72,29 @@ export function useTradeHistory(uid: string | null) {
                     timestamp: data.timestamp
                 } as TradeHistoryItem;
             });
-            setHistory(historyData);
-            setLoading(false);
-        });
 
-        return () => unsubscribe();
+            if (isInitial) {
+                setHistory(historyData);
+            } else {
+                setHistory(prev => [...prev, ...historyData]);
+            }
+
+            setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+            setHasMore(snapshot.docs.length === PAGE_SIZE);
+        } catch (error) {
+            console.error("Error fetching trade history:", error);
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    };
+
+    useEffect(() => {
+        setHistory([]);
+        setLastDoc(null);
+        setHasMore(true);
+        fetchHistory(true);
     }, [uid]);
 
-    return { history, loading };
+    return { history, loading, loadingMore, hasMore, loadMore: () => fetchHistory(false) };
 }
