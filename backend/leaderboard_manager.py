@@ -28,41 +28,62 @@ def leaderboard_update_job():
         users_docs = users_ref.stream()
         
         rankings = []
+        stock_yield_agg = {} # {symbol: {'sum_yield': 0, 'count': 0, 'name': ''}}
         DEFAULT_STARTING_BALANCE = 300000000.0 # 3억 KRW as default for Season 3
         
         # Aggregate stats
         total_equity_sum = 0
         total_yield_sum = 0
+        total_players = 0
         
-        user_list = list(users_docs)
-        total_players = len(user_list)
+        print(f"  -> Processing users and syncing to Firestore...")
         
-        print(f"  -> Processing {total_players} users and syncing to Firestore...")
-        
-        for user_doc in user_list:
-            uid = user_doc.id
-            user_data = user_doc.to_dict()
+        for user_doc_stream in users_docs:
+            total_players += 1
+            uid = user_doc_stream.id
             
-            cash = float(user_data.get('balance', 0))
-            display_name = user_data.get('displayName', 'Anonymous')
-            photo_url = user_data.get('photoURL', '')
-            starting_balance = float(user_data.get('startingBalance', DEFAULT_STARTING_BALANCE))
+            # [Fix 4.6B Issue] 
+            # We must fetch the portfolio FIRST, and THEN fetch the user document (balance).
+            # This ensures we never pair an OLD (higher) balance with a NEW (larger) portfolio.
+            # (If we do the opposite, we get Old Balance + New Portfolio = 460M. 
+            #  If we do this order, we might get New Balance + Old Portfolio = 140M, which is a temporary under-estimation, 
+            #  but much safer and will correct itself in the next run).
             
             # 3. Calculate Portfolio Value
             portfolio_value = 0
             stock_count = 0
             portfolio_ref = users_ref.document(uid).collection('portfolio')
-            portfolio_items = portfolio_ref.stream()
+            portfolio_items = list(portfolio_ref.stream()) # Fetch all portfolio items first
             
             for item in portfolio_items:
                 p_data = item.to_dict()
                 symbol = p_data.get('symbol')
                 qty = float(p_data.get('quantity', 0))
+                avg_price = float(p_data.get('averagePrice', 0))
                 
-                # Use live price if available, else use avg price as fallback
-                live_price = float(all_prices.get(symbol, {}).get('price', p_data.get('averagePrice', 0)))
+                live_price = float(all_prices.get(symbol, {}).get('price', avg_price))
                 portfolio_value += (qty * live_price)
-                if qty > 0: stock_count += 1
+                if qty > 0: 
+                    stock_count += 1
+                    if symbol and avg_price > 0:
+                        item_yield = ((live_price / avg_price) - 1) * 100
+                        if symbol not in stock_yield_agg:
+                            stock_yield_agg[symbol] = {
+                                'sum_yield': 0, 'count': 0,
+                                'name': all_prices.get(symbol, {}).get('name', symbol)
+                            }
+                        stock_yield_agg[symbol]['sum_yield'] += item_yield
+                        stock_yield_agg[symbol]['count'] += 1
+
+            # 4. Now fetch the User document freshly to get the most recent Balance
+            user_snap = users_ref.document(uid).get()
+            if not user_snap.exists: continue
+            
+            user_data = user_snap.to_dict()
+            cash = float(user_data.get('balance', 0))
+            display_name = user_data.get('displayName', 'Anonymous')
+            photo_url = user_data.get('photoURL', '')
+            starting_balance = float(user_data.get('starting_balance', user_data.get('startingBalance', DEFAULT_STARTING_BALANCE)))
             
             total_equity = cash + portfolio_value
             yield_percent = ((total_equity - starting_balance) / starting_balance) * 100 if starting_balance > 0 else 0
@@ -84,7 +105,7 @@ def leaderboard_update_job():
             # Update Firestore User Doc for Frontend Header Consistency
             users_ref.document(uid).update({
                 'totalStockValue': round(portfolio_value, 2),
-                'totalEquity': round(total_equity, 2), # Frontend can use this
+                'totalEquity': round(total_equity, 2),
                 'pnlRate': round(yield_percent, 2),
                 'stockCount': stock_count,
                 'lastCalculatedAt': datetime.now(MARKET_TZ).isoformat()
@@ -101,31 +122,7 @@ def leaderboard_update_job():
             # users_ref.document(item['uid']).update({'rank': rank})
             
         # 6. Process Top/Worst Stocks by Yield (Based on Participant Portfolios)
-        stock_yield_agg = {} # {symbol: {'sum_yield': 0, 'count': 0, 'name': ''}}
-        
-        for doc in user_list:
-            uid = doc.id
-            p_ref = users_ref.document(uid).collection('portfolio')
-            for p_item in p_ref.stream():
-                p_data = p_item.to_dict()
-                sym = p_data.get('symbol')
-                qty = float(p_data.get('quantity', 0))
-                avg_price = float(p_data.get('averagePrice', 0))
-                
-                if sym and qty > 0 and avg_price > 0:
-                    live_price = float(all_prices.get(sym, {}).get('price', avg_price))
-                    item_yield = ((live_price / avg_price) - 1) * 100
-                    
-                    if sym not in stock_yield_agg:
-                        stock_yield_agg[sym] = {
-                            'sum_yield': 0,
-                            'count': 0,
-                            'name': all_prices.get(sym, {}).get('name', sym)
-                        }
-                    
-                    stock_yield_agg[sym]['sum_yield'] += item_yield
-                    stock_yield_agg[sym]['count'] += 1
-        
+        # (This is now part of the main loop above for efficiency)
         held_stock_yield_list = []
         for symbol, agg in stock_yield_agg.items():
             avg_yield = agg['sum_yield'] / agg['count'] if agg['count'] > 0 else 0

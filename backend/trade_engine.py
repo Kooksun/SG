@@ -172,7 +172,10 @@ def process_order(uid: str, order_id: str, order_data: dict):
             total_cost = total_amount + final_fee
             if balance < total_cost: return "Insufficient Balance"
             
-            transaction.update(user_ref, {'balance': firestore.Increment(-total_cost)})
+            transaction.update(user_ref, {
+                'balance': firestore.Increment(-total_cost),
+                'totalStockValue': firestore.Increment(total_amount)
+            })
             new_qty = curr_qty + req_quantity
             new_avg = math.floor(((avg_price * curr_qty) + total_amount) / new_qty)
             transaction.set(portfolio_ref, {
@@ -192,7 +195,13 @@ def process_order(uid: str, order_id: str, order_data: dict):
             proceeds = total_amount - final_fee
             profit_ratio = (curr_price - avg_price) / avg_price if avg_price > 0 else 0
             
-            transaction.update(user_ref, {'balance': firestore.Increment(proceeds)})
+            # For SELL, we decrement totalStockValue based on the cost basis (avg_price)
+            # This keeps the math consistent since cost basis * qty is what we move.
+            cost_basis_sold = math.floor(avg_price * req_quantity)
+            transaction.update(user_ref, {
+                'balance': firestore.Increment(proceeds),
+                'totalStockValue': firestore.Increment(-cost_basis_sold)
+            })
             new_qty = curr_qty - req_quantity
             if new_qty == 0:
                 transaction.delete(portfolio_ref)
