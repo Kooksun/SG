@@ -10,7 +10,7 @@ import { useRealtimeData } from '../hooks/useRealtimeData';
 import TradeModal from '../components/TradeModal';
 
 type MarketFilter = 'ALL' | 'KOSPI' | 'KOSDAQ' | 'ETF' | 'WATCHLIST' | 'HOLDINGS';
-type SortField = 'NAME' | 'PRICE' | 'CHANGE';
+type SortField = 'NAME' | 'PRICE' | 'CHANGE' | 'VOLUME';
 type SortDirection = 'ASC' | 'DESC';
 
 const MarketPage: React.FC = () => {
@@ -65,6 +65,8 @@ const MarketPage: React.FC = () => {
                 comparison = a.price - b.price;
             } else if (sortField === 'CHANGE') {
                 comparison = a.changePercent - b.changePercent;
+            } else if (sortField === 'VOLUME') {
+                comparison = a.volume - b.volume;
             }
             return sortDirection === 'ASC' ? comparison : -comparison;
         });
@@ -129,6 +131,10 @@ const MarketPage: React.FC = () => {
                                     className={`filter-btn-mini ${sortField === 'CHANGE' ? 'active' : ''}`}
                                     onClick={() => handleSort('CHANGE')}
                                 >전일대비 {sortField === 'CHANGE' && (sortDirection === 'ASC' ? '↑' : '↓')}</button>
+                                <button
+                                    className={`filter-btn-mini ${sortField === 'VOLUME' ? 'active' : ''}`}
+                                    onClick={() => handleSort('VOLUME')}
+                                >거래량 {sortField === 'VOLUME' && (sortDirection === 'ASC' ? '↑' : '↓')}</button>
                             </div>
                         </div>
                     </Card>
