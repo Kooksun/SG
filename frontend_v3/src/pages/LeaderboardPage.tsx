@@ -96,7 +96,12 @@ const LeaderboardPage: React.FC = () => {
                                                         <span className="user-name">{user.displayName}</span>
                                                     </div>
                                                 </td>
-                                                <td className="text-right font-mono">{(user.equity / 10000).toFixed(0)}만</td>
+                                                <td className="text-right font-mono">
+                                                    {user.equity >= 100000000
+                                                        ? `${(user.equity / 100000000).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억`
+                                                        : `${(user.equity / 10000).toLocaleString('ko-KR')}만`
+                                                    }
+                                                </td>
                                                 <td className={`text-right font-mono ${user.yield >= 0 ? 'up' : 'down'}`}>
                                                     {user.yield >= 0 ? '+' : ''}{user.yield.toFixed(1)}%
                                                 </td>
