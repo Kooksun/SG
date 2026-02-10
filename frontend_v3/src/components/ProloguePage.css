@@ -18,8 +18,8 @@
 
 .prologue-card {
     width: 100%;
-    max-width: 600px;
-    padding: var(--spacing-xl) !important;
+    max-width: 800px;
+    padding: var(--spacing-lg) !important;
     text-align: center;
     animation: fadeIn 1s ease-out;
 }
@@ -40,18 +40,18 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-xl);
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-lg);
 }
 
 .icon-sparkle {
     color: var(--accent-emerald);
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
 }
 
 .prologue-header h2 {
-    font-size: 2rem;
+    font-size: 1.8rem;
     background: linear-gradient(to right, #ffffff, var(--accent-emerald));
     -webkit-background-clip: text;
     background-clip: text;
@@ -61,18 +61,18 @@
 .prologue-content {
     background: rgba(255, 255, 255, 0.03);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-xl);
-    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
     position: relative;
 }
 
 .content-icon {
     position: absolute;
-    top: -20px;
+    top: -15px;
     left: 50%;
     transform: translateX(-50%);
     background: var(--bg-color);
-    padding: 10px;
+    padding: 8px;
     border-radius: 50%;
     color: var(--text-secondary);
     border: 1px solid var(--card-border);
@@ -80,29 +80,31 @@
 
 .prologue-text {
     font-size: 1.15rem;
-    line-height: 1.8;
+    line-height: 1.7;
     color: #e1e4e8;
-    white-space: pre-wrap;
     word-break: keep-all;
 }
 
-.asset-summary {
-    display: flex;
-    justify-content: center;
-    gap: var(--spacing-lg);
-    margin-bottom: var(--spacing-xl);
+.prologue-paragraph {
+    margin-bottom: 8px;
+    min-height: 1.7rem;
 }
 
-.summary-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-secondary);
-    font-size: 0.95rem;
+.prologue-paragraph:last-child {
+    margin-bottom: 0;
 }
 
-.summary-item strong {
-    color: white;
+.highlight-player {
+    color: var(--accent-amber);
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+.highlight-stock {
+    color: #38bdf8;
+    /* Sky blue */
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
 }
 
 .start-btn {

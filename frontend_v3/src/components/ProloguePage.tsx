@@ -58,17 +58,20 @@ export default function ProloguePage({ uid, onComplete }: ProloguePageProps) {
 
                 <div className="prologue-content">
                     <BookOpen className="content-icon" />
-                    <p className="prologue-text">{prologue}</p>
-                </div>
-
-                <div className="asset-summary">
-                    <div className="summary-item">
-                        <Wallet size={18} />
-                        <span>가용 현금: <strong>{balance.toLocaleString()}원</strong></span>
-                    </div>
-                    <div className="summary-item">
-                        <TrendingUp size={18} />
-                        <span>초기 투자: <strong>200,000,000원 (ETF 3종)</strong></span>
+                    <div className="prologue-text">
+                        {prologue.split('\n').map((line, i) => (
+                            <p key={i} className="prologue-paragraph">
+                                {line.split(/(\[\[.*?\]\]|\{\{.*?\}\})/).map((part, j) => {
+                                    if (part.startsWith('[[') && part.endsWith(']]')) {
+                                        return <span key={j} className="highlight-player">{part.slice(2, -2)}</span>;
+                                    }
+                                    if (part.startsWith('{{') && part.endsWith('}}')) {
+                                        return <span key={j} className="highlight-stock">{part.slice(2, -2)}</span>;
+                                    }
+                                    return part;
+                                })}
+                            </p>
+                        ))}
                     </div>
                 </div>
 
