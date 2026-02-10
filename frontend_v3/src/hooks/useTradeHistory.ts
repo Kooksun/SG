@@ -10,6 +10,11 @@ export interface TradeHistoryItem {
     price: number;
     quantity: number;
     totalAmount: number;
+    profit?: number;
+    profitRatio?: number;
+    fee: number;
+    rawFee?: number;
+    discount?: number;
     timestamp: any;
 }
 
@@ -41,6 +46,11 @@ export function useTradeHistory(uid: string | null) {
                     price: data.price,
                     quantity: data.quantity,
                     totalAmount: data.totalAmount || data.amount || 0,
+                    profit: data.profit,
+                    profitRatio: data.profitRatio,
+                    fee: data.fee || 0,
+                    rawFee: data.rawFee,
+                    discount: data.discount,
                     timestamp: data.timestamp
                 } as TradeHistoryItem;
             });

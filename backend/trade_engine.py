@@ -63,6 +63,8 @@ def record_to_supabase(uid, symbol, name, tx_type, price, quantity, amount, raw_
             "final_fee": final_fee,
             "balance_change": balance_change,
             "stock_change": stock_change,
+            "profit": kwargs.get('profit', 0),
+            "profit_ratio": kwargs.get('profit_ratio', 0),
             "timestamp": datetime.now(MARKET_TZ).isoformat()
         }
         supabase.table("trade_records").insert(data).execute()
@@ -202,16 +204,29 @@ def process_order(uid: str, order_id: str, order_data: dict):
             
             balance_change = proceeds
             stock_change = -req_quantity
-            kwargs_out = {"profit_ratio": profit_ratio}
         
         # Record Transaction to User History sub-collection
         history_ref = user_ref.collection('history').document()
-        transaction.set(history_ref, {
+        history_item = {
             'symbol': symbol, 'name': order_data.get('name', symbol),
             'type': side, 'price': curr_price, 'quantity': req_quantity,
-            'totalAmount': total_amount, 'fee': final_fee, 'orderId': order_id,
+            'totalAmount': total_amount, 
+            'rawFee': raw_fee,
+            'discount': disc,
+            'fee': final_fee, 
+            'orderId': order_id,
             'timestamp': firestore.SERVER_TIMESTAMP
-        })
+        }
+        
+        profit = 0
+        kwargs_out = {}
+        if side == 'SELL':
+            profit = math.floor((curr_price - avg_price) * req_quantity)
+            history_item['profit'] = profit
+            history_item['profitRatio'] = profit_ratio
+            kwargs_out = {"profit": profit, "profit_ratio": profit_ratio}
+
+        transaction.set(history_ref, history_item)
 
         return {
             "uid": uid, "symbol": symbol, "name": order_data.get('name', symbol),

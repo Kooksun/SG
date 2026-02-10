@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS trade_records (
     final_fee FLOAT NOT NULL,      -- 실제 부과된 수수료
     balance_change FLOAT NOT NULL,
     stock_change INT NOT NULL,
+    profit FLOAT DEFAULT 0,
+    profit_ratio FLOAT DEFAULT 0,
     timestamp TIMESTAMPTZ DEFAULT NOW()
 );
 

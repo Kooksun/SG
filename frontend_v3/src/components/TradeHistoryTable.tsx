@@ -28,14 +28,16 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history }) => {
                         <th className="text-center">구분</th>
                         <th className="text-right">체결가</th>
                         <th className="text-right">수량</th>
-                        <th className="text-right">총 금액</th>
+                        <th className="text-right">수수료</th>
+                        <th className="text-right">손익 (수익률)</th>
+                        <th className="text-right font-bold">총 금액</th>
                     </tr>
                 </thead>
                 <tbody>
                     {history.length > 0 ? (
                         history.map((item) => (
                             <tr key={item.id}>
-                                <td className="text-secondary text-sm">{formatDate(item.timestamp)}</td>
+                                <td className="text-xs text-secondary">{formatDate(item.timestamp)}</td>
                                 <td>
                                     <div className="symbol-info">
                                         <span className="name">{item.name}</span>
@@ -49,12 +51,28 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history }) => {
                                 </td>
                                 <td className="text-right font-mono">{item.price.toLocaleString()}</td>
                                 <td className="text-right font-mono">{item.quantity.toLocaleString()}</td>
+                                <td className="text-right font-mono text-xs">
+                                    <div className="fee-display">
+                                        <div>{item.fee.toLocaleString()}원</div>
+                                        {item.discount && item.discount > 0 && (
+                                            <div className="discount-text">-{item.discount.toLocaleString()} 할인</div>
+                                        )}
+                                    </div>
+                                </td>
+                                <td className={`text-right font-mono ${item.profit && item.profit > 0 ? 'up' : item.profit && item.profit < 0 ? 'down' : ''}`}>
+                                    {item.type === 'SELL' && item.profit !== undefined ? (
+                                        <>
+                                            <div className="font-bold">{item.profit > 0 ? '+' : ''}{item.profit.toLocaleString()}</div>
+                                            <div className="text-xs opacity-80">({item.profitRatio ? (item.profitRatio * 100).toFixed(2) : '0.00'}%)</div>
+                                        </>
+                                    ) : '-'}
+                                </td>
                                 <td className="text-right font-mono font-bold">{item.totalAmount.toLocaleString()}원</td>
                             </tr>
                         ))
                     ) : (
                         <tr>
-                            <td colSpan={6} className="text-center no-data">거래 내역이 없습니다.</td>
+                            <td colSpan={8} className="text-center no-data">거래 내역이 없습니다.</td>
                         </tr>
                     )}
                 </tbody>
