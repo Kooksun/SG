@@ -31,9 +31,9 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore,
                         <th className="text-center">구분</th>
                         <th className="text-right">체결가</th>
                         <th className="text-right">수량</th>
-                        <th className="text-right">수수료</th>
-                        <th className="text-right">손익 (수익률)</th>
                         <th className="text-right font-bold">총 금액</th>
+                        <th className="text-right">손익 (수익률)</th>
+                        <th className="text-right">거래세</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -54,14 +54,7 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore,
                                 </td>
                                 <td className="text-right font-mono">{item.price.toLocaleString()}</td>
                                 <td className="text-right font-mono">{item.quantity.toLocaleString()}</td>
-                                <td className="text-right font-mono text-xs">
-                                    <div className="fee-display">
-                                        <div>{item.fee.toLocaleString()}원</div>
-                                        {item.discount !== undefined && item.discount > 0 && (
-                                            <div className="discount-text">-{item.discount.toLocaleString()} 할인</div>
-                                        )}
-                                    </div>
-                                </td>
+                                <td className="text-right font-mono font-bold">{item.totalAmount.toLocaleString()}원</td>
                                 <td className={`text-right font-mono ${item.profit && item.profit > 0 ? 'up' : item.profit && item.profit < 0 ? 'down' : ''}`}>
                                     {item.type === 'SELL' && item.profit !== undefined ? (
                                         <>
@@ -70,7 +63,14 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore,
                                         </>
                                     ) : '-'}
                                 </td>
-                                <td className="text-right font-mono font-bold">{item.totalAmount.toLocaleString()}원</td>
+                                <td className="text-right font-mono text-xs">
+                                    <div className="fee-display">
+                                        <div>{item.fee.toLocaleString()}원</div>
+                                        {item.discount !== undefined && item.discount > 0 && (
+                                            <div className="discount-text">-{item.discount.toLocaleString()} 할인</div>
+                                        )}
+                                    </div>
+                                </td>
                             </tr>
                         ))
                     ) : (

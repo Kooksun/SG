@@ -28,7 +28,7 @@ def get_latest_price(symbol: str) -> tuple[float, str, float]:
 
 def calculate_fee(side: str, market: str, amount: float) -> tuple[float, float, float]:
     """
-    Calculates raw_fee, discount, and final_fee based on policy.
+    Calculates Transaction Tax (거래세).
     BUY: 0%
     SELL: 0.2% (KOSPI/KOSDAQ), 0% (ETF)
     """
