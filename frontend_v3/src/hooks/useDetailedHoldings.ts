@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { useStocks } from './useStocks';
+import { useStockStore } from './useStockStore';
 
 export interface HoldingItem {
     symbol: string;
@@ -14,7 +14,7 @@ export interface HoldingItem {
 
 export function useDetailedHoldings(uid: string | null) {
     const [rawHoldings, setRawHoldings] = useState<any[]>([]);
-    const { stocks } = useStocks();
+    const stocks = useStockStore((state) => state.stocks);
 
     useEffect(() => {
         if (!uid) {
@@ -35,10 +35,10 @@ export function useDetailedHoldings(uid: string | null) {
     }, [uid]);
 
     const detailedHoldings = useMemo(() => {
-        if (stocks.length === 0 || rawHoldings.length === 0) return [];
+        if (rawHoldings.length === 0) return [];
 
         return rawHoldings.map(holding => {
-            const stock = stocks.find(s => s.symbol === holding.symbol);
+            const stock = stocks[holding.symbol];
             const currentPrice = stock ? stock.price : holding.averagePrice;
             return {
                 symbol: holding.symbol,

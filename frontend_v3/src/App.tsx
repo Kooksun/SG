@@ -17,12 +17,16 @@ import HistoryPage from './pages/HistoryPage'
 import { useDetailedHoldings } from './hooks/useDetailedHoldings'
 import { useTradeHistory } from './hooks/useTradeHistory'
 import { useStocks } from './hooks/useStocks'
+import { useStockSync } from './hooks/useStockSync'
 import './components/Toast.css'
 
 function AppContent() {
     const { user, loading: authLoading } = useAuth();
     const { hasSeenPrologue, uid } = useUserStore();
     const [currentView, setCurrentView] = useState<'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history'>('leaderboard');
+
+    // 실시간 시장 데이터 동기화 (앱 전역 1회)
+    useStockSync();
 
     // 유저 자산 동기화
     useUserAsset(user?.uid || null);
