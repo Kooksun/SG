@@ -1,18 +1,16 @@
 import os
 import firebase_admin
 from firebase_admin import credentials, db
-from backend.firebase_config import kospi_db, kosdaq_db
+from backend.firebase_config import main_db, kospi_db, kosdaq_db
 
 def debug_rtdb():
-    print("--- KOSPI Stocks (Samsung) ---")
-    # Samsung Electronics
-    samsung = kospi_db.child('stocks').child('005930').get()
-    print(f"Samsung: {samsung}")
+    print("--- System Tickers ---")
+    tickers = main_db.child('system/tickers').get()
+    print(f"Tickers Root: {tickers}")
     
-    print("\n--- KOSDAQ Stocks Sample ---")
-    # Search for any symbol if we don't know a specific one
-    kosdaq_sample = kosdaq_db.child('stocks').order_by_key().limit_to_first(3).get()
-    print(f"KOSDAQ Sample: {kosdaq_sample}")
+    print("\n--- Tickers List ---")
+    ticker_list = main_db.child('system/tickers/list').get()
+    print(f"Ticker List: {ticker_list}")
 
 if __name__ == "__main__":
     debug_rtdb()

@@ -43,14 +43,19 @@ export function useRealtimeData() {
         const tickerRef = ref(rtdb, 'system/tickers/list');
         const unsubscribeTickers = onValue(tickerRef, (snapshot) => {
             const data = snapshot.val();
-            if (data && Array.isArray(data)) {
-                setTickers(data);
+            if (data) {
+                // 배열 형태면 그대로, 객체 형태면 값만 추출하여 배열화
+                if (Array.isArray(data)) {
+                    setTickers(data);
+                } else {
+                    setTickers(Object.values(data));
+                }
             }
         });
 
         return () => {
-            off(systemRef);
-            off(tickerRef);
+            unsubscribeSystem();
+            unsubscribeTickers();
         };
     }, []);
 
