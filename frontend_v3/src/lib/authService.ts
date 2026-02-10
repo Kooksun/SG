@@ -5,9 +5,9 @@ import {
     updateProfile,
     User
 } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { ref, get } from "firebase/database";
-import { auth, db, kospiRtdb, kosdaqRtdb } from "./firebase";
+import { doc, setDoc, serverTimestamp as firestoreTimestamp } from "firebase/firestore";
+import { ref, get, set, serverTimestamp as rtdbTimestamp } from "firebase/database";
+import { auth, db, rtdb, kospiRtdb, kosdaqRtdb } from "./firebase";
 import { tradeService } from "./tradeService";
 
 // 초기 자산 설정 상수
@@ -110,8 +110,8 @@ export const authService = {
             totalStockValue: 0,
             stockCount: 0,
             prologue: prologueText,
-            createdAt: serverTimestamp(),
-            lastLoginAt: serverTimestamp(),
+            createdAt: firestoreTimestamp(),
+            lastLoginAt: firestoreTimestamp(),
             season: 3
         });
 
@@ -139,6 +139,13 @@ export const authService = {
                     }
                 }
             }
+        }
+
+        // 6. 리더보드 즉시 갱신 트리거 (신규 가입 즉시 반영)
+        try {
+            await set(ref(rtdb, 'commands/updateLeaderboard'), rtdbTimestamp());
+        } catch (err) {
+            console.error("Failed to trigger leaderboard update:", err);
         }
     }
 };

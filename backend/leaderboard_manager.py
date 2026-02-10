@@ -170,18 +170,40 @@ def run_manager():
     # Initial run
     leaderboard_update_job()
     
+    # Track the current operational mode
+    current_market_open = None
+
     # Schedule based on market hours
     # Market open: 1 min, Market closed: 10 mins
     def setup_schedule():
+        nonlocal current_market_open
         is_open = is_kr_market_open()
+
+        if current_market_open == is_open:
+            return # No change needed
+        
         schedule.clear('ranking_job')
         
         interval = 1 if is_open else 10
         schedule.every(interval).minutes.do(leaderboard_update_job).tag('ranking_job')
+        current_market_open = is_open
         print(f"Leaderboard schedule updated. Market Open: {is_open}, Interval: {interval}m")
 
     setup_schedule()
-    schedule.every(5).minutes.do(setup_schedule)
+    
+    # 2. Add Realtime Listener for immediate updates
+    # This allows frontend to trigger calculation after certain actions (e.g. sign up)
+    def on_trigger_change(event):
+        if event.data:
+            print(f"[{datetime.now(MARKET_TZ)}] Immediate update triggered via RTDB!")
+            leaderboard_update_job()
+
+    trigger_ref = main_db.child('commands/updateLeaderboard')
+    trigger_ref.listen(on_trigger_change)
+    print("Leaderboard Immediate Trigger Listener active.")
+
+    # Check for schedule change every 60 minutes (instead of 5, as we have a listener)
+    schedule.every(60).minutes.do(setup_schedule)
     
     while True:
         schedule.run_pending()

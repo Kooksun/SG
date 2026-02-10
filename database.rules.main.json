@@ -50,6 +50,11 @@
         "rankings": {
             ".read": true,
             ".write": false
+        },
+        "commands": {
+            "updateLeaderboard": {
+                ".write": "auth != null"
+            }
         }
     }
 }
