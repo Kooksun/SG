@@ -22,7 +22,7 @@ import './components/Toast.css'
 function AppContent() {
     const { user, loading: authLoading } = useAuth();
     const { hasSeenPrologue, uid } = useUserStore();
-    const [currentView, setCurrentView] = useState<'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history'>('market');
+    const [currentView, setCurrentView] = useState<'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history'>('leaderboard');
 
     // 유저 자산 동기화
     useUserAsset(user?.uid || null);

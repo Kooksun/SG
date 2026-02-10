@@ -13,21 +13,21 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
 
             <div className="nav-items">
                 <button
-                    className={`nav-item ${currentView === 'market' ? 'active' : ''}`}
-                    onClick={() => onViewChange('market')}
-                    title="시세 탐색"
-                >
-                    <Globe size={24} />
-                    <span>시세탐색</span>
-                </button>
-
-                <button
                     className={`nav-item ${currentView === 'leaderboard' ? 'active' : ''}`}
                     onClick={() => onViewChange('leaderboard')}
                     title="리더보드"
                 >
                     <Trophy size={24} />
                     <span>리더보드</span>
+                </button>
+
+                <button
+                    className={`nav-item ${currentView === 'market' ? 'active' : ''}`}
+                    onClick={() => onViewChange('market')}
+                    title="시세 탐색"
+                >
+                    <Globe size={24} />
+                    <span>시세탐색</span>
                 </button>
 
                 <button
