@@ -8,6 +8,8 @@ import { tradeService } from '../lib/tradeService';
 import { StockItem } from './StockList';
 import StockChart from './StockChart';
 
+import { useStockStore } from '../hooks/useStockStore';
+
 interface TradeModalProps {
     stock: StockItem;
     onClose: () => void;
@@ -17,6 +19,12 @@ interface TradeModalProps {
 }
 
 const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, uid, initialTradeType }) => {
+    // 실시간 시세 구독
+    const liveStock = useStockStore((state) => state.stocks[stock.symbol]);
+    const currentPrice = liveStock?.price || stock.price;
+    const currentChange = liveStock?.change ?? stock.change;
+    const currentChangePercent = liveStock?.changePercent ?? stock.changePercent;
+
     const [quantity, setQuantity] = useState<number>(1);
     const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>(initialTradeType || 'BUY');
     const [loading, setLoading] = useState(false);
@@ -41,11 +49,11 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
         return () => unsub();
     }, [uid, stock.symbol]);
 
-    const totalAmount = stock.price * quantity;
+    const totalAmount = currentPrice * quantity;
     const isAffordable = tradeType === 'SELL' ? (holdingQty >= quantity) : (userBalance >= totalAmount);
 
     // 수익률 계산
-    const profitRate = avgPrice > 0 ? ((stock.price - avgPrice) / avgPrice) * 100 : 0;
+    const profitRate = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0;
 
     const handleTrade = async () => {
         if (quantity <= 0) return;
@@ -58,7 +66,7 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
                 symbol: stock.symbol,
                 name: stock.name,
                 type: tradeType,
-                price: stock.price,
+                price: currentPrice,
                 quantity: quantity
             });
             onClose();
@@ -71,7 +79,7 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
 
     const handlePercentage = (pct: number) => {
         if (tradeType === 'BUY') {
-            const maxBuy = Math.floor(userBalance / stock.price);
+            const maxBuy = Math.floor(userBalance / currentPrice);
             setQuantity(Math.max(1, Math.floor(maxBuy * pct)));
         } else {
             setQuantity(Math.max(0, Math.floor(holdingQty * pct)));
@@ -104,7 +112,7 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
                                 </div>
                                 <div className="info-item">
                                     <span className="label">거래량</span>
-                                    <span className="value">{stock.volume?.toLocaleString() || 0}</span>
+                                    <span className="value">{liveStock?.volume?.toLocaleString() || stock.volume?.toLocaleString() || 0}</span>
                                 </div>
                             </div>
                         </div>
@@ -124,13 +132,13 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
 
                             <div className="price-display-box">
                                 <div className="price-main">
-                                    <span className="current-price">{stock.price.toLocaleString()}</span>
+                                    <span className="current-price">{currentPrice.toLocaleString()}</span>
                                     <span className="unit">원</span>
                                 </div>
-                                <div className={`price-change ${stock.change >= 0 ? 'up' : 'down'}`}>
-                                    {stock.change >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                                    <span className="change-val">{Math.abs(stock.change).toLocaleString()}</span>
-                                    <span className="change-pct">({stock.change >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)</span>
+                                <div className={`price-change ${currentChange >= 0 ? 'up' : 'down'}`}>
+                                    {currentChange >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                    <span className="change-val">{Math.abs(currentChange).toLocaleString()}</span>
+                                    <span className="change-pct">({currentChange >= 0 ? '+' : ''}{currentChangePercent.toFixed(2)}%)</span>
                                 </div>
                             </div>
 
