@@ -100,19 +100,48 @@ def leaderboard_update_job():
             # Optional: Sync rank to Firestore if needed for profile
             # users_ref.document(item['uid']).update({'rank': rank})
             
-        # 6. Process Top 10 Stocks by Yield (Global Market)
-        stock_yield_list = []
-        for symbol, sdata in all_prices.items():
-            rate = float(sdata.get('rate', 0))
-            name = sdata.get('name', symbol)
-            stock_yield_list.append({
+        # 6. Process Top/Worst Stocks by Yield (Based on Participant Portfolios)
+        stock_yield_agg = {} # {symbol: {'sum_yield': 0, 'count': 0, 'name': ''}}
+        
+        for doc in user_list:
+            uid = doc.id
+            p_ref = users_ref.document(uid).collection('portfolio')
+            for p_item in p_ref.stream():
+                p_data = p_item.to_dict()
+                sym = p_data.get('symbol')
+                qty = float(p_data.get('quantity', 0))
+                avg_price = float(p_data.get('averagePrice', 0))
+                
+                if sym and qty > 0 and avg_price > 0:
+                    live_price = float(all_prices.get(sym, {}).get('price', avg_price))
+                    item_yield = ((live_price / avg_price) - 1) * 100
+                    
+                    if sym not in stock_yield_agg:
+                        stock_yield_agg[sym] = {
+                            'sum_yield': 0,
+                            'count': 0,
+                            'name': all_prices.get(sym, {}).get('name', sym)
+                        }
+                    
+                    stock_yield_agg[sym]['sum_yield'] += item_yield
+                    stock_yield_agg[sym]['count'] += 1
+        
+        held_stock_yield_list = []
+        for symbol, agg in stock_yield_agg.items():
+            avg_yield = agg['sum_yield'] / agg['count'] if agg['count'] > 0 else 0
+            held_stock_yield_list.append({
                 'symbol': symbol,
-                'name': name,
-                'yield': rate
+                'name': agg['name'],
+                'yield': round(avg_yield, 2)
             })
         
-        stock_yield_list.sort(key=lambda x: x['yield'], reverse=True)
-        top_yielding_stocks = stock_yield_list[:10]
+        # Sort for Top 10
+        held_stock_yield_list.sort(key=lambda x: x['yield'], reverse=True)
+        top_yielding_stocks = held_stock_yield_list[:10]
+        
+        # Sort for Worst 10
+        held_stock_yield_list.sort(key=lambda x: x['yield'], reverse=False)
+        worst_yielding_stocks = held_stock_yield_list[:10]
         
         # 7. Update to Main RTDB
         leaderboard_payload = {
@@ -121,7 +150,8 @@ def leaderboard_update_job():
                 'totalPlayers': total_players,
                 'averageYield': round(total_yield_sum / total_players, 2) if total_players > 0 else 0,
                 'totalMarketCap': round(total_equity_sum, 0),
-                'topYieldingStocks': top_yielding_stocks
+                'topYieldingStocks': top_yielding_stocks,
+                'worstYieldingStocks': worst_yielding_stocks
             },
             'list': rankings
         }

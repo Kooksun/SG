@@ -18,6 +18,7 @@ export interface LeaderboardStats {
     averageYield: number;
     totalMarketCap: number;
     topYieldingStocks: { symbol: string; name: string; yield: number }[];
+    worstYieldingStocks: { symbol: string; name: string; yield: number }[];
 }
 
 export interface LeaderboardData {

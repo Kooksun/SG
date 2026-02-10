@@ -54,9 +54,15 @@ const LeaderboardPage: React.FC = () => {
                                     <div className="stat-value">{(stats?.totalMarketCap ? (stats.totalMarketCap / 100000000).toFixed(1) : '0')}억</div>
                                 </div>
                                 <div className="summary-stat-row">
-                                    <div className="stat-label"><Trophy size={18} /> 나의 순위</div>
-                                    <div className="stat-value">
-                                        {rankings.find(r => r.displayName === nickname)?.rank || '-'}위
+                                    <div className="stat-label"><BarChart3 size={18} /> 시장 평균 수익률</div>
+                                    <div className={`stat-value ${(stats?.averageYield || 0) >= 0 ? 'up' : 'down'}`}>
+                                        {(stats?.averageYield || 0) >= 0 ? '+' : ''}{stats?.averageYield.toFixed(2)}%
+                                    </div>
+                                </div>
+                                <div className="summary-stat-row">
+                                    <div className="stat-label"><TrendingUp size={18} /> 시장 심리</div>
+                                    <div className={`stat-value ${(stats?.averageYield || 0) >= 0 ? 'up' : 'down'}`}>
+                                        {(stats?.averageYield || 0) >= 0 ? '낙관적' : '침체'}
                                     </div>
                                 </div>
                             </div>
@@ -106,7 +112,7 @@ const LeaderboardPage: React.FC = () => {
                     <section className="leaderboard-column">
                         <Card title="종목 수익률 Top 10" glow="none" className="leaderboard-card fixed-height-card">
                             <div className="top-holdings-list scrollable-content">
-                                {stats?.topYieldingStocks?.map((h, idx) => (
+                                {stats?.topYieldingStocks?.map((h: { symbol: string; name: string; yield: number }, idx: number) => (
                                     <div key={h.symbol} className="holding-rank-item">
                                         <div className="holding-info">
                                             <span className="holding-rank">{idx + 1}</span>
@@ -121,18 +127,21 @@ const LeaderboardPage: React.FC = () => {
                         </Card>
                     </section>
 
-                    {/* 카드 4: 통합 수익률 (순서 변경) */}
+                    {/* 카드 4: 종목 수익률 Worst 10 */}
                     <section className="leaderboard-column">
-                        <Card title="통합 수익률" glow="emerald" className="leaderboard-card">
-                            <div className="yield-display-box">
-                                <div className={`avg-yield-value ${(stats?.averageYield || 0) >= 0 ? 'up' : 'down'}`}>
-                                    {(stats?.averageYield || 0) >= 0 ? '+' : ''}{stats?.averageYield.toFixed(2)}%
-                                </div>
-                                <div className="yield-label">시장 투자자 평균 수익률</div>
-                                <div className={`asset-pnl-chip ${(stats?.averageYield || 0) >= 0 ? 'up' : 'down'}`}>
-                                    <TrendingUp size={14} className={(stats?.averageYield || 0) < 0 ? 'flip-v' : ''} />
-                                    <span>시장 심리: {(stats?.averageYield || 0) >= 0 ? '낙관적' : '침체'}</span>
-                                </div>
+                        <Card title="종목 수익률 Worst 10" glow="none" className="leaderboard-card fixed-height-card">
+                            <div className="top-holdings-list scrollable-content">
+                                {stats?.worstYieldingStocks?.map((h: { symbol: string; name: string; yield: number }, idx: number) => (
+                                    <div key={h.symbol} className="holding-rank-item">
+                                        <div className="holding-info">
+                                            <span className="holding-rank">{idx + 1}</span>
+                                            <span className="holding-name">{h.name}</span>
+                                        </div>
+                                        <span className={`holding-value font-bold ${h.yield >= 0 ? 'up' : 'down'}`}>
+                                            {h.yield >= 0 ? '+' : ''}{h.yield.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
                         </Card>
                     </section>
