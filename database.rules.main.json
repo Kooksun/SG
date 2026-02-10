@@ -46,6 +46,10 @@
                 ".read": "auth != null && auth.uid === $uid",
                 ".write": false
             }
+        },
+        "rankings": {
+            ".read": true,
+            ".write": false
         }
     }
 }
