@@ -28,15 +28,16 @@ def leaderboard_update_job():
         users_docs = users_ref.stream()
         
         rankings = []
-        initial_balance = 100000000.0 # Default starting asset (100M KRW)
+        DEFAULT_STARTING_BALANCE = 300000000.0 # 3억 KRW as default for Season 3
         
         # Aggregate stats
         total_equity_sum = 0
         total_yield_sum = 0
-        aggregate_portfolio = {} # {symbol: {name: str, value: float}}
         
         user_list = list(users_docs)
         total_players = len(user_list)
+        
+        print(f"  -> Processing {total_players} users and syncing to Firestore...")
         
         for user_doc in user_list:
             uid = user_doc.id
@@ -45,35 +46,31 @@ def leaderboard_update_job():
             cash = float(user_data.get('balance', 0))
             display_name = user_data.get('displayName', 'Anonymous')
             photo_url = user_data.get('photoURL', '')
+            starting_balance = float(user_data.get('startingBalance', DEFAULT_STARTING_BALANCE))
             
             # 3. Calculate Portfolio Value
             portfolio_value = 0
+            stock_count = 0
             portfolio_ref = users_ref.document(uid).collection('portfolio')
             portfolio_items = portfolio_ref.stream()
             
             for item in portfolio_items:
                 p_data = item.to_dict()
                 symbol = p_data.get('symbol')
-                name = p_data.get('name', symbol)
                 qty = float(p_data.get('quantity', 0))
                 
                 # Use live price if available, else use avg price as fallback
                 live_price = float(all_prices.get(symbol, {}).get('price', p_data.get('averagePrice', 0)))
-                item_market_value = (qty * live_price)
-                portfolio_value += item_market_value
-                
-                # Global Portfolio Aggregation
-                if symbol not in aggregate_portfolio:
-                    aggregate_portfolio[symbol] = {'name': name, 'value': 0}
-                aggregate_portfolio[symbol]['value'] += item_market_value
+                portfolio_value += (qty * live_price)
+                if qty > 0: stock_count += 1
             
             total_equity = cash + portfolio_value
-            yield_percent = ((total_equity - initial_balance) / initial_balance) * 100 if initial_balance > 0 else 0
+            yield_percent = ((total_equity - starting_balance) / starting_balance) * 100 if starting_balance > 0 else 0
             
             total_equity_sum += total_equity
             total_yield_sum += yield_percent
             
-            rankings.append({
+            user_rank_data = {
                 'uid': uid,
                 'displayName': display_name,
                 'photoURL': photo_url,
@@ -81,34 +78,56 @@ def leaderboard_update_job():
                 'yield': round(yield_percent, 2),
                 'cash': round(cash, 2),
                 'stockValue': round(portfolio_value, 2)
+            }
+            rankings.append(user_rank_data)
+            
+            # Update Firestore User Doc for Frontend Header Consistency
+            users_ref.document(uid).update({
+                'totalStockValue': round(portfolio_value, 2),
+                'totalEquity': round(total_equity, 2), # Frontend can use this
+                'pnlRate': round(yield_percent, 2),
+                'stockCount': stock_count,
+                'lastCalculatedAt': datetime.now(MARKET_TZ).isoformat()
             })
             
         # 4. Sort by Equity descending
         rankings.sort(key=lambda x: x['equity'], reverse=True)
         
-        # 5. Add Rank
+        # 5. Add Rank and Sync individual rank back to Firestore
         for i, item in enumerate(rankings):
-            item['rank'] = i + 1
+            rank = i + 1
+            item['rank'] = rank
+            # Optional: Sync rank to Firestore if needed for profile
+            # users_ref.document(item['uid']).update({'rank': rank})
             
-        # 6. Process Aggregate Portfolio (Top 10)
-        top_holdings = []
-        for sym, data in aggregate_portfolio.items():
-            top_holdings.append({'symbol': sym, 'name': data['name'], 'value': round(data['value'], 0)})
-        top_holdings.sort(key=lambda x: x['value'], reverse=True)
-        top_holdings = top_holdings[:10]
+        # 6. Process Top 10 Stocks by Yield (Global Market)
+        stock_yield_list = []
+        for symbol, sdata in all_prices.items():
+            rate = float(sdata.get('rate', 0))
+            name = sdata.get('name', symbol)
+            stock_yield_list.append({
+                'symbol': symbol,
+                'name': name,
+                'yield': rate
+            })
+        
+        stock_yield_list.sort(key=lambda x: x['yield'], reverse=True)
+        top_yielding_stocks = stock_yield_list[:10]
         
         # 7. Update to Main RTDB
-        main_db.child('rankings').set({
+        leaderboard_payload = {
             'updatedAt': datetime.now(MARKET_TZ).isoformat(),
             'stats': {
                 'totalPlayers': total_players,
                 'averageYield': round(total_yield_sum / total_players, 2) if total_players > 0 else 0,
                 'totalMarketCap': round(total_equity_sum, 0),
-                'topHoldings': top_holdings
+                'topYieldingStocks': top_yielding_stocks
             },
-            'list': rankings[:100] # Top 100 only for performance
-        })
-        print(f"  -> Leaderboard updated. {len(rankings)} users ranked. Stats & Top Holdings computed.")
+            'list': rankings
+        }
+        
+        main_db.child('rankings').set(leaderboard_payload)
+        print(f"  -> Leaderboard successfully updated and synced to Firestore.")
         
     except Exception as e:
         import traceback

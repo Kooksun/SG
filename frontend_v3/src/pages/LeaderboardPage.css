@@ -116,10 +116,41 @@
     font-size: 0.85rem;
 }
 
+/* Card common refined */
+.fixed-height-card {
+    height: 440px;
+    display: flex;
+    flex-direction: column;
+}
+
+.scrollable-content {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+    /* Space for scrollbar */
+}
+
+/* Custom Scrollbar for inner content */
+.scrollable-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.scrollable-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+
+.scrollable-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.scrollable-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
 /* Card 4: Ranking Table Container */
 .ranking-table-wrapper {
-    max-height: 400px;
-    overflow-y: auto;
     margin-top: 8px;
     border-radius: 12px;
     border: 1px solid var(--card-border);

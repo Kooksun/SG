@@ -17,7 +17,7 @@ export interface LeaderboardStats {
     totalPlayers: number;
     averageYield: number;
     totalMarketCap: number;
-    topHoldings: { symbol: string; name: string; value: number }[];
+    topYieldingStocks: { symbol: string; name: string; yield: number }[];
 }
 
 export interface LeaderboardData {

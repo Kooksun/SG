@@ -9,7 +9,7 @@ const LeaderboardPage: React.FC = () => {
     const { data, loading } = useLeaderboard();
     const { nickname } = useUserStore();
 
-    if (loading) {
+    if (loading || !data) {
         return (
             <main className="dashboard">
                 <div className="loading-state">데이터를 분석 중입니다...</div>
@@ -63,43 +63,10 @@ const LeaderboardPage: React.FC = () => {
                         </Card>
                     </section>
 
-                    {/* 카드 2: 통합 수익률 */}
+                    {/* 카드 2: 수익률 랭킹 리스트 (순서 변경 및 스크롤 적용) */}
                     <section className="leaderboard-column">
-                        <Card title="통합 수익률" glow="emerald" className="leaderboard-card">
-                            <div className="yield-display-box">
-                                <div className={`avg-yield-value ${(stats?.averageYield || 0) >= 0 ? 'up' : 'down'}`}>
-                                    {(stats?.averageYield || 0) >= 0 ? '+' : ''}{stats?.averageYield.toFixed(2)}%
-                                </div>
-                                <div className="yield-label">시장 투자자 평균 수익률</div>
-                                <div className={`asset-pnl-chip ${(stats?.averageYield || 0) >= 0 ? 'up' : 'down'}`}>
-                                    <TrendingUp size={14} className={(stats?.averageYield || 0) < 0 ? 'flip-v' : ''} />
-                                    <span>시장 심리: {(stats?.averageYield || 0) >= 0 ? '낙관적' : '침체'}</span>
-                                </div>
-                            </div>
-                        </Card>
-                    </section>
-
-                    {/* 카드 3: 통합 포트폴리오 (가장 많이 보유한 종목) */}
-                    <section className="leaderboard-column">
-                        <Card title="통합 포트폴리오 (Top 10)" glow="none" className="leaderboard-card">
-                            <div className="top-holdings-list">
-                                {stats?.topHoldings.map((h, idx) => (
-                                    <div key={h.symbol} className="holding-rank-item">
-                                        <div className="holding-info">
-                                            <span className="holding-rank">{idx + 1}</span>
-                                            <span className="holding-name">{h.name}</span>
-                                        </div>
-                                        <span className="holding-value">{(h.value / 100000000).toFixed(1)}억 보유</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-                    </section>
-
-                    {/* 카드 4: 수익률 랭킹 리스트 */}
-                    <section className="leaderboard-column">
-                        <Card title="수익률 랭킹 (Top 100)" glow="blue" className="leaderboard-card">
-                            <div className="ranking-table-wrapper">
+                        <Card title="전체 수익률 랭킹" glow="blue" className="leaderboard-card fixed-height-card">
+                            <div className="ranking-table-wrapper scrollable-content">
                                 <table className="ranking-table">
                                     <thead>
                                         <tr>
@@ -131,6 +98,41 @@ const LeaderboardPage: React.FC = () => {
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                        </Card>
+                    </section>
+
+                    {/* 카드 3: 종목 수익률 Top 10 (포트폴리오 비중에서 변경) */}
+                    <section className="leaderboard-column">
+                        <Card title="종목 수익률 Top 10" glow="none" className="leaderboard-card fixed-height-card">
+                            <div className="top-holdings-list scrollable-content">
+                                {stats?.topYieldingStocks?.map((h, idx) => (
+                                    <div key={h.symbol} className="holding-rank-item">
+                                        <div className="holding-info">
+                                            <span className="holding-rank">{idx + 1}</span>
+                                            <span className="holding-name">{h.name}</span>
+                                        </div>
+                                        <span className={`holding-value font-bold ${h.yield >= 0 ? 'up' : 'down'}`}>
+                                            {h.yield >= 0 ? '+' : ''}{h.yield.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </section>
+
+                    {/* 카드 4: 통합 수익률 (순서 변경) */}
+                    <section className="leaderboard-column">
+                        <Card title="통합 수익률" glow="emerald" className="leaderboard-card">
+                            <div className="yield-display-box">
+                                <div className={`avg-yield-value ${(stats?.averageYield || 0) >= 0 ? 'up' : 'down'}`}>
+                                    {(stats?.averageYield || 0) >= 0 ? '+' : ''}{stats?.averageYield.toFixed(2)}%
+                                </div>
+                                <div className="yield-label">시장 투자자 평균 수익률</div>
+                                <div className={`asset-pnl-chip ${(stats?.averageYield || 0) >= 0 ? 'up' : 'down'}`}>
+                                    <TrendingUp size={14} className={(stats?.averageYield || 0) < 0 ? 'flip-v' : ''} />
+                                    <span>시장 심리: {(stats?.averageYield || 0) >= 0 ? '낙관적' : '침체'}</span>
+                                </div>
                             </div>
                         </Card>
                     </section>
