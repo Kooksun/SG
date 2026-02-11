@@ -8,6 +8,7 @@ import './StockChart.css';
 interface ChartDataPoint {
     x: Date;
     y: [number, number, number, number]; // OHLC
+    v: number; // Volume
 }
 
 interface StockChartProps {
@@ -19,6 +20,7 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
     const [data, setData] = useState<ChartDataPoint[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [hoveredPoint, setHoveredPoint] = useState<ChartDataPoint | null>(null);
 
     useEffect(() => {
         if (!symbol) return;
@@ -79,10 +81,12 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
             // Compressed format: [Date, Open, High, Low, Close, Volume]
             const formattedData: ChartDataPoint[] = compressed.map((item: any) => ({
                 x: new Date(item[0]),
-                y: [item[1], item[2], item[3], item[4]] as [number, number, number, number]
+                y: [item[1], item[2], item[3], item[4]] as [number, number, number, number],
+                v: item[5] || 0
             })).reverse(); // Naver is latest first, reverse for ApexCharts
 
             setData(formattedData);
+            setHoveredPoint(formattedData[formattedData.length - 1]); // Set latest as default
             setLoading(false);
         };
 
@@ -100,7 +104,18 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
             height: 350,
             toolbar: { show: false },
             background: 'transparent',
-            animations: { enabled: true }
+            animations: { enabled: false },
+            events: {
+                mouseMove: (event, chartContext, config) => {
+                    if (config.dataPointIndex >= 0) {
+                        setHoveredPoint(data[config.dataPointIndex]);
+                    }
+                },
+                mouseLeave: () => {
+                    // Optionally reset to latest point
+                    if (data.length > 0) setHoveredPoint(data[data.length - 1]);
+                }
+            }
         },
         theme: { mode: 'dark' },
         xaxis: {
@@ -126,15 +141,14 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
         plotOptions: {
             candlestick: {
                 colors: {
-                    upward: '#10b981', // Emerald
-                    downward: '#f43f5e' // Rose
+                    upward: '#f43f5e', // Red (Korean Market Style)
+                    downward: '#3b82f6' // Blue (Korean Market Style)
                 },
                 wick: { useFillColor: true }
             }
         },
         tooltip: {
-            theme: 'dark',
-            x: { format: 'MMM dd, yyyy' }
+            enabled: false // Using external display instead
         }
     };
 
@@ -156,11 +170,17 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
         );
     }
 
+    // Calculate high/low for the period
+    const periodHigh = data.length > 0 ? Math.max(...data.map(d => d.y[1])) : 0;
+    const periodLow = data.length > 0 ? Math.min(...data.map(d => d.y[2])) : 0;
+
     return (
         <div className="stock-chart-container">
             <div className="chart-header">
-                <span className="chart-title">{name} 히스토리</span>
-                <span className="chart-period">(최근 60회기)</span>
+                <div>
+                    <span className="chart-title">{name} 히스토리</span>
+                    <span className="chart-period">(최근 60회기)</span>
+                </div>
             </div>
             <Chart
                 options={chartOptions}
@@ -168,6 +188,52 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
                 type="candlestick"
                 height={300}
             />
+            <div className="chart-footer-v3">
+                {/* 1줄: 상시 노출 정보 */}
+                <div className="footer-row-v3 primary">
+                    <div className="info-group">
+                        <span className="label">차트 최고</span>
+                        <span className="value up">{periodHigh.toLocaleString()}</span>
+                    </div>
+                    <div className="info-group">
+                        <span className="label">차트 최저</span>
+                        <span className="value down">{periodLow.toLocaleString()}</span>
+                    </div>
+                    <div className="info-group">
+                        <span className="label">현재 거래량</span>
+                        <span className="value">{data.length > 0 ? data[data.length - 1].v.toLocaleString() : 0}</span>
+                    </div>
+                </div>
+                <br></br>
+                {/* 2줄: 호버 시 일자 및 해당 지점 거래량 */}
+                <div className="footer-row-v3 detail">
+                    <div className="info-group">
+                        <span className="label">데이터 일자</span>
+                        <span className="value date">{hoveredPoint ? hoveredPoint.x.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) : '--/--'}</span>
+                    </div>
+                    <div className="info-group">
+                        <span className="label">지점 거래량</span>
+                        <span className="value">{hoveredPoint ? hoveredPoint.v.toLocaleString() : '0'}</span>
+                    </div>
+                </div>
+
+                {/* 3줄: 호버 시 OHLC 상세 */}
+                <div className="footer-row-v3 ohlc">
+                    {hoveredPoint ? (
+                        <div className="ohlc-compact">
+                            <span className="label">시</span><span className="value">{hoveredPoint.y[0].toLocaleString()}</span>
+                            <span className="divider">|</span>
+                            <span className="label">고</span><span className="value up">{hoveredPoint.y[1].toLocaleString()}</span>
+                            <span className="divider">|</span>
+                            <span className="label">저</span><span className="value down">{hoveredPoint.y[2].toLocaleString()}</span>
+                            <span className="divider">|</span>
+                            <span className="label">종</span><span className="value">{hoveredPoint.y[3].toLocaleString()}</span>
+                        </div>
+                    ) : (
+                        <div className="ohlc-placeholder">데이터 지점에 커서를 올려 상세 값을 확인하세요.</div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 };
