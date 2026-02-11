@@ -68,24 +68,40 @@ def start_gateway():
 
     def on_request_change(event):
         """Callback for RTDB chart request listener."""
-        if event.data is None: return
-        
-        path_parts = event.path.strip('/').split('/')
-        
-        if len(path_parts) == 1: # /SYMBOL (Individual update)
-            symbol = path_parts[0]
-            process_chart_request(symbol, event.data)
-        elif len(path_parts) == 0: # Root change / (Initial load or bulk)
-            for symbol, req_data in event.data.items():
-                if req_data.get('status') == 'PENDING':
-                    process_chart_request(symbol, req_data)
+        try:
+            if event.data is None: return
+            
+            path = event.path.strip('/')
+            path_parts = path.split('/') if path else []
+            
+            if len(path_parts) == 1: # /SYMBOL (Individual update)
+                symbol = path_parts[0]
+                process_chart_request(symbol, event.data)
+            elif len(path_parts) == 0: # Root change / (Initial load or bulk)
+                if isinstance(event.data, dict):
+                    for symbol, req_data in event.data.items():
+                        if req_data.get('status') == 'PENDING':
+                            process_chart_request(symbol, req_data)
+        except Exception as e:
+            print(f"Error in on_request_change: {e}")
 
-    # Watch chart requests
-    main_db.child('system/requests/chart').listen(on_request_change)
-    
-    # Keep the main thread alive
+    # Watch chart requests with a reconnection loop
     while True:
-        time.sleep(1)
+        try:
+            print(f"[{datetime.now(MARKET_TZ)}] Starting RTDB Listener...")
+            listener = main_db.child('system/requests/chart').listen(on_request_change)
+            
+            # Keep the main thread alive while checking for listener health (or refresh periodically)
+            # We'll refresh the listener every 4 hours to prevent stale connections
+            for _ in range(240): # 4 hours (240 * 60 seconds)
+                time.sleep(60)
+            
+            print(f"[{datetime.now(MARKET_TZ)}] Periodic listener refresh...")
+            listener.close()
+        except Exception as e:
+            print(f"[{datetime.now(MARKET_TZ)}] Listener encountered an error: {e}")
+            print("Waiting 10 seconds before reconnecting...")
+            time.sleep(10)
 
 if __name__ == "__main__":
     # python -m backend.chart_gateway
