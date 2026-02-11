@@ -6,11 +6,15 @@ interface CardProps {
     title?: string;
     className?: string;
     glow?: 'blue' | 'emerald' | 'rose' | 'none';
+    onClick?: () => void;
 }
 
-const Card: React.FC<CardProps> = ({ children, title, className = '', glow = 'none' }) => {
+const Card: React.FC<CardProps> = ({ children, title, className = '', glow = 'none', onClick }) => {
     return (
-        <div className={`glass-card glow-${glow} ${className}`}>
+        <div
+            className={`glass-card glow-${glow} ${className}`}
+            onClick={onClick}
+        >
             {title && <div className="card-header"><h3 className="card-title">{title}</h3></div>}
             <div className="card-content">
                 {children}

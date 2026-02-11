@@ -6,7 +6,11 @@ import { useDetailedHoldings } from '../hooks/useDetailedHoldings';
 
 const COLORS = ['#38bdf8', '#10b981', '#f59e0b', '#f43f5e', '#a855f7', '#64748b', '#94a3b8'];
 
-const AssetCompositionChart: React.FC = () => {
+interface AssetCompositionChartProps {
+    onViewChange: (view: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history') => void;
+}
+
+const AssetCompositionChart: React.FC<AssetCompositionChartProps> = ({ onViewChange }) => {
     const { uid, balance } = useUserStore();
     const { detailedHoldings } = useDetailedHoldings(uid);
 
@@ -56,7 +60,12 @@ const AssetCompositionChart: React.FC = () => {
     };
 
     return (
-        <Card title="자산 구성" className="asset-composition-card" glow="blue">
+        <Card
+            title="자산 구성"
+            className="asset-composition-card clickable-card"
+            glow="blue"
+            onClick={() => onViewChange('portfolio')}
+        >
             <div style={{ width: '100%', height: 300 }}>
                 {chartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">

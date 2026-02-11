@@ -12,7 +12,11 @@ import { useTradeHistory } from '../hooks/useTradeHistory';
 import DashboardHeader from '../components/DashboardHeader';
 import './MyPage.css';
 
-const MyPage: React.FC = () => {
+interface MyPageProps {
+    onViewChange: (view: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history') => void;
+}
+
+const MyPage: React.FC<MyPageProps> = ({ onViewChange }) => {
     const { user } = useAuth();
     const { nickname, balance, uid } = useUserStore();
     const { detailedHoldings } = useDetailedHoldings(uid);
@@ -40,7 +44,11 @@ const MyPage: React.FC = () => {
                     <section className="mypage-column">
                         <Card title="자산 현황" className="unified-asset-card" glow="blue">
                             <div className="asset-summary-content">
-                                <div className="asset-primary-value">
+                                <div
+                                    className="asset-primary-value clickable-value"
+                                    onClick={() => onViewChange('leaderboard')}
+                                    title="리더보드 보기"
+                                >
                                     <div className="value-row">
                                         <span className="amount">{assetStats.equity.toLocaleString()}</span>
                                         <span className="unit">원</span>
@@ -57,14 +65,20 @@ const MyPage: React.FC = () => {
                             <div className="asset-divider" />
 
                             <div className="asset-details-rows">
-                                <div className="asset-row">
+                                <div
+                                    className="asset-row clickable-row"
+                                    onClick={() => onViewChange('market')}
+                                >
                                     <div className="row-label">
                                         <CircleDollarSign size={18} className="cash-icon" />
                                         <span>보유 현금</span>
                                     </div>
                                     <span className="row-value">{balance.toLocaleString()}원</span>
                                 </div>
-                                <div className="asset-row">
+                                <div
+                                    className="asset-row clickable-row"
+                                    onClick={() => onViewChange('portfolio')}
+                                >
                                     <div className="row-label">
                                         <Briefcase size={18} className="stock-icon" />
                                         <span>주식 평가금</span>
@@ -77,7 +91,7 @@ const MyPage: React.FC = () => {
 
                     {/* 2열: 포트폴리오 차트 */}
                     <section className="mypage-column">
-                        <AssetCompositionChart />
+                        <AssetCompositionChart onViewChange={onViewChange} />
                     </section>
                 </div>
             </div>

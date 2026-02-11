@@ -97,6 +97,15 @@
     gap: 12px;
 }
 
+.asset-primary-value.clickable-value {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.asset-primary-value.clickable-value:hover {
+    opacity: 0.8;
+}
+
 .value-row {
     display: flex;
     align-items: baseline;
@@ -182,6 +191,15 @@
     transition: all 0.2s ease;
 }
 
+.asset-row.clickable-row {
+    cursor: pointer;
+}
+
+.asset-row.clickable-row:hover {
+    border-color: var(--accent-blue);
+    background: rgba(56, 189, 248, 0.05);
+}
+
 .asset-row:hover {
     background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.15);
@@ -228,9 +246,13 @@
     transform: rotate(180deg);
 }
 
-.asset-composition-card {
-    min-height: 400px;
-    height: 100%;
+.asset-composition-card.clickable-card {
+    cursor: pointer;
+}
+
+.asset-composition-card.clickable-card:hover {
+    border-color: var(--accent-blue);
+    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.15);
 }
 
 .asset-composition-card .card-content {

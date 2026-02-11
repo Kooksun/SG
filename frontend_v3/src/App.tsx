@@ -60,7 +60,7 @@ function AppContent() {
         if (!hasSeenPrologue) {
             return <ProloguePage uid={user.uid} onComplete={() => { }} />;
         }
-        return <MyPage />;
+        return <MyPage onViewChange={setCurrentView} />;
     };
 
     const renderView = () => {
