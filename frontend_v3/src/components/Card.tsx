@@ -5,7 +5,7 @@ interface CardProps {
     children: React.ReactNode;
     title?: string;
     className?: string;
-    glow?: 'blue' | 'emerald' | 'rose' | 'none';
+    glow?: 'blue' | 'emerald' | 'rose' | 'amber' | 'none';
     onClick?: () => void;
 }
 

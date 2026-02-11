@@ -4,7 +4,7 @@ import {
     serverTimestamp as firestoreTimestamp,
     deleteDoc
 } from "firebase/firestore";
-import { ref, push, serverTimestamp as rtdbTimestamp } from "firebase/database";
+import { ref, push, serverTimestamp as rtdbTimestamp, remove } from "firebase/database";
 import { db, rtdb } from "./firebase";
 
 export interface TradeRequest {
@@ -41,6 +41,18 @@ export const tradeService = {
         } catch (error: any) {
             console.error("Order submission failed:", error);
             throw new Error("주문 요청에 실패했습니다: " + error.message);
+        }
+    },
+
+    // 주문 취소 (대기 중인 주문 삭제)
+    async cancelOrder(uid: string, orderId: string) {
+        if (!uid || !orderId) return;
+        const orderRef = ref(rtdb, `orders/${uid}/${orderId}`);
+        try {
+            await remove(orderRef);
+        } catch (error: any) {
+            console.error("Order cancellation failed:", error);
+            throw new Error("주문 취소에 실패했습니다: " + error.message);
         }
     },
 

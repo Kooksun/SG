@@ -125,6 +125,14 @@
     color: var(--accent-blue);
 }
 
+.pending-icon {
+    color: var(--accent-amber);
+}
+
+.text-amber {
+    color: var(--accent-amber) !important;
+}
+
 .value-row .amount {
     font-size: 2.75rem;
     font-weight: 800;

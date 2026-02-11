@@ -1,10 +1,10 @@
 import React from 'react';
 import './Navigation.css';
-import { Globe, Trophy, PieChart, Briefcase, History } from 'lucide-react';
+import { Globe, Trophy, PieChart, Briefcase, History, Clock } from 'lucide-react';
 
 interface NavigationProps {
-    currentView: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history';
-    onViewChange: (view: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history') => void;
+    currentView: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history' | 'pendings';
+    onViewChange: (view: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history' | 'pendings') => void;
 }
 
 const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
@@ -55,6 +55,15 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
                 >
                     <History size={24} />
                     <span>거래내역</span>
+                </button>
+
+                <button
+                    className={`nav-item ${currentView === 'pendings' ? 'active' : ''}`}
+                    onClick={() => onViewChange('pendings')}
+                    title="주문대기"
+                >
+                    <Clock size={24} />
+                    <span>주문대기</span>
                 </button>
             </div>
 
