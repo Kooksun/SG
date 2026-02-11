@@ -112,7 +112,7 @@ def process_order(uid: str, order_id: str, order_data: dict):
     req_quantity = order_data.get('quantity')
     side = order_data.get('type') # BUY or SELL
     order_type = order_data.get('orderType') # MARKET or LIMIT
-    target_price = order_data.get('targetPrice')
+    target_price = order_data.get('targetPrice') or order_data.get('price')
 
     # Status check (Idempotency)
     if order_data.get('status') != 'PENDING':
