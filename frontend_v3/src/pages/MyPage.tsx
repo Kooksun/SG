@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import Card from '../components/Card';
-import { LogOut, Wallet, TrendingUp, Briefcase, CircleDollarSign, User, History, PieChart as PieIcon, Clock } from 'lucide-react';
+import { LogOut, Wallet, TrendingUp, Briefcase, CircleDollarSign, User, History, PieChart as PieIcon } from 'lucide-react';
 import { useUserStore } from '../hooks/useUserStore';
 import { authService } from '../lib/authService';
 import { useAuth } from '../hooks/useAuth';
@@ -13,7 +13,7 @@ import DashboardHeader from '../components/DashboardHeader';
 import './MyPage.css';
 
 interface MyPageProps {
-    onViewChange: (view: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history' | 'pendings') => void;
+    onViewChange: (view: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history') => void;
 }
 
 const MyPage: React.FC<MyPageProps> = ({ onViewChange }) => {
@@ -84,16 +84,6 @@ const MyPage: React.FC<MyPageProps> = ({ onViewChange }) => {
                                         <span>주식 평가금</span>
                                     </div>
                                     <span className="row-value">{assetStats.stockValue.toLocaleString()}원</span>
-                                </div>
-                                <div
-                                    className="asset-row clickable-row"
-                                    onClick={() => onViewChange('pendings')}
-                                >
-                                    <div className="row-label">
-                                        <Clock size={18} className="pending-icon" />
-                                        <span>주문 대기</span>
-                                    </div>
-                                    <span className="row-value text-amber">대기 중인 주문 확인</span>
                                 </div>
                             </div>
                         </Card>

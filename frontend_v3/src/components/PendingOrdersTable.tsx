@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PendingOrder } from '../hooks/usePendingOrders';
 import './Table.css';
 import { Trash2 } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 
 interface PendingOrdersTableProps {
     orders: PendingOrder[];
-    onCancel: (id: string) => void;
+    onCancelClick: (id: string) => void;
 }
 
-const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, onCancel }) => {
+const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, onCancelClick }) => {
     const formatDate = (dateStr: string) => {
         if (!dateStr) return '-';
         const date = new Date(dateStr);
@@ -64,12 +65,9 @@ const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, onCance
                                 </td>
                                 <td className="text-center">
                                     <button
+                                        type="button"
                                         className="cancel-btn"
-                                        onClick={() => {
-                                            if (window.confirm('정말 주문을 취소하시겠습니까?')) {
-                                                onCancel(order.id);
-                                            }
-                                        }}
+                                        onClick={() => onCancelClick(order.id)}
                                         title="주문 취소"
                                     >
                                         <Trash2 size={16} />
