@@ -47,8 +47,8 @@ def cleanup_job():
     """Cleans up all chart requests and data (Midnight Cleanup)."""
     print(f"[{datetime.now(MARKET_TZ)}] Running Midnight Chart Cleanup...")
     try:
-        main_db.child('system/requests/chart').remove()
-        main_db.child('system/data/chart').remove()
+        main_db.child('system/requests/chart').delete()
+        main_db.child('system/data/chart').delete()
         print("     Cleanup successful.")
     except Exception as e:
         print(f"     Cleanup failed: {e}")

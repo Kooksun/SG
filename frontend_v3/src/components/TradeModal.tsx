@@ -100,7 +100,11 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
                                 </div>
                                 <button className="close-btn" onClick={onClose}><X size={20} /></button>
                             </header>
-                            <StockChart symbol={stock.symbol} name={stock.name} />
+                            <StockChart
+                                symbol={stock.symbol}
+                                name={stock.name}
+                                liveVolume={liveStock?.volume || stock.volume}
+                            />
                         </div>
 
                         {/* 우측: 매매 섹션 */}

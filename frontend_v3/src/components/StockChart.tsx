@@ -14,9 +14,10 @@ interface ChartDataPoint {
 interface StockChartProps {
     symbol: string;
     name: string;
+    liveVolume?: number;
 }
 
-const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
+const StockChart: React.FC<StockChartProps> = ({ symbol, name, liveVolume }) => {
     const [data, setData] = useState<ChartDataPoint[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -40,11 +41,19 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
                 const dataSnap = await get(dataRef);
                 if (dataSnap.exists()) {
                     const relayData = dataSnap.val();
-                    renderChart(relayData.data);
-                    return;
+                    const updatedAt = relayData.updatedAt ? new Date(relayData.updatedAt) : new Date(0);
+                    const isToday = updatedAt.toDateString() === new Date().toDateString();
+
+                    // If data exists and is from today, use it immediately
+                    if (isToday) {
+                        renderChart(relayData.data);
+                        return;
+                    }
+                    // Else, data is stale. Fall through to request fresh data.
+                    console.log(`Stale chart data for ${symbol} found (last updated: ${updatedAt.toLocaleString()}), requesting fresh data...`);
                 }
 
-                // 2. Data doesn't exist, request it
+                // 2. Data doesn't exist or is stale, request it
                 const reqSnap = await get(requestRef);
                 if (!reqSnap.exists() || reqSnap.val().status === 'FAILED') {
                     await set(requestRef, {
@@ -98,6 +107,40 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
         };
     }, [symbol]);
 
+    // Calculate high/low for the period
+    const periodHigh = data.length > 0 ? Math.max(...data.map(d => d.y[1])) : 0;
+    const periodLow = data.length > 0 ? Math.min(...data.map(d => d.y[2])) : 0;
+
+    // Calculate Moving Averages (SMA)
+    const calculateSMA = (period: number) => {
+        return data.map((point, index) => {
+            if (index < period - 1) return { x: point.x, y: null };
+            const sum = data.slice(index - period + 1, index + 1).reduce((acc, p) => acc + p.y[3], 0);
+            return { x: point.x, y: Math.round(sum / period) };
+        });
+    };
+
+    const ma5Data = calculateSMA(5);
+    const ma20Data = calculateSMA(20);
+
+    const chartSeries = [
+        {
+            name: 'candle',
+            type: 'candlestick',
+            data: data
+        },
+        {
+            name: 'MA 5',
+            type: 'line',
+            data: ma5Data
+        },
+        {
+            name: 'MA 20',
+            type: 'line',
+            data: ma20Data
+        }
+    ];
+
     const chartOptions: ApexCharts.ApexOptions = {
         chart: {
             type: 'candlestick',
@@ -118,6 +161,11 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
             }
         },
         theme: { mode: 'dark' },
+        stroke: {
+            width: [1, 1.2, 1.2],
+            curve: 'smooth'
+        },
+        colors: ['#f43f5e', '#ffca3a', '#a5a5ff'], // Slightly softer colors for MA lines
         xaxis: {
             type: 'datetime',
             labels: {
@@ -137,6 +185,13 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
         grid: {
             borderColor: 'rgba(255,255,255,0.05)',
             strokeDashArray: 4
+        },
+        legend: {
+            show: true,
+            position: 'top',
+            horizontalAlign: 'right',
+            offsetY: -10,
+            labels: { colors: 'rgba(255,255,255,0.7)' }
         },
         plotOptions: {
             candlestick: {
@@ -170,10 +225,6 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
         );
     }
 
-    // Calculate high/low for the period
-    const periodHigh = data.length > 0 ? Math.max(...data.map(d => d.y[1])) : 0;
-    const periodLow = data.length > 0 ? Math.min(...data.map(d => d.y[2])) : 0;
-
     return (
         <div className="stock-chart-container">
             <div className="chart-header">
@@ -184,7 +235,7 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
             </div>
             <Chart
                 options={chartOptions}
-                series={[{ data }]}
+                series={chartSeries}
                 type="candlestick"
                 height={300}
             />
@@ -201,7 +252,7 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, name }) => {
                     </div>
                     <div className="info-group">
                         <span className="label">현재 거래량</span>
-                        <span className="value">{data.length > 0 ? data[data.length - 1].v.toLocaleString() : 0}</span>
+                        <span className="value">{(liveVolume || (data.length > 0 ? data[data.length - 1].v : 0)).toLocaleString()}</span>
                     </div>
                 </div>
                 <br></br>
