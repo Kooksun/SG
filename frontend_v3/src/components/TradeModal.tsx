@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, TrendingUp, TrendingDown, Minus, Plus, Loader2, Wallet, PieChart } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, Minus, Plus, Loader2, Wallet, PieChart, ExternalLink } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import Card from './Card';
@@ -95,7 +95,19 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
                         <div className="chart-section">
                             <header className="trade-header mobile-only">
                                 <div className="stock-info">
-                                    <h3>{stock.name}</h3>
+                                    <div className="mobile-title-row">
+                                        <h3>{stock.name}</h3>
+                                        <a
+                                            href={`https://stock.naver.com/domestic/stock/${stock.symbol}/price`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="naver-link-icon"
+                                            title="네이버 증권에서 보기"
+                                        >
+                                            <span className="naver-n">N</span>
+                                            <ExternalLink size={12} />
+                                        </a>
+                                    </div>
                                     <span className="symbol">{stock.symbol}</span>
                                 </div>
                                 <button className="close-btn" onClick={onClose}><X size={20} /></button>
@@ -114,6 +126,16 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
                                     <div className="title-row">
                                         <h3>{stock.name}</h3>
                                         <span className={`market-badge ${stock.market.toLowerCase()}`}>{stock.market}</span>
+                                        <a
+                                            href={`https://stock.naver.com/domestic/stock/${stock.symbol}/price`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="naver-link-icon"
+                                            title="네이버 증권에서 보기"
+                                        >
+                                            <span className="naver-n">N</span>
+                                            <ExternalLink size={12} />
+                                        </a>
                                     </div>
                                     <span className="symbol">{stock.symbol}</span>
                                 </div>
@@ -206,9 +228,9 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
                             </button>
                         </div>
                     </div>
-                </Card>
-            </div>
-        </div>
+                </Card >
+            </div >
+        </div >
     );
 };
 
