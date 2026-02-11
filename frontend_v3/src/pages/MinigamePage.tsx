@@ -1,26 +1,276 @@
-import React from 'react';
-import { Gamepad2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import Chart from 'react-apexcharts';
+import { Gamepad2, Loader2, Trophy, Coins, RotateCcw, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { ref, onValue, set, get, push } from 'firebase/database';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { rtdb, db } from '../lib/firebase';
+import { useAuth } from '../hooks/useAuth';
 import './MinigamePage.css';
 
+interface MinigameSession {
+    sessionId: string;
+    window: any[];
+    status: 'ACTIVE' | 'DECIDING' | 'FINISHED';
+    wins: number;
+    finalWins?: number;
+    securedReward: number;
+    answer?: {
+        name: string;
+        date: string;
+    };
+    lastAnswer?: {
+        direction: number;
+        name: string;
+        date: string;
+    };
+    reward?: number;
+    isSuccess?: boolean;
+}
+
 const MinigamePage: React.FC = () => {
+    const { user } = useAuth();
+    const [session, setSession] = useState<MinigameSession | null>(null);
+    const [dailyStats, setDailyStats] = useState({ attempts: 0, lastDate: '' });
+    const [taxPoints, setTaxPoints] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (!user) return;
+
+        // 1. Listen for User Document (Tax Points & Daily Stats)
+        const userUnsub = onSnapshot(doc(db, 'users', user.uid), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                setTaxPoints(data.taxPoints || 0);
+                setDailyStats(data.minigameStats || { attempts: 0, lastDate: '' });
+            }
+            setLoading(false);
+        }, (err) => {
+            console.error('Firestore Read Error:', err);
+            setError('데이터를 불러오는데 실패했습니다 (권한 오류).');
+            setLoading(false);
+        });
+
+        // 2. Listen for Game Session
+        const sessionRef = ref(rtdb, `user_activities/${user.uid}/minigameData`);
+        const sessionUnsub = onValue(sessionRef, (snapshot) => {
+            setSession(snapshot.val());
+        });
+
+        return () => {
+            userUnsub();
+            sessionUnsub();
+        };
+    }, [user]);
+
+    const startNewGame = async () => {
+        if (!user || actionLoading) return;
+        setActionLoading(true);
+        setError('');
+
+        try {
+            const requestRef = ref(rtdb, `user_activities/${user.uid}/minigameRequest`);
+            await set(requestRef, {
+                status: 'PENDING',
+                requestedAt: new Date().toISOString()
+            });
+        } catch (err) {
+            setError('게임 시작 요청에 실패했습니다.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const submitGuess = async (direction: number) => {
+        if (!user || !session || actionLoading) return;
+        setActionLoading(true);
+
+        try {
+            const requestRef = ref(rtdb, `user_activities/${user.uid}/minigameRequest`);
+            await set(requestRef, {
+                status: 'GUESS_SUBMITTED',
+                guess: direction,
+                submittedAt: new Date().toISOString()
+            });
+        } catch (err) {
+            setError('추측 제출에 실패했습니다.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const submitDecision = async (decision: 'STOP' | 'CONTINUE') => {
+        if (!user || !session || actionLoading) return;
+        setActionLoading(true);
+
+        try {
+            const requestRef = ref(rtdb, `user_activities/${user.uid}/minigameRequest`);
+            await set(requestRef, {
+                status: 'DECISION_SUBMITTED',
+                decision: decision,
+                submittedAt: new Date().toISOString()
+            });
+        } catch (err) {
+            setError('결정 제출에 실패했습니다.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const getNextReward = (currentWins: number) => {
+        if (currentWins === 0) return 100000;
+        if (currentWins === 1) return 300000;
+        if (currentWins === 2) return 500000;
+        return 500000 + (currentWins - 2) * 100000;
+    };
+
+    const renderChart = () => {
+        if (!session?.window) return null;
+
+        const data = session.window.map((item: any) => ({
+            x: new Date(item[0]),
+            y: [item[1], item[2], item[3], item[4]]
+        }));
+
+        const options: ApexCharts.ApexOptions = {
+            chart: {
+                type: 'candlestick',
+                toolbar: { show: false },
+                background: 'transparent',
+                animations: { enabled: true }
+            },
+            xaxis: { type: 'datetime' },
+            yaxis: { tooltip: { enabled: true } },
+            grid: { borderColor: 'rgba(255,255,255,0.05)' },
+            theme: { mode: 'dark' },
+            plotOptions: {
+                candlestick: {
+                    colors: { upward: '#f43f5e', downward: '#3b82f6' }
+                }
+            }
+        };
+
+        return <Chart options={options} series={[{ data }]} type="candlestick" height={300} />;
+    };
+
+    if (loading) {
+        return <div className="minigame-loading"><Loader2 className="animate-spin" /></div>;
+    }
+
     return (
         <div className="minigame-page">
             <header className="minigame-header">
-                <h1>미니게임</h1>
-                <p>시즌 3 신규 컨셉: 캔들 예측 퀴즈</p>
+                <div className="title-area">
+                    <h1>캔들 예측 퀴즈</h1>
+                    <p>차트를 보고 다음 날 캔들의 방향을 맞춰보세요!</p>
+                </div>
+                <div className="stats-cards">
+                    <div className="stat-card">
+                        <span className="label">보유 포인트</span>
+                        <span className="value">{taxPoints.toLocaleString()} P</span>
+                    </div>
+                    <div className="stat-card">
+                        <span className="label">오늘의 도전</span>
+                        <span className="value">{dailyStats.attempts} / 2</span>
+                    </div>
+                </div>
             </header>
 
-            <div className="minigame-placeholder-card">
-                <div className="minigame-icon-wrapper">
-                    <Gamepad2 size={48} />
+            {!session || session.status === 'FINISHED' ? (
+                <div className="game-init-area">
+                    <div className="minigame-placeholder-card">
+                        <div className="icon-badge">
+                            <Gamepad2 size={40} />
+                        </div>
+                        <h2>{session?.status === 'FINISHED' ? '게임 종료!' : '새로운 도전을 시작하세요'}</h2>
+
+                        {session?.status === 'FINISHED' && (
+                            <div className="result-summary">
+                                <div className={`result-win-badge ${session.isSuccess ? 'win' : 'fail'}`}>
+                                    {session.isSuccess ? <CheckCircle2 /> : <RotateCcw />}
+                                    <span>{session.finalWins}연승 달성</span>
+                                </div>
+                                <div className="reward-points">+{session.reward?.toLocaleString()} P</div>
+                                {session.lastAnswer && (
+                                    <div className="answer-reveal">
+                                        마지막 종목: <strong>{session.lastAnswer.name}</strong> ({session.lastAnswer.date})
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <p className="rules-text">
+                            3연승 시 50만 포인트를 획득합니다.<br />
+                            3연승 이후에는 도전을 계속할지(성공 시 +10만, 실패 시 -10만) 선택할 수 있습니다.
+                        </p>
+
+                        <button
+                            className="start-btn"
+                            onClick={startNewGame}
+                            disabled={actionLoading || dailyStats.attempts >= 2}
+                        >
+                            {actionLoading ? <Loader2 className="animate-spin" /> : '도전하기 (100% 무료)'}
+                        </button>
+                        {dailyStats.attempts >= 2 && <p className="limit-text">오늘의 도전 횟수를 모두 사용했습니다.</p>}
+                    </div>
                 </div>
-                <h2>캔들 예측 퀴즈 (준비 중)</h2>
-                <p>
-                    실제 과거 주가 데이터(캔들 차트)를 보고 다음에 올 캔들의 방향을 맞춰보세요!
-                    연승 시 신용한도 영구 상향 보상을 획득할 수 있습니다.
-                </p>
-                <div className="coming-soon-badge">Coming Soon</div>
-            </div>
+            ) : (
+                <div className="game-active-area">
+                    <div className="game-dashboard">
+                        <div className="board-item secured">
+                            <span className="label">확보된 보상</span>
+                            <span className="value">{session.securedReward.toLocaleString()} P</span>
+                        </div>
+                        <div className="board-item wins">
+                            <span className="label">현재 연승</span>
+                            <span className="value">{session.wins} 연승</span>
+                        </div>
+                        <div className="board-item next">
+                            <span className="label">다음 보상</span>
+                            <span className="value">{getNextReward(session.wins).toLocaleString()} P</span>
+                        </div>
+                    </div>
+
+                    <div className="chart-container-mini">
+                        {renderChart()}
+                        <div className="chart-overlay-text">다음 캔들의 방향은?</div>
+                    </div>
+
+                    {session.status === 'ACTIVE' && (
+                        <div className="guess-controls">
+                            <button className="guess-btn up" onClick={() => submitGuess(1)} disabled={actionLoading}>
+                                <Trophy size={20} /> 상승 (UP)
+                            </button>
+                            <button className="guess-btn down" onClick={() => submitGuess(-1)} disabled={actionLoading}>
+                                <RotateCcw size={20} /> 하락 (DOWN)
+                            </button>
+                        </div>
+                    )}
+
+                    {session.status === 'DECIDING' && (
+                        <div className="decision-overlay">
+                            <div className="decision-content">
+                                <CheckCircle2 size={48} className="success-icon" />
+                                <h3>축하합니다! {session.wins}연승 달성!</h3>
+                                <p>여기서 그만두고 {session.securedReward.toLocaleString()}P를 받으시겠습니까,<br />아니면 리스크를 안고 더 큰 보상에 도전하시겠습니까?</p>
+                                <div className="decision-btns">
+                                    <button className="stop-btn" onClick={() => submitDecision('STOP')} disabled={actionLoading}>
+                                        그만하기 (안전하게 적립)
+                                    </button>
+                                    <button className="continue-btn" onClick={() => submitDecision('CONTINUE')} disabled={actionLoading}>
+                                        계속하기 (+10만P 도전)
+                                    </button>
+                                </div>
+                                <p className="risk-warning">※ 계속하기 선택 후 실패 시 100,000 P가 차감됩니다.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {error && <div className="game-error"><AlertCircle size={20} /> {error}</div>}
         </div>
     );
 };

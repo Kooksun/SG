@@ -39,6 +39,14 @@ service cloud.firestore {
         // Only the owner can access their history
         allow read, write: if isSignedIn() && request.auth.uid == uid;
       }
+
+      // Minigame sub-collection
+      match /minigame/{id} {
+        // Only the owner can access their minigame stats
+        allow read: if isSignedIn() && request.auth.uid == uid;
+        // Writing is handled by Backend Admin SDK
+        allow write: if false;
+      }
     }
 
     // Transactions collection (Top-level)

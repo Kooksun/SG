@@ -26,7 +26,7 @@ def get_latest_price(symbol: str) -> tuple[float, str, float]:
     
     return 0.0, None, 0.0
 
-def calculate_fee(side: str, market: str, amount: float) -> tuple[float, float, float]:
+def calculate_fee(side: str, market: str, amount: float, tax_points: float = 0) -> tuple[float, float, float]:
     """
     Calculates Transaction Tax (거래세).
     BUY: 0%
@@ -39,9 +39,10 @@ def calculate_fee(side: str, market: str, amount: float) -> tuple[float, float, 
         return 0.0, 0.0, 0.0
     
     raw_fee = math.floor(amount * FEE_RATE_SELL)
-    # Future mini-game discount logic can be added here
-    discount = 0.0 
-    final_fee = max(0, raw_fee - discount)
+    
+    # Mini-game tax point deduction logic
+    discount = min(float(raw_fee), float(tax_points))
+    final_fee = float(raw_fee) - discount
     
     return float(raw_fee), float(discount), float(final_fee)
 
@@ -165,7 +166,8 @@ def process_order(uid: str, order_id: str, order_data: dict):
             avg_price = p_data.get('averagePrice', 0)
 
         total_amount = math.floor(curr_price * req_quantity)
-        raw_fee, disc, final_fee = calculate_fee(side, market, total_amount)
+        tax_points = user_data.get('taxPoints', 0)
+        raw_fee, disc, final_fee = calculate_fee(side, market, total_amount, tax_points)
         
         kwargs_out = {}
         if side == 'BUY':
@@ -209,6 +211,12 @@ def process_order(uid: str, order_id: str, order_data: dict):
                 transaction.update(portfolio_ref, {
                     'quantity': new_qty,
                     'updatedAt': firestore.SERVER_TIMESTAMP
+                })
+            
+            # Deduct used tax points
+            if disc > 0:
+                transaction.update(user_ref, {
+                    'taxPoints': firestore.Increment(-disc)
                 })
             
             balance_change = proceeds
