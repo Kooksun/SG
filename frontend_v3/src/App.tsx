@@ -15,6 +15,7 @@ import { useOrderToast } from './hooks/useOrderToast'
 import PortfolioPage from './pages/PortfolioPage'
 import HistoryPage from './pages/HistoryPage'
 import PendingOrdersPage from './pages/PendingOrdersPage'
+import MinigamePage from './pages/MinigamePage'
 import { useDetailedHoldings } from './hooks/useDetailedHoldings'
 import { useTradeHistory } from './hooks/useTradeHistory'
 import { useStocks } from './hooks/useStocks'
@@ -24,7 +25,7 @@ import './components/Toast.css'
 function AppContent() {
     const { user, loading: authLoading } = useAuth();
     const { hasSeenPrologue, uid } = useUserStore();
-    const [currentView, setCurrentView] = useState<'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history' | 'pendings'>('leaderboard');
+    const [currentView, setCurrentView] = useState<'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history' | 'pendings' | 'minigame'>('leaderboard');
 
     // 실시간 시장 데이터 동기화 (앱 전역 1회)
     useStockSync();
@@ -85,6 +86,8 @@ function AppContent() {
                 ) : <AuthPage onSuccess={() => setCurrentView('history')} />;
             case 'pendings':
                 return user ? <PendingOrdersPage /> : <AuthPage onSuccess={() => setCurrentView('pendings')} />;
+            case 'minigame':
+                return <MinigamePage />;
         }
     };
 

@@ -1,10 +1,10 @@
 import React from 'react';
 import './Navigation.css';
-import { Globe, Trophy, PieChart, Briefcase, History, Clock } from 'lucide-react';
+import { Globe, Trophy, PieChart, Briefcase, History, Clock, Gamepad2 } from 'lucide-react';
 
 interface NavigationProps {
-    currentView: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history' | 'pendings';
-    onViewChange: (view: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history' | 'pendings') => void;
+    currentView: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history' | 'pendings' | 'minigame';
+    onViewChange: (view: 'leaderboard' | 'market' | 'assets' | 'portfolio' | 'history' | 'pendings' | 'minigame') => void;
 }
 
 const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
@@ -29,6 +29,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
                     <Globe size={24} />
                     <span>시세탐색</span>
                 </button>
+
+
 
                 <button
                     className={`nav-item ${currentView === 'assets' ? 'active' : ''}`}
@@ -64,6 +66,15 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
                 >
                     <Clock size={24} />
                     <span>주문대기</span>
+                </button>
+
+                <button
+                    className={`nav-item ${currentView === 'minigame' ? 'active' : ''}`}
+                    onClick={() => onViewChange('minigame')}
+                    title="미니게임"
+                >
+                    <Gamepad2 size={24} />
+                    <span>미니게임</span>
                 </button>
             </div>
 
