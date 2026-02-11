@@ -312,6 +312,52 @@
     color: var(--text-secondary);
 }
 
+.summary-row.limit-order-row {
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+.limit-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.limit-checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-amber);
+    cursor: pointer;
+}
+
+.limit-price-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.limit-price-input {
+    background: transparent;
+    border: none;
+    color: white;
+    font-weight: 700;
+    text-align: right;
+    width: 100px;
+    font-size: 0.9rem;
+}
+
+.limit-price-input:focus {
+    outline: none;
+}
+
 .summary-row.divider {
     padding-top: 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);

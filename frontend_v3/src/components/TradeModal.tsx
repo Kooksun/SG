@@ -31,6 +31,8 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
     const [error, setError] = useState('');
     const [holdingQty, setHoldingQty] = useState<number>(0);
     const [avgPrice, setAvgPrice] = useState<number>(0);
+    const [isLimitOrder, setIsLimitOrder] = useState(false);
+    const [limitPrice, setLimitPrice] = useState<number>(currentPrice);
 
     // 실시간 보유 수량 감시
     useEffect(() => {
@@ -49,7 +51,8 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
         return () => unsub();
     }, [uid, stock.symbol]);
 
-    const totalAmount = currentPrice * quantity;
+    const tradePrice = isLimitOrder ? limitPrice : currentPrice;
+    const totalAmount = tradePrice * quantity;
     const isAffordable = tradeType === 'SELL' ? (holdingQty >= quantity) : (userBalance >= totalAmount);
 
     // 수익률 계산
@@ -66,8 +69,9 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
                 symbol: stock.symbol,
                 name: stock.name,
                 type: tradeType,
-                price: currentPrice,
-                quantity: quantity
+                price: tradePrice,
+                quantity: quantity,
+                orderType: isLimitOrder ? 'LIMIT' : 'MARKET'
             });
             onClose();
         } catch (err: any) {
@@ -78,8 +82,9 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
     };
 
     const handlePercentage = (pct: number) => {
+        const tradePrice = isLimitOrder ? limitPrice : currentPrice;
         if (tradeType === 'BUY') {
-            const maxBuy = Math.floor(userBalance / currentPrice);
+            const maxBuy = Math.floor(userBalance / tradePrice);
             setQuantity(Math.max(1, Math.floor(maxBuy * pct)));
         } else {
             setQuantity(Math.max(0, Math.floor(holdingQty * pct)));
@@ -205,8 +210,32 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
                             </div>
 
                             <div className="order-summary">
+                                <div className="summary-row limit-order-row">
+                                    <label className="limit-checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={isLimitOrder}
+                                            onChange={(e) => {
+                                                setIsLimitOrder(e.target.checked);
+                                                if (e.target.checked) setLimitPrice(currentPrice);
+                                            }}
+                                        />
+                                        <span>지정가 주문</span>
+                                    </label>
+                                    {isLimitOrder && (
+                                        <div className="limit-price-input-wrapper">
+                                            <input
+                                                type="number"
+                                                className="limit-price-input"
+                                                value={limitPrice}
+                                                onChange={(e) => setLimitPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                                            />
+                                            <span className="unit">원</span>
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="summary-row">
-                                    <span>주문 금액</span>
+                                    <span>{isLimitOrder ? '지정가 주문 금액' : '주문 금액'}</span>
                                     <span className="amount">{totalAmount.toLocaleString()}원</span>
                                 </div>
                                 <div className="summary-row divider">
