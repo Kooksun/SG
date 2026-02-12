@@ -312,44 +312,50 @@ const MinigamePage: React.FC = () => {
                 </div>
             ) : (
                 <div className="game-active-area">
-                    <div className="game-dashboard">
-                        <div className="board-item secured">
-                            <span className="label">확보된 보상</span>
-                            <span className="value">{session.securedReward.toLocaleString()} P</span>
+                    <div className="game-main-layout">
+                        <div className="game-dashboard-vertical">
+                            <div className="board-item secured">
+                                <span className="label">확보된 보상</span>
+                                <span className="value">{session.securedReward.toLocaleString()} P</span>
+                            </div>
+                            <div className="board-item wins">
+                                <span className="label">현재 연승</span>
+                                <span className="value">{session.wins} 연승</span>
+                            </div>
+                            <div className="board-item next">
+                                <span className="label">다음 보상</span>
+                                <span className="value">{getNextReward(session.wins).toLocaleString()} P</span>
+                            </div>
                         </div>
-                        <div className="board-item wins">
-                            <span className="label">현재 연승</span>
-                            <span className="value">{session.wins} 연승</span>
-                        </div>
-                        <div className="board-item next">
-                            <span className="label">다음 보상</span>
-                            <span className="value">{getNextReward(session.wins).toLocaleString()} P</span>
+
+                        <div className="chart-and-controls">
+                            <div className="chart-column">
+                                <div className="chart-container-mini">
+                                    {renderChart()}
+                                    <div className="chart-overlay-text">다음 캔들의 방향은?</div>
+                                </div>
+                            </div>
+
+                            {session.status === 'ACTIVE' && (
+                                <div className="guess-controls-vertical">
+                                    <button className="guess-btn up" onClick={() => submitGuess(1)} disabled={actionLoading}>
+                                        <div className="btn-icon"><Trophy size={20} /></div>
+                                        <div className="btn-text">
+                                            <span className="dir">상승 (UP)</span>
+                                            <span className="sub">위로 갈 것 같아요</span>
+                                        </div>
+                                    </button>
+                                    <button className="guess-btn down" onClick={() => submitGuess(-1)} disabled={actionLoading}>
+                                        <div className="btn-icon"><RotateCcw size={20} /></div>
+                                        <div className="btn-text">
+                                            <span className="dir">하락 (DOWN)</span>
+                                            <span className="sub">아래로 갈 것 같아요</span>
+                                        </div>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
-
-                    <div className="chart-container-mini">
-                        {renderChart()}
-                        <div className="chart-overlay-text">다음 캔들의 방향은?</div>
-                    </div>
-
-                    {session.status === 'ACTIVE' && (
-                        <div className="guess-controls">
-                            <button className="guess-btn up" onClick={() => submitGuess(1)} disabled={actionLoading}>
-                                <div className="btn-icon"><Trophy size={20} /></div>
-                                <div className="btn-text">
-                                    <span className="dir">상승 (UP)</span>
-                                    <span className="sub">위로 갈 것 같아요</span>
-                                </div>
-                            </button>
-                            <button className="guess-btn down" onClick={() => submitGuess(-1)} disabled={actionLoading}>
-                                <div className="btn-icon"><RotateCcw size={20} /></div>
-                                <div className="btn-text">
-                                    <span className="dir">하락 (DOWN)</span>
-                                    <span className="sub">아래로 갈 것 같아요</span>
-                                </div>
-                            </button>
-                        </div>
-                    )}
 
                     {session.status === 'DECIDING' && (
                         <div className="decision-overlay">

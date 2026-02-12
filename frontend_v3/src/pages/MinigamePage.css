@@ -174,20 +174,58 @@
     flex-direction: column;
     gap: var(--spacing-lg);
     position: relative;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
 }
 
-.game-dashboard {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+.game-main-layout {
+    display: flex;
+    gap: var(--spacing-lg);
+    align-items: stretch;
+    height: 420px;
+    /* Unified height for better alignment */
+}
+
+.game-dashboard-vertical {
+    display: flex;
+    flex-direction: column;
     gap: var(--spacing-md);
+    width: 220px;
+    flex-shrink: 0;
+}
+
+.chart-and-controls {
+    display: flex;
+    flex: 1;
+    gap: var(--spacing-lg);
+    min-width: 0;
+    /* Prevents overflow in flex items */
+}
+
+.chart-column {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
 }
 
 .board-item {
     background: var(--card-bg);
     border: var(--glass-border);
     border-radius: var(--radius-md);
-    padding: var(--spacing-md);
-    text-align: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    text-align: left;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+}
+
+.board-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateX(4px);
 }
 
 .board-item .label {
@@ -198,8 +236,9 @@
 }
 
 .board-item .value {
-    font-size: 1.25rem;
-    font-weight: 700;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
 }
 
 .board-item.secured .value {
@@ -220,6 +259,10 @@
     border-radius: var(--radius-lg);
     padding: var(--spacing-md);
     position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .chart-overlay-text {
@@ -229,21 +272,23 @@
     font-weight: 600;
     color: var(--text-secondary);
     pointer-events: none;
+    z-index: 5;
 }
 
-.guess-controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.25rem;
-    padding: 0 1rem;
-    margin-top: 1.5rem;
+.guess-controls-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    width: 260px;
+    flex-shrink: 0;
+    justify-content: center;
 }
 
 .guess-btn {
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1.25rem;
+    padding: 1.5rem 1.25rem;
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.03);
@@ -251,6 +296,7 @@
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     text-align: left;
+    height: 120px;
 }
 
 .guess-btn.up:hover {
