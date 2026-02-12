@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Chart from 'react-apexcharts';
 import { Gamepad2, Loader2, Trophy, Coins, RotateCcw, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { ref, onValue, set, get, push } from 'firebase/database';
@@ -49,6 +49,7 @@ const MinigamePage: React.FC = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState('');
     const [showResultModal, setShowResultModal] = useState(false);
+    const isInitialLoad = useRef(true);
 
     useEffect(() => {
         if (!user) return;
@@ -72,9 +73,19 @@ const MinigamePage: React.FC = () => {
         const sessionUnsub = onValue(sessionRef, (snapshot) => {
             const data = snapshot.val();
             setSession(data);
+
             if (data?.lastRoundResult) {
-                setShowResultModal(true);
+                if (isInitialLoad.current) {
+                    // On initial mount, only open modal if game is waiting for a decision/next round
+                    if (data.status === 'ROUND_COMPLETED' || data.status === 'DECIDING') {
+                        setShowResultModal(true);
+                    }
+                } else {
+                    // Subsequent updates (e.g. just finished a round)
+                    setShowResultModal(true);
+                }
             }
+            isInitialLoad.current = false;
         });
 
         return () => {
