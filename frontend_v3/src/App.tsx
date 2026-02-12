@@ -87,7 +87,7 @@ function AppContent() {
             case 'pendings':
                 return user ? <PendingOrdersPage /> : <AuthPage onSuccess={() => setCurrentView('pendings')} />;
             case 'minigame':
-                return <MinigamePage />;
+                return user ? <MinigamePage /> : <AuthPage onSuccess={() => setCurrentView('minigame')} />;
         }
     };
 

@@ -10,10 +10,23 @@ import './MinigamePage.css';
 interface MinigameSession {
     sessionId: string;
     window: any[];
-    status: 'ACTIVE' | 'DECIDING' | 'FINISHED';
+    status: 'ACTIVE' | 'ROUND_COMPLETED' | 'DECIDING' | 'FINISHED';
     wins: number;
     finalWins?: number;
     securedReward: number;
+    lastRoundResult?: {
+        isCorrect: boolean;
+        userGuess: number;
+        answerDirection: number;
+        stockName: string;
+        date: string;
+        ohlc: {
+            open: number;
+            high: number;
+            low: number;
+            close: number;
+        }
+    };
     answer?: {
         name: string;
         date: string;
@@ -35,6 +48,7 @@ const MinigamePage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showResultModal, setShowResultModal] = useState(false);
 
     useEffect(() => {
         if (!user) return;
@@ -56,7 +70,11 @@ const MinigamePage: React.FC = () => {
         // 2. Listen for Game Session
         const sessionRef = ref(rtdb, `user_activities/${user.uid}/minigameData`);
         const sessionUnsub = onValue(sessionRef, (snapshot) => {
-            setSession(snapshot.val());
+            const data = snapshot.val();
+            setSession(data);
+            if (data?.lastRoundResult) {
+                setShowResultModal(true);
+            }
         });
 
         return () => {
@@ -96,6 +114,24 @@ const MinigamePage: React.FC = () => {
             });
         } catch (err) {
             setError('추측 제출에 실패했습니다.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const requestNextRound = async () => {
+        if (!user || !session || actionLoading) return;
+        setActionLoading(true);
+        setShowResultModal(false);
+
+        try {
+            const requestRef = ref(rtdb, `user_activities/${user.uid}/minigameRequest`);
+            await set(requestRef, {
+                status: 'NEXT_ROUND_PENDING',
+                requestedAt: new Date().toISOString()
+            });
+        } catch (err) {
+            setError('다음 라운드 요청에 실패했습니다.');
         } finally {
             setActionLoading(false);
         }
@@ -153,6 +189,53 @@ const MinigamePage: React.FC = () => {
         };
 
         return <Chart options={options} series={[{ data }]} type="candlestick" height={300} />;
+    };
+
+    const ResultModal = () => {
+        if (!session?.lastRoundResult || !showResultModal) return null;
+        const result = session.lastRoundResult;
+
+        return (
+            <div className="result-detail-overlay">
+                <div className={`result-detail-content ${result.isCorrect ? 'correct' : 'incorrect'}`}>
+                    <div className="status-icon">
+                        {result.isCorrect ? <CheckCircle2 size={64} /> : <XCircle size={64} />}
+                    </div>
+                    <h2>{result.isCorrect ? '정답입니다!' : '아쉽게도 틀렸습니다.'}</h2>
+                    <p className="round-status-text">
+                        {result.isCorrect ? `${session.wins}연승으로 다음 단계에 도전할 수 있습니다.` : '이번 도전은 여기서 종료됩니다.'}
+                    </p>
+
+                    <div className="answer-card">
+                        <div className="stock-info">
+                            <span className="brand">{result.stockName}</span>
+                            <span className="date">{result.date}</span>
+                            <div className={`direction-badge ${result.answerDirection === 1 ? 'up' : 'down'}`}>
+                                {result.answerDirection === 1 ? '상승 마감' : '하락 마감'}
+                            </div>
+                        </div>
+                        <div className="ohlc-grid">
+                            <div className="ohlc-item"><span className="label">시가</span><span className="val">{result.ohlc.open.toLocaleString()}</span></div>
+                            <div className="ohlc-item"><span className="label">고가</span><span className="val">{result.ohlc.high.toLocaleString()}</span></div>
+                            <div className="ohlc-item"><span className="label">저가</span><span className="val">{result.ohlc.low.toLocaleString()}</span></div>
+                            <div className="ohlc-item"><span className="label">종가</span><span className="val">{result.ohlc.close.toLocaleString()}</span></div>
+                        </div>
+                    </div>
+
+                    <div className="modal-actions">
+                        {result.isCorrect ? (
+                            <button className="next-step-btn" onClick={requestNextRound} disabled={actionLoading}>
+                                {actionLoading ? <Loader2 className="animate-spin" /> : '다음 라운드 진행하기'}
+                            </button>
+                        ) : (
+                            <button className="close-result-btn" onClick={() => setShowResultModal(false)} disabled={actionLoading}>
+                                결과 확인 및 종료
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     if (loading) {
@@ -241,10 +324,18 @@ const MinigamePage: React.FC = () => {
                     {session.status === 'ACTIVE' && (
                         <div className="guess-controls">
                             <button className="guess-btn up" onClick={() => submitGuess(1)} disabled={actionLoading}>
-                                <Trophy size={20} /> 상승 (UP)
+                                <div className="btn-icon"><Trophy size={20} /></div>
+                                <div className="btn-text">
+                                    <span className="dir">상승 (UP)</span>
+                                    <span className="sub">위로 갈 것 같아요</span>
+                                </div>
                             </button>
                             <button className="guess-btn down" onClick={() => submitGuess(-1)} disabled={actionLoading}>
-                                <RotateCcw size={20} /> 하락 (DOWN)
+                                <div className="btn-icon"><RotateCcw size={20} /></div>
+                                <div className="btn-text">
+                                    <span className="dir">하락 (DOWN)</span>
+                                    <span className="sub">아래로 갈 것 같아요</span>
+                                </div>
                             </button>
                         </div>
                     )}
@@ -269,6 +360,9 @@ const MinigamePage: React.FC = () => {
                     )}
                 </div>
             )}
+
+            {session?.status === 'ROUND_COMPLETED' && <ResultModal />}
+            {session?.lastRoundResult && session.status === 'FINISHED' && <ResultModal />}
 
             {error && <div className="game-error"><AlertCircle size={20} /> {error}</div>}
         </div>

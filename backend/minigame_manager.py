@@ -36,10 +36,13 @@ def get_random_top_stock():
     stocks = kospi_db.child('stocks').get()
     if not stocks: return None
     
-    # Filter for top stocks (e.g., those with price > 10000 or just random from list)
-    stock_list = list(stocks.values())
+    # Filter for top stocks and exclude ETFs
+    stock_list = [
+        s for s in stocks.values() 
+        if not any(etf_kw in s['name'].upper() for etf_kw in ['KODEX', 'TIGER', 'RISE', 'ACE', 'SOL', 'PLUS', 'HANARO', 'KBSTAR', 'ARIRANG'])
+    ]
     random.shuffle(stock_list)
-    return stock_list[0]
+    return stock_list[0] if stock_list else None
 
 def start_game(uid: str):
     """Initializes a new mini-game session."""
@@ -116,7 +119,7 @@ def start_game(uid: str):
             'details': answer_candle
         },
         'wins': 0,
-        'securedReward': 0,
+        'securedReward': get_reward(0),
         'status': 'ACTIVE'
     })
     
@@ -144,36 +147,57 @@ def handle_guess(uid: str, guess_data: dict):
         return
 
     answer_data = session_data.get('answer')
-    correct = (guess == answer_data['direction'])
+    # direction: 1 (UP), -1 (DOWN)
+    is_correct = (guess == answer_data['direction'])
     
     wins = session_data.get('wins', 0)
+    new_wins = wins + 1 if is_correct else wins
     
-    if correct:
-        new_wins = wins + 1
+    # Detailed result for the modal
+    round_result = {
+        'isCorrect': is_correct,
+        'userGuess': guess,
+        'answerDirection': answer_data['direction'],
+        'stockName': answer_data['name'],
+        'date': answer_data['date'],
+        'ohlc': {
+            'open': answer_data['details'][1],
+            'high': answer_data['details'][2],
+            'low': answer_data['details'][3],
+            'close': answer_data['details'][4]
+        }
+    }
+
+    if is_correct:
         secured = get_reward(new_wins, failed=False)
-        
-        # Check if they need to decide (wins >= 3)
-        if new_wins >= 3:
-            session_ref.update({
-                'wins': new_wins,
-                'securedReward': secured,
-                'status': 'DECIDING' # Frontend should show Stop/Continue
-            })
-            print(f"  -> {uid} Correct! Decision Point: {new_wins} wins.")
-        else:
-            # Continue to next round automatically or wait?
-            # User said "Each additional win". Let's prepare NEXT challenge.
-            prepare_next_round(uid, new_wins, secured)
+        # Update session with result and wait for user to click "Next"
+        session_ref.update({
+            'wins': new_wins,
+            'securedReward': secured,
+            'lastRoundResult': round_result,
+            'status': 'ROUND_COMPLETED' # Frontend shows modal
+        })
+        print(f"  -> {uid} Correct! Round {new_wins} Completed.")
     else:
         # FAILED
         final_reward = get_reward(wins, failed=True)
-        finalize_game(uid, wins, final_reward, success=False, answer=answer_data)
+        # For failure, we can go straight to FINISHED but provide lastRoundResult
+        # Or ROUND_COMPLETED then FINISHED. Let's do FINISHED with result.
+        finalize_game(uid, wins, final_reward, success=False, answer=answer_data, last_result=round_result)
 
 def prepare_next_round(uid: str, wins: int, secured: int):
     """Pick a new stock and window for the next round."""
     stock = get_random_top_stock()
     history = fetch_stock_chart(stock['symbol'], page_size=60, page=1)
-    if not history: return
+    if not history: 
+        # Fallback to another stock
+        stock = get_random_top_stock()
+        history = fetch_stock_chart(stock['symbol'], page_size=60, page=1)
+    
+    if not history:
+        print(f"  !! Error fetching history for next round ({uid})")
+        return
+
     history.reverse()
     
     max_start = len(history) - 21
@@ -193,9 +217,30 @@ def prepare_next_round(uid: str, wins: int, secured: int):
         },
         'wins': wins,
         'securedReward': secured,
-        'status': 'ACTIVE'
+        'status': 'ACTIVE',
+        'lastRoundResult': None # Clear result for new round
     })
-    print(f"  -> {uid} Correct! Round {wins+1} Next.")
+    print(f"  -> {uid} Round {wins+1} Started.")
+
+def handle_next_round_request(uid: str):
+    """Processes user clicking 'Next Round'."""
+    session_ref = main_db.child(f'user_activities/{uid}/minigameData')
+    session_data = session_ref.get()
+    
+    if not session_data: return
+    
+    # If they already reached 3 wins, they might have been in DECIDING state
+    # But usually Next Round request comes from ROUND_COMPLETED
+    if session_data.get('status') == 'ROUND_COMPLETED':
+        wins = session_data.get('wins', 0)
+        secured = session_data.get('securedReward', 0)
+        
+        if wins >= 3:
+            # Transition to DECIDING (Stop or Continue)
+            session_ref.update({'status': 'DECIDING'})
+        else:
+            # Go directly to next round
+            prepare_next_round(uid, wins, secured)
 
 def handle_decision(uid: str, decision_data: dict):
     """Handles STOP or CONTINUE decisions."""
@@ -216,7 +261,7 @@ def handle_decision(uid: str, decision_data: dict):
         print(f"  -> {uid} Chose to CONTINUE at {wins} wins.")
         prepare_next_round(uid, wins, secured)
 
-def finalize_game(uid: str, wins: int, reward: int, success: bool, answer: dict = None):
+def finalize_game(uid: str, wins: int, reward: int, success: bool, answer: dict = None, last_result: dict = None):
     """Awards points and ends the session."""
     print(f"  -> Finalizing game for {uid}: {wins} wins, {reward} points.")
     
@@ -254,7 +299,9 @@ def finalize_game(uid: str, wins: int, reward: int, success: bool, answer: dict 
         'reward': reward,
         'isSuccess': success
     }
-    if answer:
+    if last_result:
+        update_pkg['lastRoundResult'] = last_result
+    elif answer:
         update_pkg['lastAnswer'] = answer
         
     session_ref.update(update_pkg)
@@ -277,6 +324,7 @@ def start_manager():
             if req.get('status') == 'PENDING': start_game(uid)
             elif req.get('status') == 'GUESS_SUBMITTED': handle_guess(uid, req)
             elif req.get('status') == 'DECISION_SUBMITTED': handle_decision(uid, req)
+            elif req.get('status') == 'NEXT_ROUND_PENDING': handle_next_round_request(uid)
         
         elif len(path_parts) == 1:
             uid = path_parts[0]
@@ -285,6 +333,7 @@ def start_manager():
                 if req.get('status') == 'PENDING': start_game(uid)
                 elif req.get('status') == 'GUESS_SUBMITTED': handle_guess(uid, req)
                 elif req.get('status') == 'DECISION_SUBMITTED': handle_decision(uid, req)
+                elif req.get('status') == 'NEXT_ROUND_PENDING': handle_next_round_request(uid)
         
         elif len(path_parts) == 0:
             for uid, user_data in event.data.items():
