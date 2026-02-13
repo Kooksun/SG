@@ -29,6 +29,17 @@ def init_bots():
         uid = bot["uid"]
         user_ref = main_firestore.collection('users').document(uid)
         
+        # Clear existing portfolio
+        portfolio_ref = user_ref.collection('portfolio')
+        docs = portfolio_ref.stream()
+        deleted_count = 0
+        for doc in docs:
+            doc.reference.delete()
+            deleted_count += 1
+        
+        if deleted_count > 0:
+            print(f"  - Cleared {deleted_count} holdings for {uid}")
+
         # Check if exists
         if user_ref.get().exists:
             print(f"Bot {uid} already exists. Updating balance and info...")
@@ -36,7 +47,8 @@ def init_bots():
                 "displayName": bot["displayName"],
                 "balance": bot["balance"],
                 "isBot": True,
-                "persona": bot["persona"]
+                "persona": bot["persona"],
+                "totalStockValue": 0
             })
             continue
             

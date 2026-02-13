@@ -150,7 +150,9 @@ def process_order(uid: str, order_id: str, order_data: dict):
         return
 
     # [Reality Engine] Market Limit Protection (±29.5%)
-    if abs(change_percent) >= 29.5:
+    # Skip for Bots as requested
+    is_bot = order_data.get('isBot', False)
+    if not is_bot and abs(change_percent) >= 29.5:
         main_db.child(f'orders/{uid}/{order_id}').update({
             'status': 'FAILED',
             'errorMessage': '상/하한가 도달 종목은 거래가 제한됩니다.'
