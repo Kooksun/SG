@@ -266,7 +266,9 @@ def fetch_single_stock(symbol: str) -> Optional[Stock]:
     """
     time.sleep(0.1) # Mandatory 100ms throttle
 
-    is_us = any(c.isalpha() for c in symbol) # Simple heuristic for US/KR
+    # Heuristic: 6 chars with at least one digit is likely a KR symbol (including those with letters like 0013V0)
+    is_kr = len(symbol) == 6 and any(c.isdigit() for c in symbol)
+    is_us = not is_kr
     headers = {"User-Agent": "Mozilla/5.0"}
     
     try:

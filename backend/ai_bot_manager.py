@@ -135,7 +135,7 @@ class AIBotManager:
 {{
     "analysis": "현재 시장 상황과 나의 포트폴리오에 대한 분석 내용 (페르소나에 맞춰 작성)",
     "decision": "BUY" | "SELL" | "HOLD",
-    "symbol": "종목코드 (숫자 6자리)",
+    "symbol": "종목코드 (6자리)",
     "quantity": 수량 (숫자),
     "reason": "결정 이유"
 }}
@@ -144,7 +144,7 @@ class AIBotManager:
 - 매수 시 현금 잔고를 초과할 수 없습니다. (거래 금액 = 현재가 * 수량)
 - 매도 시 보유 수량을 초과할 수 없습니다.
 - 아무것도 하고 싶지 않거나 적절한 종목이 없다면 'HOLD'를 선택하세요.
-- 종목 코드는 반드시 6자리 숫자 문자열이어야 합니다.
+- 종목 코드는 반드시 6자리 문자열이어야 합니다 (예: 005930, 0013V0).
 """
         
         # LLM Call
@@ -198,7 +198,11 @@ class AIBotManager:
         return '{"decision": "HOLD", "reason": "AI Service unavailable"}'
 
     def _submit_order(self, decision_data: Dict[str, Any]):
-        symbol = str(decision_data.get('symbol')).zfill(6)
+        symbol = str(decision_data.get('symbol', '')).strip().upper()
+        # Ensure 6 chars for KR styles if it looks like a KR symbol
+        if len(symbol) < 6 and any(c.isdigit() for c in symbol):
+            symbol = symbol.zfill(6)
+        
         quantity = int(decision_data.get('quantity', 0))
         tx_type = decision_data.get('decision')
         
