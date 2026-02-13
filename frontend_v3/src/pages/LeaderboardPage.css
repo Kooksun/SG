@@ -44,6 +44,17 @@
     color: var(--text-primary);
 }
 
+.summary-stat-row.highlight-stat {
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05));
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.d-day-value {
+    color: #3b82f6;
+    font-size: 1.25rem;
+    text-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+}
+
 /* Card 2: Market Yield */
 .yield-display-box {
     flex: 1;

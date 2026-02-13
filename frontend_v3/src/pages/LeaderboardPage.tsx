@@ -20,6 +20,15 @@ const LeaderboardPage: React.FC = () => {
     const stats = data?.stats;
     const rankings = data?.list || [];
     const updatedAt = data?.updatedAt ? new Date(data.updatedAt) : null;
+    const seasonEnd = data?.seasonEnd ? new Date(data.seasonEnd) : null;
+
+    // Calculate D-Day
+    let dDay = null;
+    if (seasonEnd) {
+        const now = new Date();
+        const diffTime = seasonEnd.getTime() - now.getTime();
+        dDay = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
 
     return (
         <main className="dashboard">
@@ -28,7 +37,7 @@ const LeaderboardPage: React.FC = () => {
                     <h1 className="welcome-text">리더보드 & <span className="highlight">통합 분석</span></h1>
                     <div className="live-badge">
                         <Clock size={14} className="icon-pulse" />
-                        <span>FINAL</span>
+                        <span>시즌 3</span>
                         {updatedAt && (
                             <span className="update-time-small">
                                 {updatedAt.toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' })} 업데이트
@@ -45,6 +54,12 @@ const LeaderboardPage: React.FC = () => {
                     <section className="leaderboard-column">
                         <Card title="데이터 요약" glow="blue" className="leaderboard-card">
                             <div className="leaderboard-summary">
+                                {dDay !== null && (
+                                    <div className="summary-stat-row highlight-stat">
+                                        <div className="stat-label"><Clock size={18} /> 시즌 종료까지</div>
+                                        <div className="stat-value d-day-value">D-{dDay > 0 ? dDay : 'Day'}</div>
+                                    </div>
+                                )}
                                 <div className="summary-stat-row">
                                     <div className="stat-label"><Users size={18} /> 총 참가자</div>
                                     <div className="stat-value">{stats?.totalPlayers.toLocaleString()}명</div>

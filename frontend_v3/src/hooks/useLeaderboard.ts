@@ -25,6 +25,7 @@ export interface LeaderboardData {
     list: LeaderboardUser[];
     stats: LeaderboardStats;
     updatedAt: string;
+    seasonEnd: string | null;
 }
 
 export function useLeaderboard() {
@@ -33,10 +34,24 @@ export function useLeaderboard() {
 
     useEffect(() => {
         const rankingsRef = ref(rtdb, 'rankings');
+        const seasonEndRef = ref(rtdb, 'system/season_end');
 
-        const unsubscribe = onValue(rankingsRef, (snapshot) => {
+        let rankingsData: any = null;
+        let seasonEndData: string | null = null;
+
+        const updateData = () => {
+            if (rankingsData) {
+                setData({
+                    ...rankingsData,
+                    seasonEnd: seasonEndData
+                });
+            }
+        };
+
+        const unsubRankings = onValue(rankingsRef, (snapshot) => {
             if (snapshot.exists()) {
-                setData(snapshot.val());
+                rankingsData = snapshot.val();
+                updateData();
             }
             setLoading(false);
         }, (error) => {
@@ -44,7 +59,17 @@ export function useLeaderboard() {
             setLoading(false);
         });
 
-        return () => unsubscribe();
+        const unsubSeason = onValue(seasonEndRef, (snapshot) => {
+            if (snapshot.exists()) {
+                seasonEndData = snapshot.val();
+                updateData();
+            }
+        });
+
+        return () => {
+            unsubRankings();
+            unsubSeason();
+        };
     }, []);
 
     return { data, loading };
