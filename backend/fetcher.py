@@ -129,6 +129,42 @@ def fetch_indices() -> Dict[str, Dict]:
         except: pass
     return results
 
+def fetch_custom_stocks(symbols: List[str]) -> Dict[str, Stock]:
+    """Fetch multiple KR stocks (KOSPI/KOSDAQ) using the modern polling API."""
+    if not symbols:
+        return {}
+        
+    snapshot: Dict[str, Stock] = {}
+    headers = {"User-Agent": "Mozilla/5.0"}
+    
+    # Naver polling API for domestic stocks
+    url = f"https://stock.naver.com/api/polling/domestic/stock?itemCodes={','.join(symbols)}"
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            items = data.get('datas', [])
+            for item in items:
+                symbol = item.get('itemCode')
+                # Determine market (this API doesn't explicitly return KOSPI/KOSDAQ string in a simple way, 
+                # but we can infer or leave as is if the caller knows. For now, we'll try to find it.)
+                # In Naver's case, domestic stocks are usually under 'domestic'
+                snapshot[symbol] = Stock(
+                    symbol=symbol,
+                    name=item.get('stockName'),
+                    price=float(item.get('closePriceRaw', 0)),
+                    change=float(item.get('compareToPreviousClosePriceRaw', 0)),
+                    change_percent=float(item.get('fluctuationsRatioRaw', 0)),
+                    volume=float(item.get('accumulatedTradingVolumeRaw', 0)),
+                    updated_at=datetime.now(MARKET_TZ),
+                    currency='KRW',
+                    market='UNKNOWN' # Will be refined by the caller (price_updater)
+                )
+    except Exception as e:
+        print(f"Error fetching custom stocks: {e}")
+        
+    return snapshot
+
 def fetch_stock_chart(symbol: str, page_size: int = 60, page: int = 1) -> List[List]:
     """
     Fetch historical stock data from Naver and compress it into an array format.

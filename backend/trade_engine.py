@@ -4,7 +4,7 @@ from datetime import datetime
 from firebase_admin import firestore
 from .firebase_config import main_db, kospi_db, kosdaq_db, main_firestore
 from .supabase_client import get_supabase
-from .fetcher import MARKET_TZ
+from .fetcher import MARKET_TZ, fetch_custom_stocks
 
 # Constants
 FEE_RATE_SELL = 0.002  # 0.2% (SELL only)
@@ -24,6 +24,25 @@ def get_latest_price(symbol: str) -> tuple[float, str, float]:
     if stock:
         return float(stock.get('price', 0)), stock.get('market', 'KOSDAQ'), float(stock.get('change_percent', 0))
     
+    # 3. Fallback: Fetch directly from Naver and Register to custom_stocks
+    print(f"  ? Symbol {symbol} not in DB. Searching Naver...")
+    batch_data = fetch_custom_stocks([symbol])
+    if symbol in batch_data:
+        stock_obj = batch_data[symbol]
+        price = stock_obj.price
+        change_p = stock_obj.change_percent
+        
+        # Register to custom_stocks for future tracking
+        # We don't know the market for sure yet, so we'll default to KOSPI
+        # (It will be updated correctly if we find a way to distinguish later, 
+        # but KOSPI project covers ETF as well)
+        main_db.child('system/custom_stocks').child(symbol).update({
+            'addedAt': datetime.now(MARKET_TZ).isoformat(),
+            'market': 'KOSPI' 
+        })
+        print(f"  + Registered {symbol} to custom_stocks tracking.")
+        return price, 'KOSPI', change_p
+
     return 0.0, None, 0.0
 
 def calculate_fee(side: str, market: str, amount: float, tax_points: float = 0) -> tuple[float, float, float]:
