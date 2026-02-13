@@ -33,14 +33,11 @@ def get_reward(wins: int, failed: bool = False) -> int:
 
 def get_random_top_stock():
     """Fetches a random stock from the top pool."""
-    stocks = kospi_db.child('stocks').get()
+    # Filter for top stocks and exclude ETFs (which are now in stocks/ETF)
+    stocks = kospi_db.child('stocks/KOSPI').get()
     if not stocks: return None
     
-    # Filter for top stocks and exclude ETFs
-    stock_list = [
-        s for s in stocks.values() 
-        if not any(etf_kw in s['name'].upper() for etf_kw in ['KODEX', 'TIGER', 'RISE', 'ACE', 'SOL', 'PLUS', 'HANARO', 'KBSTAR', 'ARIRANG'])
-    ]
+    stock_list = list(stocks.values())
     random.shuffle(stock_list)
     return stock_list[0] if stock_list else None
 

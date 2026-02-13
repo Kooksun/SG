@@ -9,19 +9,19 @@ def init_bots():
             "uid": "bot_buffett",
             "displayName": "워런 버핏 (AI)",
             "persona": "value_investor",
-            "balance": 1000000000, # 1B KRW
+            "balance": 300000000,
         },
         {
             "uid": "bot_bulnabang",
             "displayName": "불나방 (AI)",
             "persona": "speculator",
-            "balance": 100000000, # 100M KRW
+            "balance": 300000000,
         },
         {
             "uid": "bot_safety",
             "displayName": "안전지구 (AI)",
             "persona": "conservative",
-            "balance": 500000000, # 500M KRW
+            "balance": 300000000,
         }
     ]
     
@@ -31,9 +31,10 @@ def init_bots():
         
         # Check if exists
         if user_ref.get().exists:
-            print(f"Bot {uid} already exists. Updating...")
+            print(f"Bot {uid} already exists. Updating balance and info...")
             user_ref.update({
                 "displayName": bot["displayName"],
+                "balance": bot["balance"],
                 "isBot": True,
                 "persona": bot["persona"]
             })

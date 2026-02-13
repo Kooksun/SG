@@ -8,11 +8,17 @@ from .price_updater import is_kr_market_open
 def get_all_prices():
     """Fetch all prices from KOSPI/KOSDAQ RTDBs to use as a local cache."""
     prices = {}
-    kospi_data = kospi_db.child('stocks').get()
-    if kospi_data: prices.update(kospi_data)
     
-    kosdaq_data = kosdaq_db.child('stocks').get()
-    if kosdaq_data: prices.update(kosdaq_data)
+    # 1. KOSPI project (KOSPI + ETF)
+    # The structure is now: stocks/KOSPI/{symbol} and stocks/ETF/{symbol}
+    kp_raw = kospi_db.child('stocks').get() or {}
+    for market in ['KOSPI', 'ETF']:
+        prices.update(kp_raw.get(market, {}))
+    
+    # 2. KOSDAQ project (KOSDAQ)
+    # The structure is now: stocks/KOSDAQ/{symbol}
+    kd_raw = kosdaq_db.child('stocks').get() or {}
+    prices.update(kd_raw.get('KOSDAQ', {}))
     
     return prices
 
