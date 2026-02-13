@@ -21,19 +21,23 @@ export function useStockSync() {
         };
 
         const unsubKospi = onValue(kospiRef, (snapshot) => {
-            const data = snapshot.val();
+            const data = snapshot.val(); // { KOSPI: {...}, ETF: {...} }
             if (data) {
                 const mapped: Record<string, StockItem> = {};
-                Object.entries(data).forEach(([symbol, stock]: [string, any]) => {
-                    mapped[symbol] = {
-                        symbol,
-                        name: stock.name,
-                        price: stock.price,
-                        change: stock.change,
-                        changePercent: stock.change_percent,
-                        volume: stock.volume || 0,
-                        market: stock.market
-                    };
+                Object.entries(data).forEach(([market, stocks]: [string, any]) => {
+                    if (typeof stocks === 'object') {
+                        Object.entries(stocks).forEach(([symbol, stock]: [string, any]) => {
+                            mapped[symbol] = {
+                                symbol,
+                                name: stock.name,
+                                price: stock.price,
+                                change: stock.change,
+                                changePercent: stock.change_percent,
+                                volume: stock.volume || 0,
+                                market: market // Injecting market from the path
+                            };
+                        });
+                    }
                 });
                 kospiStocks = mapped;
                 handleUpdate();
@@ -41,19 +45,23 @@ export function useStockSync() {
         });
 
         const unsubKosdaq = onValue(kosdaqRef, (snapshot) => {
-            const data = snapshot.val();
+            const data = snapshot.val(); // { KOSDAQ: {...} }
             if (data) {
                 const mapped: Record<string, StockItem> = {};
-                Object.entries(data).forEach(([symbol, stock]: [string, any]) => {
-                    mapped[symbol] = {
-                        symbol,
-                        name: stock.name,
-                        price: stock.price,
-                        change: stock.change,
-                        changePercent: stock.change_percent,
-                        volume: stock.volume || 0,
-                        market: stock.market
-                    };
+                Object.entries(data).forEach(([market, stocks]: [string, any]) => {
+                    if (typeof stocks === 'object') {
+                        Object.entries(stocks).forEach(([symbol, stock]: [string, any]) => {
+                            mapped[symbol] = {
+                                symbol,
+                                name: stock.name,
+                                price: stock.price,
+                                change: stock.change,
+                                changePercent: stock.change_percent,
+                                volume: stock.volume || 0,
+                                market: market // Injecting KOSDAQ
+                            };
+                        });
+                    }
                 });
                 kosdaqStocks = mapped;
                 handleUpdate();

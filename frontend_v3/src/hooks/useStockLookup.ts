@@ -26,9 +26,9 @@ export function useStockLookup() {
             // 2. Listen for response
             const unsub = onValue(dataRef, (snapshot) => {
                 const data = snapshot.val();
-                if (data && data.updatedAt) {
+                if (data && data.name) { // Use name as a proxy for existence
                     const stock: StockItem = {
-                        symbol: data.symbol,
+                        symbol: symbol, // Using the requested symbol
                         name: data.name,
                         price: data.price,
                         change: data.change,

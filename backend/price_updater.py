@@ -42,7 +42,7 @@ def price_update_job():
     
     # 1. Fetch Latest Data
     try:
-        kr_stocks = fetch_kr_stocks(kospi_limit=500, kosdaq_limit=700)
+        kr_stocks = fetch_kr_stocks(kospi_limit=600, kosdaq_limit=900)
         etf_stocks = fetch_etf_stocks(limit=200)
         
         # 1-B. Fetch Custom Stocks from RTDB
@@ -82,19 +82,20 @@ def price_update_job():
         return
 
     # 2. Prepare Updates (Diff check)
-    kospi_updates = {}
-    kosdaq_updates = {}
+    updates_by_market = {
+        'KOSPI': {},
+        'KOSDAQ': {},
+        'ETF': {}
+    }
     
     for symbol, stock in all_stocks.items():
         new_dict = stock.to_dict()
         old_dict = last_snapshot.get(symbol)
         
         if has_stock_changed(new_dict, old_dict):
-            # Format update
-            if stock.market in ['KOSPI', 'ETF']:
-                kospi_updates[symbol] = new_dict
-            elif stock.market == 'KOSDAQ':
-                kosdaq_updates[symbol] = new_dict
+            # Group by market
+            m_type = stock.market if stock.market in updates_by_market else 'KOSPI'
+            updates_by_market[m_type][symbol] = new_dict
             
             # Update local snapshot
             last_snapshot[symbol] = new_dict
@@ -109,21 +110,27 @@ def price_update_job():
             'market_open': is_open
         }))
         
-        # B. KOSPI Project: Stocks + updatedAt
-        if kospi_updates or is_open: # Keep updatedAt fresh during market hours
-            if kospi_updates:
-                kospi_db.child('stocks').update(sanitize_for_firebase(kospi_updates))
+        # B. KOSPI Project: KOSPI + ETF
+        if updates_by_market['KOSPI'] or updates_by_market['ETF'] or is_open:
+            if updates_by_market['KOSPI']:
+                kospi_db.child('stocks/KOSPI').update(sanitize_for_firebase(updates_by_market['KOSPI']))
+            if updates_by_market['ETF']:
+                kospi_db.child('stocks/ETF').update(sanitize_for_firebase(updates_by_market['ETF']))
+            
             kospi_db.child('system/updatedAt').set(now.isoformat())
-            if kospi_updates:
-                print(f"  -> KOSPI: Synced {len(kospi_updates)} stock changes.")
+            
+            total_kp = len(updates_by_market['KOSPI']) + len(updates_by_market['ETF'])
+            if total_kp > 0:
+                print(f"  -> KOSPI Project: Synced {total_kp} stock changes (KOSPI+ETF).")
 
-        # C. KOSDAQ Project: Stocks + updatedAt
-        if kosdaq_updates or is_open:
-            if kosdaq_updates:
-                kosdaq_db.child('stocks').update(sanitize_for_firebase(kosdaq_updates))
+        # C. KOSDAQ Project: KOSDAQ
+        if updates_by_market['KOSDAQ'] or is_open:
+            if updates_by_market['KOSDAQ']:
+                kosdaq_db.child('stocks/KOSDAQ').update(sanitize_for_firebase(updates_by_market['KOSDAQ']))
+            
             kosdaq_db.child('system/updatedAt').set(now.isoformat())
-            if kosdaq_updates:
-                print(f"  -> KOSDAQ: Synced {len(kosdaq_updates)} stock changes.")
+            if updates_by_market['KOSDAQ']:
+                print(f"  -> KOSDAQ Project: Synced {len(updates_by_market['KOSDAQ'])} stock changes.")
                 
     except Exception as e:
         print(f"Error during Firebase sync: {e}")

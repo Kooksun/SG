@@ -22,16 +22,14 @@ def process_lookup_request(symbol: str, request_data: dict):
         
         if symbol in batch_data:
             stock_obj = batch_data[symbol]
-            # 3. Upload to Data path
+            # 3. Upload to Data path (DIETED FIELDS)
             main_db.child(f'system/data/lookup/{symbol}').set({
-                'symbol': stock_obj.symbol,
                 'name': stock_obj.name,
                 'price': stock_obj.price,
                 'change': stock_obj.change,
                 'change_percent': stock_obj.change_percent,
                 'volume': stock_obj.volume,
-                'market': stock_obj.market,
-                'updatedAt': datetime.now(MARKET_TZ).isoformat()
+                'market': stock_obj.market
             })
             
             # 4. Update status to COMPLETED

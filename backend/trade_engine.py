@@ -13,16 +13,21 @@ PROFIT_RATIO_THRESHOLD = 0.1 # 10%
 MAX_TICKERS = 20
 
 def get_latest_price(symbol: str) -> tuple[float, str, float]:
-    """Fetch latest price and change_percent from KOSPI/KOSDAQ RTDB."""
-    # 1. Try KOSPI (includes ETF)
-    stock = kospi_db.child(f'stocks/{symbol}').get()
-    if stock:
-        return float(stock.get('price', 0)), stock.get('market', 'KOSPI'), float(stock.get('change_percent', 0))
+    """Fetch latest price and change_percent from nested RTDB structure."""
+    # 1. Try KOSPI
+    stock_kp = kospi_db.child(f'stocks/KOSPI/{symbol}').get()
+    if stock_kp:
+        return float(stock_kp.get('price', 0)), 'KOSPI', float(stock_kp.get('change_percent', 0))
     
-    # 2. Try KOSDAQ
-    stock = kosdaq_db.child(f'stocks/{symbol}').get()
-    if stock:
-        return float(stock.get('price', 0)), stock.get('market', 'KOSDAQ'), float(stock.get('change_percent', 0))
+    # 2. Try ETF (also in KOSPI DB)
+    stock_etf = kospi_db.child(f'stocks/ETF/{symbol}').get()
+    if stock_etf:
+        return float(stock_etf.get('price', 0)), 'ETF', float(stock_etf.get('change_percent', 0))
+    
+    # 3. Try KOSDAQ
+    stock_kq = kosdaq_db.child(f'stocks/KOSDAQ/{symbol}').get()
+    if stock_kq:
+        return float(stock_kq.get('price', 0)), 'KOSDAQ', float(stock_kq.get('change_percent', 0))
     
     # 3. Fallback: Fetch directly from Naver and Register to custom_stocks
     print(f"  ? Symbol {symbol} not in DB. Searching Naver...")
