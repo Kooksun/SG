@@ -32,16 +32,13 @@ def get_latest_price(symbol: str) -> tuple[float, str, float]:
         price = stock_obj.price
         change_p = stock_obj.change_percent
         
-        # Register to custom_stocks for future tracking
-        # We don't know the market for sure yet, so we'll default to KOSPI
-        # (It will be updated correctly if we find a way to distinguish later, 
-        # but KOSPI project covers ETF as well)
+        # Register to custom_stocks for future tracking with CORRECT market
         main_db.child('system/custom_stocks').child(symbol).update({
             'addedAt': datetime.now(MARKET_TZ).isoformat(),
-            'market': 'KOSPI' 
+            'market': stock_obj.market
         })
-        print(f"  + Registered {symbol} to custom_stocks tracking.")
-        return price, 'KOSPI', change_p
+        print(f"  + Registered {symbol} to custom_stocks tracking ({stock_obj.market}).")
+        return price, stock_obj.market, change_p
 
     return 0.0, None, 0.0
 

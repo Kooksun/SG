@@ -7,6 +7,7 @@ import { useStocks } from '../hooks/useStocks';
 import { useAuth } from '../hooks/useAuth';
 import { useUserStore } from '../hooks/useUserStore';
 import { useRealtimeData } from '../hooks/useRealtimeData';
+import { useStockLookup } from '../hooks/useStockLookup';
 import TradeModal from '../components/TradeModal';
 
 type MarketFilter = 'ALL' | 'KOSPI' | 'KOSDAQ' | 'ETF' | 'WATCHLIST' | 'HOLDINGS';
@@ -23,6 +24,7 @@ const MarketPage: React.FC = () => {
     const [filter, setFilter] = useState<MarketFilter>('ALL');
     const [sortField, setSortField] = useState<SortField>('PRICE');
     const [sortDirection, setSortDirection] = useState<SortDirection>('DESC');
+    const { lookupStock, isLookingUp, error: lookupError } = useStockLookup();
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -77,6 +79,18 @@ const MarketPage: React.FC = () => {
     const handleSelectStock = (stock: StockItem) => {
         setSelectedStock(stock);
     };
+
+    const handleExternalLookup = async () => {
+        if (!searchQuery) return;
+        const res = await lookupStock(searchQuery);
+        if (res) {
+            setSelectedStock(res);
+        }
+    };
+
+    const isCodeSearchPossible = useMemo(() => {
+        return searchQuery.length === 6 && /^\d+$/.test(searchQuery) && filteredStocks.length === 0;
+    }, [searchQuery, filteredStocks]);
 
     return (
         <main className="dashboard">
@@ -151,6 +165,24 @@ const MarketPage: React.FC = () => {
                         className="stock-list-card full-height"
                     >
                         <StockList stocks={filteredStocks} onSelect={handleSelectStock} />
+
+                        {filteredStocks.length === 0 && searchQuery && (
+                            <div className="empty-search-container">
+                                <p className="empty-msg">'{searchQuery}'에 대한 검색 결과가 없습니다.</p>
+                                {isCodeSearchPossible ? (
+                                    <button
+                                        className="external-search-btn"
+                                        onClick={handleExternalLookup}
+                                        disabled={isLookingUp}
+                                    >
+                                        {isLookingUp ? '조회 중...' : '종목 코드로 외부 시세 조회하기'}
+                                    </button>
+                                ) : (
+                                    <p className="hint-msg">정확한 종목명이나 6자리 종목 코드를 입력해 보세요.</p>
+                                )}
+                                {lookupError && <p className="error-msg-mini">{lookupError}</p>}
+                            </div>
+                        )}
                     </Card>
                 </div>
             </section>

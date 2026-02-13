@@ -146,9 +146,9 @@ def fetch_custom_stocks(symbols: List[str]) -> Dict[str, Stock]:
             items = data.get('datas', [])
             for item in items:
                 symbol = item.get('itemCode')
-                # Determine market (this API doesn't explicitly return KOSPI/KOSDAQ string in a simple way, 
-                # but we can infer or leave as is if the caller knows. For now, we'll try to find it.)
-                # In Naver's case, domestic stocks are usually under 'domestic'
+                exchange_info = item.get('stockExchangeType', {})
+                market_name = exchange_info.get('nameEng', 'KOSPI') # Fallback to KOSPI
+                
                 snapshot[symbol] = Stock(
                     symbol=symbol,
                     name=item.get('stockName'),
@@ -158,7 +158,7 @@ def fetch_custom_stocks(symbols: List[str]) -> Dict[str, Stock]:
                     volume=float(item.get('accumulatedTradingVolumeRaw', 0)),
                     updated_at=datetime.now(MARKET_TZ),
                     currency='KRW',
-                    market='UNKNOWN' # Will be refined by the caller (price_updater)
+                    market=market_name
                 )
     except Exception as e:
         print(f"Error fetching custom stocks: {e}")

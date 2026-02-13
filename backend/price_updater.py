@@ -56,10 +56,18 @@ def price_update_job():
                 batch = custom_symbols[i:i + 50]
                 batch_data = fetch_custom_stocks(batch)
                 
-                # Assign market from RTDB metadata
+                # Assign market from API (most reliable)
                 for sym, stock in batch_data.items():
                     info = custom_info.get(sym, {})
-                    stock.market = info.get('market', 'KOSPI') # Default to KOSPI
+                    api_market = stock.market
+                    saved_market = info.get('market')
+                    
+                    if api_market != saved_market:
+                        # Update metadata in RTDB if it was wrong or missing
+                        main_db.child('system/custom_stocks').child(sym).update({
+                            'market': api_market
+                        })
+                        print(f"  [FIX] Market for {sym} corrected: {saved_market} -> {api_market}")
                 
                 custom_stocks.update(batch_data)
             print(f"  -> Processed {len(custom_stocks)} custom stocks.")
