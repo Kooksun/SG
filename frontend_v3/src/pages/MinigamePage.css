@@ -35,7 +35,7 @@
     gap: var(--spacing-md);
 }
 
-.stat-card {
+.mg-stat-card {
     background: var(--card-bg);
     border: var(--glass-border);
     border-radius: var(--radius-md);
@@ -46,13 +46,13 @@
     min-width: 120px;
 }
 
-.stat-card .label {
+.mg-stat-card .mg-label {
     font-size: 0.75rem;
     color: var(--text-secondary);
     margin-bottom: 2px;
 }
 
-.stat-card .value {
+.mg-stat-card .mg-value {
     font-size: 1.1rem;
     font-weight: 700;
     color: var(--accent-blue);
@@ -209,7 +209,7 @@
     height: 100%;
 }
 
-.board-item {
+.mg-board-item {
     background: var(--card-bg);
     border: var(--glass-border);
     border-radius: var(--radius-md);
@@ -223,33 +223,33 @@
     transition: all 0.3s ease;
 }
 
-.board-item:hover {
+.mg-board-item:hover {
     background: rgba(255, 255, 255, 0.05);
     transform: translateX(4px);
 }
 
-.board-item .label {
+.mg-board-item .mg-label {
     display: block;
     font-size: 0.8rem;
     color: var(--text-secondary);
     margin-bottom: 4px;
 }
 
-.board-item .value {
+.mg-board-item .mg-value {
     font-size: 1.5rem;
     font-weight: 800;
     letter-spacing: -0.02em;
 }
 
-.board-item.secured .value {
+.mg-board-item.secured .mg-value {
     color: var(--accent-amber);
 }
 
-.board-item.wins .value {
+.mg-board-item.wins .mg-value {
     color: var(--accent-emerald);
 }
 
-.board-item.next .value {
+.mg-board-item.next .mg-value {
     color: var(--accent-blue);
 }
 
@@ -416,20 +416,20 @@
     margin-bottom: 2rem;
 }
 
-.stock-info {
+.mg-stock-info {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
     margin-bottom: 1.25rem;
 }
 
-.stock-info .brand {
+.mg-stock-info .brand {
     font-size: 1.25rem;
     font-weight: 700;
     color: #fff;
 }
 
-.stock-info .date {
+.mg-stock-info .date {
     font-size: 0.875rem;
     color: rgba(255, 255, 255, 0.4);
 }

@@ -318,7 +318,7 @@ const MinigamePage: React.FC = () => {
                     </p>
 
                     <div className="answer-card">
-                        <div className="stock-info">
+                        <div className="mg-stock-info">
                             <span className="brand">{result.stockName}</span>
                             <span className="date">{result.date}</span>
                             <div className={`direction-badge ${result.answerDirection === 1 ? 'up' : 'down'}`}>
@@ -361,17 +361,17 @@ const MinigamePage: React.FC = () => {
                     <p>차트를 보고 다음 날 캔들의 방향을 맞춰보세요!</p>
                 </div>
                 <div className="stats-cards">
-                    <div className="stat-card">
-                        <span className="label">상태</span>
-                        <span className="value" style={{ fontSize: '0.8rem' }}>{session?.status || 'N/A'}</span>
+                    <div className="mg-stat-card">
+                        <span className="mg-label">상태</span>
+                        <span className="mg-value" style={{ fontSize: '0.8rem' }}>{session?.status || 'N/A'}</span>
                     </div>
-                    <div className="stat-card">
-                        <span className="label">보유 포인트</span>
-                        <span className="value">{taxPoints.toLocaleString()} P</span>
+                    <div className="mg-stat-card">
+                        <span className="mg-label">보유 포인트</span>
+                        <span className="mg-value">{taxPoints.toLocaleString()} P</span>
                     </div>
-                    <div className="stat-card">
-                        <span className="label">오늘의 도전</span>
-                        <span className="value">{dailyStats.attempts} / 2</span>
+                    <div className="mg-stat-card">
+                        <span className="mg-label">오늘의 도전</span>
+                        <span className="mg-value">{dailyStats.attempts} / 2</span>
                     </div>
                 </div>
             </header>
@@ -418,17 +418,17 @@ const MinigamePage: React.FC = () => {
                 <div className="game-active-area">
                     <div className="game-main-layout">
                         <div className="game-dashboard-vertical">
-                            <div className="board-item secured">
-                                <span className="label">확보된 보상</span>
-                                <span className="value">{session.securedReward.toLocaleString()} P</span>
+                            <div className="mg-board-item secured">
+                                <span className="mg-label">확보된 보상</span>
+                                <span className="mg-value">{session.securedReward.toLocaleString()} P</span>
                             </div>
-                            <div className="board-item wins">
-                                <span className="label">현재 연승</span>
-                                <span className="value">{session.wins} 연승</span>
+                            <div className="mg-board-item wins">
+                                <span className="mg-label">현재 연승</span>
+                                <span className="mg-value">{session.wins} 연승</span>
                             </div>
-                            <div className="board-item next">
-                                <span className="label">다음 보상</span>
-                                <span className="value">{getNextReward(session.wins).toLocaleString()} P</span>
+                            <div className="mg-board-item next">
+                                <span className="mg-label">다음 보상</span>
+                                <span className="mg-value">{getNextReward(session.wins).toLocaleString()} P</span>
                             </div>
                         </div>
 
