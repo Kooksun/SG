@@ -132,47 +132,63 @@ def fetch_indices() -> Dict[str, Dict]:
 def fetch_stock_chart(symbol: str, page_size: int = 60, page: int = 1) -> List[List]:
     """
     Fetch historical stock data from Naver and compress it into an array format.
+    Handles larger page_size by fetching multiple pages (API limit is approx 60).
     Format: [Date(YYYY-MM-DD), Open, High, Low, Close, Volume]
     """
     headers = {"User-Agent": "Mozilla/5.0"}
-    url = f"https://m.stock.naver.com/api/stock/{symbol}/price?pageSize={page_size}&page={page}"
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if not isinstance(data, list):
-                return []
-            
-            compressed = []
-            for item in data:
-                # Naver fields: localTradedAt, openPrice, highPrice, lowPrice, closePrice, accumulatedTradingVolume
-                # Dates are like "2024-02-05 00:00:00"
-                date_str = item.get('localTradedAt', '')[:10] 
+    all_data = []
+    
+    # If page_size is large, we need to fetch multiple pages of up to 60 each
+    current_page = page
+    remaining_size = page_size
+    MAX_API_PAGE_SIZE = 60
+
+    while remaining_size > 0:
+        fetch_size = min(remaining_size, MAX_API_PAGE_SIZE)
+        url = f"https://m.stock.naver.com/api/stock/{symbol}/price?pageSize={fetch_size}&page={current_page}"
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                if not isinstance(data, list) or not data:
+                    break
                 
-                def p(val):
-                    if isinstance(val, str):
-                        return float(val.replace(',', ''))
-                    return float(val or 0)
+                for item in data:
+                    # Naver fields: localTradedAt, openPrice, highPrice, lowPrice, closePrice, accumulatedTradingVolume
+                    date_str = item.get('localTradedAt', '')[:10] 
+                    
+                    def p(val):
+                        if isinstance(val, str):
+                            return float(val.replace(',', ''))
+                        return float(val or 0)
 
-                # 시가, 고가, 저가가 0인 경우 종가로 대체(시즌2 보정 로직)
-                close_val = p(item.get('closePrice'))
-                open_val = p(item.get('openPrice'))
-                high_val = p(item.get('highPrice'))
-                low_val = p(item.get('lowPrice'))
+                    close_val = p(item.get('closePrice'))
+                    open_val = p(item.get('openPrice'))
+                    high_val = p(item.get('highPrice'))
+                    low_val = p(item.get('lowPrice'))
 
-                if open_val == 0: open_val = close_val
-                if high_val == 0: high_val = close_val
-                if low_val == 0: low_val = close_val
+                    if open_val == 0: open_val = close_val
+                    if high_val == 0: high_val = close_val
+                    if low_val == 0: low_val = close_val
 
-                compressed.append([
-                    date_str,
-                    open_val,
-                    high_val,
-                    low_val,
-                    close_val,
-                    p(item.get('accumulatedTradingVolume'))
-                ])
-            return compressed
-    except Exception as e:
-        print(f"Error fetching chart for {symbol}: {e}")
-    return []
+                    all_data.append([
+                        date_str,
+                        open_val,
+                        high_val,
+                        low_val,
+                        close_val,
+                        p(item.get('accumulatedTradingVolume'))
+                    ])
+                
+                if len(data) < fetch_size:
+                    break # No more data available
+                
+                remaining_size -= len(data)
+                current_page += 1
+            else:
+                break
+        except Exception as e:
+            print(f"Error fetching chart for {symbol}: {e}")
+            break
+            
+    return all_data

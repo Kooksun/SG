@@ -29,7 +29,7 @@ def get_reward(wins: int, failed: bool = False) -> int:
             return REWARDS[2]
         # Risk logic for wins >= 3
         secured = 500000 + (wins - 3) * 100000
-        return secured - 100000
+        return secured - 50000
 
 def get_random_top_stock():
     """Fetches a random stock from the top pool."""
@@ -79,15 +79,28 @@ def start_game(uid: str):
     symbol = stock['symbol']
     name = stock['name']
     
-    # 3. Fetch Historical Data (60 sessions)
-    history = fetch_stock_chart(symbol, page_size=60, page=1)
-    if not history or len(history) < 25: # Need at least 21 to have a 20-window + 1 answer
-        # Retry with another stock once or fail
+    # 3. Fetch Historical Data (120 sessions) with retries
+    max_retries = 3
+    history = None
+    target_stock = stock
+    
+    for i in range(max_retries):
+        history = fetch_stock_chart(target_stock['symbol'], page_size=120, page=1)
+        if history and len(history) >= 45:
+            break
+        print(f"  !! Retry {i+1} for starting game ({uid})")
+        target_stock = get_random_top_stock()
+        if not target_stock: break
+
+    if not history or len(history) < 45:
         main_db.child(f'user_activities/{uid}/minigameRequest').update({
             'status': 'FAILED',
-            'errorMessage': '충분한 차트 데이터가 없습니다. 다시 시도해 주세요.'
+            'errorMessage': '충분한 차트 데이터를 확보하지 못했습니다. 다시 시도해 주세요.'
         })
         return
+
+    symbol = target_stock['symbol']
+    name = target_stock['name']
 
     # 4. Select Window
     # Naver returns latest first. We reverse it in fetcher or here?
@@ -97,10 +110,10 @@ def start_game(uid: str):
     # Let's reverse to make it chronological.
     history.reverse()
     
-    max_start = len(history) - 21
+    max_start = len(history) - 41
     start_idx = random.randint(0, max_start)
-    window_data = history[start_idx : start_idx + 20]
-    answer_candle = history[start_idx + 20] # The 21st candle
+    window_data = history[start_idx : start_idx + 40]
+    answer_candle = history[start_idx + 40] # The 41st candle
     
     # Calculate direction: 1 for UP, -1 for DOWN, 0 for FLAT
     direction = 1 if answer_candle[4] > answer_candle[1] else -1
@@ -131,9 +144,11 @@ def start_game(uid: str):
         }
     })
 
+    print(f"  -> {uid} Session Created: {session_id} with {name}")
+    
     # 6. Update Request status
     main_db.child(f'user_activities/{uid}/minigameRequest').update({
-        'status': 'READY',
+        'status': 'SUCCESS', # Use SUCCESS to indicate readiness
         'sessionId': session_id
     })
 
@@ -187,31 +202,40 @@ def handle_guess(uid: str, guess_data: dict):
 
 def prepare_next_round(uid: str, wins: int, secured: int):
     """Pick a new stock and window for the next round."""
-    stock = get_random_top_stock()
-    history = fetch_stock_chart(stock['symbol'], page_size=60, page=1)
-    if not history: 
-        # Fallback to another stock
-        stock = get_random_top_stock()
-        history = fetch_stock_chart(stock['symbol'], page_size=60, page=1)
-    
-    if not history:
-        print(f"  !! Error fetching history for next round ({uid})")
+    # Try up to 3 times to get a valid stock with history
+    max_retries = 3
+    history = None
+    target_stock = get_random_top_stock() # Fix: use get_random_top_stock() instead of undefined stock
+
+    for i in range(max_retries):
+        history = fetch_stock_chart(target_stock['symbol'], page_size=120, page=1)
+        if history and len(history) >= 45:
+            break
+        print(f"  !! Retry {i+1} for next round ({uid})")
+        target_stock = get_random_top_stock()
+
+    if not history or len(history) < 45:
+        print(f"  !! Failed to fetch history for next round after retries ({uid})")
+        main_db.child(f'user_activities/{uid}/minigameData').update({
+            'status': 'FINISHED',
+            'errorMessage': '차트 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+        })
         return
 
     history.reverse()
     
-    max_start = len(history) - 21
+    max_start = len(history) - 41
     start_idx = random.randint(0, max_start)
-    window_data = history[start_idx : start_idx + 20]
-    answer_candle = history[start_idx + 20]
+    window_data = history[start_idx : start_idx + 40]
+    answer_candle = history[start_idx + 40]
     direction = 1 if answer_candle[4] > answer_candle[1] else -1
     
     main_db.child(f'user_activities/{uid}/minigameData').update({
         'window': window_data,
         'answer': {
             'direction': direction,
-            'symbol': stock['symbol'],
-            'name': stock['name'],
+            'symbol': target_stock['symbol'],
+            'name': target_stock['name'],
             'date': answer_candle[0],
             'details': answer_candle
         },
@@ -220,7 +244,7 @@ def prepare_next_round(uid: str, wins: int, secured: int):
         'status': 'ACTIVE',
         'lastRoundResult': None # Clear result for new round
     })
-    print(f"  -> {uid} Round {wins+1} Started.")
+    print(f"  -> {uid} Round {wins+1} Started with {target_stock['name']}.")
 
 def handle_next_round_request(uid: str):
     """Processes user clicking 'Next Round'."""
@@ -237,7 +261,11 @@ def handle_next_round_request(uid: str):
         
         if wins >= 3:
             # Transition to DECIDING (Stop or Continue)
-            session_ref.update({'status': 'DECIDING'})
+            # Clear lastRoundResult so it doesn't show up again if they STOP
+            session_ref.update({
+                'status': 'DECIDING',
+                'lastRoundResult': None
+            })
         else:
             # Go directly to next round
             prepare_next_round(uid, wins, secured)

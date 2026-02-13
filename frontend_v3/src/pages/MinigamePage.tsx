@@ -76,21 +76,29 @@ const MinigamePage: React.FC = () => {
 
             if (data?.lastRoundResult) {
                 if (isInitialLoad.current) {
-                    // On initial mount, only open modal if game is waiting for a decision/next round
                     if (data.status === 'ROUND_COMPLETED' || data.status === 'DECIDING') {
                         setShowResultModal(true);
                     }
                 } else {
-                    // Subsequent updates (e.g. just finished a round)
                     setShowResultModal(true);
                 }
             }
             isInitialLoad.current = false;
         });
 
+        // 3. Listen for Request Status (Errors)
+        const requestRef = ref(rtdb, `user_activities/${user.uid}/minigameRequest`);
+        const requestUnsub = onValue(requestRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data?.status === 'FAILED') {
+                setError(data.errorMessage || '요청 처리에 실패했습니다.');
+            }
+        });
+
         return () => {
             userUnsub();
             sessionUnsub();
+            requestUnsub();
         };
     }, [user]);
 
@@ -173,33 +181,125 @@ const MinigamePage: React.FC = () => {
         return 500000 + (currentWins - 2) * 100000;
     };
 
+    const calculateMA = (windowData: any[], period: number) => {
+        return windowData.map((_, index) => {
+            if (index < period - 1) return { x: new Date(windowData[index][0]), y: null };
+            let sum = 0;
+            for (let i = 0; i < period; i++) {
+                sum += windowData[index - i][4]; // Close price
+            }
+            return { x: new Date(windowData[index][0]), y: Math.round(sum / period) };
+        });
+    };
+
     const renderChart = () => {
         if (!session?.window) return null;
 
-        const data = session.window.map((item: any) => ({
+        const candlestickData = session.window.map((item: any) => ({
             x: new Date(item[0]),
             y: [item[1], item[2], item[3], item[4]]
         }));
 
+        const ma5Data = calculateMA(session.window, 5);
+        const ma20Data = calculateMA(session.window, 20);
+
+        const series = [
+            {
+                name: '시세',
+                type: 'candlestick',
+                data: candlestickData
+            },
+            {
+                name: '5일 이평선',
+                type: 'line',
+                data: ma5Data
+            },
+            {
+                name: '20일 이평선',
+                type: 'line',
+                data: ma20Data
+            }
+        ];
+
         const options: ApexCharts.ApexOptions = {
             chart: {
-                type: 'candlestick',
+                type: 'line',
                 toolbar: { show: false },
                 background: 'transparent',
-                animations: { enabled: true }
+                animations: { enabled: false },
+                sparkline: { enabled: false }
             },
-            xaxis: { type: 'datetime' },
-            yaxis: { tooltip: { enabled: true } },
-            grid: { borderColor: 'rgba(255,255,255,0.05)' },
+            xaxis: {
+                type: 'datetime',
+                labels: {
+                    style: { colors: 'rgba(255,255,255,0.5)', fontSize: '10px' },
+                    datetimeFormatter: { month: 'MMM', day: 'dd' }
+                }
+            },
+            yaxis: {
+                tooltip: { enabled: true },
+                labels: {
+                    style: { colors: 'rgba(255,255,255,0.5)', fontSize: '10px' },
+                    formatter: (val) => val?.toLocaleString()
+                },
+                opposite: true
+            },
+            grid: {
+                borderColor: 'rgba(255,255,255,0.05)',
+                xaxis: { lines: { show: true } }
+            },
             theme: { mode: 'dark' },
+            stroke: {
+                width: [1, 2, 2],
+                curve: ['straight', 'smooth', 'smooth'],
+                colors: ['#f43f5e', '#facc15', '#a855f7']
+            },
+            colors: ['#f43f5e', '#facc15', '#a855f7'],
             plotOptions: {
                 candlestick: {
-                    colors: { upward: '#f43f5e', downward: '#3b82f6' }
+                    colors: { upward: '#f43f5e', downward: '#3b82f6' },
+                    wick: { useFillColor: true }
+                }
+            },
+            legend: {
+                show: true,
+                position: 'top',
+                horizontalAlign: 'right',
+                labels: { colors: 'rgba(255,255,255,0.7)' }
+            },
+            tooltip: {
+                shared: true,
+                intersect: false,
+                theme: 'dark',
+                custom: function ({ seriesIndex, dataPointIndex, w }) {
+                    const o = w.globals.seriesCandleO[0][dataPointIndex];
+                    const h = w.globals.seriesCandleH[0][dataPointIndex];
+                    const l = w.globals.seriesCandleL[0][dataPointIndex];
+                    const c = w.globals.seriesCandleC[0][dataPointIndex];
+
+                    const ma5 = w.globals.series[1][dataPointIndex];
+                    const ma20 = w.globals.series[2][dataPointIndex];
+
+                    return `
+                        <div class="chart-tooltip-mini">
+                            <div style="margin-bottom: 5px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 3px;">
+                                ${new Date(w.globals.labels[dataPointIndex]).toLocaleDateString()}
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <div>시가: ${o?.toLocaleString()}</div>
+                                <div style="color: #f43f5e">고가: ${h?.toLocaleString()}</div>
+                                <div style="color: #3b82f6">저가: ${l?.toLocaleString()}</div>
+                                <div>종가: ${c?.toLocaleString()}</div>
+                                ${ma5 ? `<div style="color: #facc15; margin-top: 3px;">MA5: ${ma5.toLocaleString()}</div>` : ''}
+                                ${ma20 ? `<div style="color: #a855f7;">MA20: ${ma20.toLocaleString()}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
                 }
             }
         };
 
-        return <Chart options={options} series={[{ data }]} type="candlestick" height={300} />;
+        return <Chart options={options} series={series} type="line" height={360} />;
     };
 
     const ResultModal = () => {
@@ -262,6 +362,10 @@ const MinigamePage: React.FC = () => {
                 </div>
                 <div className="stats-cards">
                     <div className="stat-card">
+                        <span className="label">상태</span>
+                        <span className="value" style={{ fontSize: '0.8rem' }}>{session?.status || 'N/A'}</span>
+                    </div>
+                    <div className="stat-card">
                         <span className="label">보유 포인트</span>
                         <span className="value">{taxPoints.toLocaleString()} P</span>
                     </div>
@@ -297,7 +401,7 @@ const MinigamePage: React.FC = () => {
 
                         <p className="rules-text">
                             3연승 시 50만 포인트를 획득합니다.<br />
-                            3연승 이후에는 도전을 계속할지(성공 시 +10만, 실패 시 -10만) 선택할 수 있습니다.
+                            3연승 이후에는 도전을 계속할지(성공 시 +10만, 실패 시 -5만) 선택할 수 있습니다.
                         </p>
 
                         <button
@@ -371,7 +475,7 @@ const MinigamePage: React.FC = () => {
                                         계속하기 (+10만P 도전)
                                     </button>
                                 </div>
-                                <p className="risk-warning">※ 계속하기 선택 후 실패 시 100,000 P가 차감됩니다.</p>
+                                <p className="risk-warning">※ 계속하기 선택 후 실패 시 50,000 P가 차감됩니다.</p>
                             </div>
                         </div>
                     )}

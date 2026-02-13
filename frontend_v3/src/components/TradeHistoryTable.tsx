@@ -49,12 +49,14 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore,
                                 </td>
                                 <td className="text-center">
                                     <span className={`type-badge ${item.type.toLowerCase()}`}>
-                                        {item.type === 'BUY' ? '매수' : '매도'}
+                                        {item.type === 'BUY' ? '매수' : item.type === 'REWARD' ? '적립' : '매도'}
                                     </span>
                                 </td>
-                                <td className="text-right font-mono">{item.price.toLocaleString()}</td>
-                                <td className="text-right font-mono">{item.quantity.toLocaleString()}</td>
-                                <td className="text-right font-mono font-bold">{item.totalAmount.toLocaleString()}원</td>
+                                <td className="text-right font-mono">{item.type === 'REWARD' ? '-' : item.price.toLocaleString()}</td>
+                                <td className="text-right font-mono">{item.type === 'REWARD' ? '-' : item.quantity.toLocaleString()}</td>
+                                <td className="text-right font-mono font-bold">
+                                    {item.totalAmount.toLocaleString()}{item.type === 'REWARD' ? ' P' : '원'}
+                                </td>
                                 <td className={`text-right font-mono ${item.profit && item.profit > 0 ? 'up' : item.profit && item.profit < 0 ? 'down' : ''}`}>
                                     {item.type === 'SELL' && item.profit !== undefined ? (
                                         <>
@@ -64,12 +66,14 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore,
                                     ) : '-'}
                                 </td>
                                 <td className="text-right font-mono text-xs">
-                                    <div className="fee-display">
-                                        <div>{item.fee.toLocaleString()}원</div>
-                                        {item.discount !== undefined && item.discount > 0 && (
-                                            <div className="discount-text">-{item.discount.toLocaleString()} 할인</div>
-                                        )}
-                                    </div>
+                                    {item.type === 'REWARD' ? '-' : (
+                                        <div className="fee-display">
+                                            <div>{item.fee.toLocaleString()}원</div>
+                                            {item.discount !== undefined && item.discount > 0 && (
+                                                <div className="discount-text">-{item.discount.toLocaleString()} 할인</div>
+                                            )}
+                                        </div>
+                                    )}
                                 </td>
                             </tr>
                         ))
