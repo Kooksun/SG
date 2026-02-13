@@ -53,8 +53,10 @@ const MarketPage: React.FC = () => {
 
         // 2. Search Query
         if (searchQuery) {
+            const lowQuery = searchQuery.toLowerCase();
             result = result.filter(s =>
-                s.name.includes(searchQuery) || s.symbol.includes(searchQuery)
+                s.name.toLowerCase().includes(lowQuery) ||
+                s.symbol.toLowerCase().includes(lowQuery)
             );
         }
 
