@@ -44,12 +44,13 @@ export function useRealtimeData() {
         const unsubscribeTickers = onValue(tickerRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
-                // 배열 형태면 그대로, 객체 형태면 값만 추출하여 배열화
-                if (Array.isArray(data)) {
-                    setTickers(data);
-                } else {
-                    setTickers(Object.values(data));
-                }
+                const raw: BroadcastTrade[] = Array.isArray(data) ? data : Object.values(data);
+                // 48시간 이내 항목만 필터링 후 최신 20건으로 제한
+                const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+                const filtered = raw
+                    .filter((t) => t && t.timestamp && new Date(t.timestamp).getTime() > cutoff)
+                    .slice(0, 20);
+                setTickers(filtered);
             }
         });
 

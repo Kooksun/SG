@@ -10,7 +10,7 @@ from .fetcher import MARKET_TZ, fetch_custom_stocks
 FEE_RATE_SELL = 0.002  # 0.2% (SELL only)
 TICKER_THRESHOLD = 50000000 # 50M KRW
 PROFIT_RATIO_THRESHOLD = 0.1 # 10%
-MAX_TICKERS = 20
+MAX_TICKERS = 50
 
 def get_latest_price(symbol: str) -> tuple[float, str, float]:
     """Fetch latest price and change_percent from nested RTDB structure."""
