@@ -324,7 +324,7 @@ const LeaderboardPage: React.FC = () => {
                                     >
                                         <Bomb size={28} />
                                         <span className="action-title">강제 매각 타격</span>
-                                        <span className="action-cost">50,000 P 소모</span>
+                                        <span className="action-cost">100,000 P 소모</span>
                                     </button>
                                 </div>
 
@@ -370,14 +370,14 @@ const LeaderboardPage: React.FC = () => {
                                 <h3 style={{ color: '#ef4444' }}>강제 매각 타격</h3>
                                 <p>
                                     <strong>{selectedUser.displayName}</strong>님의 포트폴리오 중 평가액이 가장 큰 종목의 <strong>5%</strong>(최소 1주)를 강제로 매각시킵니다!<br /><br />
-                                    요청 시 <strong>50,000 P</strong>가 소모되며 취소할 수 없습니다.
+                                    요청 시 <strong>100,000 P</strong>가 소모되며 취소할 수 없습니다.
                                 </p>
 
-                                <div className={`portfolio-modal-points ${taxPoints < 50000 ? 'insufficient' : ''}`}>
+                                <div className={`portfolio-modal-points ${taxPoints < 100000 ? 'insufficient' : ''}`}>
                                     <span>현재 포인트</span>
                                     <span>{taxPoints.toLocaleString()} P</span>
                                 </div>
-                                {taxPoints < 50000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
+                                {taxPoints < 100000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
 
                                 <div className="portfolio-modal-actions">
                                     <button
@@ -390,10 +390,10 @@ const LeaderboardPage: React.FC = () => {
                                     <button
                                         className="btn-confirm sabotage-confirm-btn"
                                         onClick={requestSabotage}
-                                        disabled={actionStatus === 'PENDING' || taxPoints < 50000}
+                                        disabled={actionStatus === 'PENDING' || taxPoints < 100000}
                                         style={{ background: '#ef4444' }}
                                     >
-                                        {actionStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 폭격 중...</> : '50,000 P로 매각'}
+                                        {actionStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 폭격 중...</> : '100,000 P로 매각'}
                                     </button>
                                 </div>
                             </>

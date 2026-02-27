@@ -229,11 +229,11 @@ def process_sabotage_request(uid: str, req: dict):
         return
         
     req_data = req_snap.to_dict()
-    requester_name = req_data.get('nickname', '익명 플레이어')
+    requester_name = req_data.get('displayName', '익명 플레이어')
     tax_points = req_data.get('taxPoints', 0)
     
-    if tax_points < 50000:
-        mark_request_failed(uid, "포인트가 부족합니다 (50,000 P 필요).", 'sabotageRequest')
+    if tax_points < 100000:
+        mark_request_failed(uid, "포인트가 부족합니다 (100,000 P 필요).", 'sabotageRequest')
         return
 
     # 2. Pick target's largest holding outside of transaction
@@ -290,7 +290,7 @@ def process_sabotage_request(uid: str, req: dict):
                 return False, "유저 또는 보유 종목 데이터를 찾을 수 없습니다."
 
             req_pts = req_snap_tx.to_dict().get('taxPoints', 0)
-            if req_pts < 50000:
+            if req_pts < 100000:
                 return False, "포인트가 부족합니다."
 
             stock_data = stock_snap_tx.to_dict()
@@ -313,7 +313,7 @@ def process_sabotage_request(uid: str, req: dict):
 
             # Writes
             transaction.update(requester_ref, {
-                'taxPoints': req_pts - 50000
+                'taxPoints': req_pts - 100000
             })
             
             transaction.set(hist_req_ref, {
@@ -322,7 +322,7 @@ def process_sabotage_request(uid: str, req: dict):
                 'type': 'TAX',
                 'price': 0,
                 'quantity': 1,
-                'totalAmount': -50000,
+                'totalAmount': -100000,
                 'fee': 0,
                 'timestamp': firestore.SERVER_TIMESTAMP,
                 'details': f"{target_name}님의 {largest_stock['name']} 타격"
@@ -389,7 +389,7 @@ def process_sabotage_request(uid: str, req: dict):
         <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #fef2f2; border-radius: 10px; border: 1px solid #fecaca;">
             <h2 style="color: #b91c1c; text-align: center; margin-bottom: 20px;">💣 주의 요망! 강제 매각 발생</h2>
             <p style="color: #4b5563; font-size: 15px; line-height: 1.6;">
-                <strong>{requester_name}</strong>님이 50,000 포인트를 사용하여 회원님의 포트폴리오를 타격했습니다! <br/>
+                <strong>{requester_name}</strong>님이 100,000 포인트를 사용하여 회원님의 포트폴리오를 타격했습니다! <br/>
                 평가 금액이 가장 높았던 우량 자산 일부가 로컬 시장가로 즉시 매각 처리되었습니다.
             </p>
             <div style="background-color: white; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb;">
