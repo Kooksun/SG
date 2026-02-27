@@ -346,6 +346,161 @@ def finalize_game(uid: str, wins: int, reward: int, success: bool, answer: dict 
         
     session_ref.update(update_pkg)
 
+def get_all_prices():
+    """Fetch all prices from KOSPI/KOSDAQ RTDBs to use as a local cache."""
+    prices = {}
+    kp_raw = kospi_db.child('stocks').get() or {}
+    for market in ['KOSPI', 'ETF']:
+        prices.update(kp_raw.get(market, {}))
+    kd_raw = kosdaq_db.child('stocks').get() or {}
+    prices.update(kd_raw.get('KOSDAQ', {}))
+    return prices
+
+def get_random_luckybox_stock():
+    """Fetches a random stock for Lucky Box with price >= 50,000 KRW, weighted by price."""
+    valid_stocks = []
+    prices = get_all_prices()
+    
+    # 1. Fetch KOSPI
+    kp_data = kospi_db.child('stocks/KOSPI').get()
+    if kp_data:
+        for symbol, stock_data in kp_data.items():
+            if isinstance(stock_data, dict) and 'name' in stock_data:
+                stock_info = prices.get(symbol, {})
+                price = float(stock_info.get('price', stock_data.get('price', 0)))
+                if price >= 50000:
+                    stock_data['symbol'] = symbol
+                    stock_data['current_price'] = price
+                    valid_stocks.append(stock_data)
+        
+    # 2. Fetch KOSDAQ
+    kq_data = kosdaq_db.child('stocks/KOSDAQ').get()
+    if kq_data:
+        for symbol, stock_data in kq_data.items():
+            if isinstance(stock_data, dict) and 'name' in stock_data:
+                stock_info = prices.get(symbol, {})
+                price = float(stock_info.get('price', stock_data.get('price', 0)))
+                if price >= 50000:
+                    stock_data['symbol'] = symbol
+                    stock_data['current_price'] = price
+                    valid_stocks.append(stock_data)
+
+    if not valid_stocks:
+        # Fallback if somehow no stocks match
+        return get_random_top_stock()
+        
+    # Weight by price for better chances at high-tier stocks
+    weights = [stock['current_price'] for stock in valid_stocks]
+    selected_stock = random.choices(valid_stocks, weights=weights, k=1)[0]
+    return selected_stock
+
+def handle_luckybox_request(uid: str):
+    """Processes a Lucky Box purchase request."""
+    print(f"  -> Processing Lucky Box request for {uid}")
+    request_ref = main_db.child(f'user_activities/{uid}/luckyBoxRequest')
+    
+    def mark_failed(msg):
+        request_ref.update({
+            'status': 'FAILED',
+            'errorMessage': msg
+        })
+
+    user_ref = main_firestore.collection('users').document(uid)
+    port_ref = user_ref.collection('portfolio')
+    hist_ref = user_ref.collection('history').document()
+
+    try:
+        # 1. Deduct points safely using transaction
+        @firestore.transactional
+        def deduct_points_and_get_stock(transaction):
+            # --- 1. All Reads ---
+            # 1a. Read User Doc
+            user_snap = user_ref.get(transaction=transaction)
+            if not user_snap.exists:
+                return False, "유저 정보를 찾을 수 없습니다."
+            
+            user_data = user_snap.to_dict()
+            current_points = user_data.get('taxPoints', 0)
+            
+            if current_points < 100000:
+                return False, "포인트가 부족합니다."
+
+            # 1b. Pick stock (reads from RTDB implicitly, not Firestore, so it's safe here)
+            selected = get_random_luckybox_stock()
+            if not selected:
+                return False, "종목 데이터를 불러오지 못했습니다."
+            
+            symbol = selected['symbol']
+            name = selected['name']
+            prices = get_all_prices()
+            stock_info = prices.get(symbol, {})
+            current_price = float(stock_info.get('price', selected.get('price', 0)))
+
+            # 1c. Read Portfolio Doc
+            stock_doc_ref = port_ref.document(symbol)
+            stock_snap = stock_doc_ref.get(transaction=transaction)
+            
+            # --- 2. All Writes ---
+            # 2a. Deduct points
+            transaction.update(user_ref, {
+                'taxPoints': current_points - 100000
+            })
+
+            # 2b. Add to history
+            transaction.set(hist_ref, {
+                'symbol': 'LUCKY_BOX',
+                'name': '럭키박스 구매',
+                'type': 'LUCKY_BOX',
+                'price': 0,
+                'quantity': 1,
+                'totalAmount': -100000,
+                'fee': 0,
+                'timestamp': firestore.SERVER_TIMESTAMP,
+                'details': f"100,000 P 사용 ({name} 1주 획득)"
+            })
+
+            # 2c. Update Portfolio
+            if stock_snap.exists:
+                stock_data = stock_snap.to_dict()
+                old_qty = stock_data.get('quantity', 0)
+                old_avg = stock_data.get('averagePrice', 0)
+                new_qty = old_qty + 1
+                new_avg = ((old_qty * old_avg) + current_price) / new_qty
+                transaction.update(stock_doc_ref, {
+                    'quantity': new_qty,
+                    'averagePrice': new_avg,
+                    'name': name
+                })
+            else:
+                transaction.set(stock_doc_ref, {
+                    'symbol': symbol,
+                    'name': name,
+                    'quantity': 1,
+                    'averagePrice': current_price
+                })
+
+            return True, selected
+
+        transaction = main_firestore.transaction()
+        success, result = deduct_points_and_get_stock(transaction)
+
+        if not success:
+            mark_failed(result)
+            return
+
+        # Success!
+        selected_stock = result
+        print(f"  -> {uid} won {selected_stock['name']} ({selected_stock['symbol']})")
+        request_ref.update({
+            'status': 'SUCCESS',
+            'rewardSymbol': selected_stock['symbol'],
+            'rewardName': selected_stock['name']
+        })
+
+    except Exception as e:
+        print(f"Error processing Lucky Box: {e}")
+        mark_failed("처리 중 오류가 발생했습니다.")
+
 def start_manager():
     print("Season 3 Mini-game Manager Daemon Started.")
     
@@ -366,14 +521,28 @@ def start_manager():
             elif req.get('status') == 'DECISION_SUBMITTED': handle_decision(uid, req)
             elif req.get('status') == 'NEXT_ROUND_PENDING': handle_next_round_request(uid)
         
+        # 2. Check Lucky Box Request
+        if len(path_parts) == 2 and path_parts[1] == 'luckyBoxRequest':
+            uid = path_parts[0]
+            req = event.data
+            if req and req.get('status') == 'PENDING':
+                handle_luckybox_request(uid)
+        
         elif len(path_parts) == 1:
             uid = path_parts[0]
+            
+            # Check Minigame request inside user data
             req = event.data.get('minigameRequest')
             if req:
                 if req.get('status') == 'PENDING': start_game(uid)
                 elif req.get('status') == 'GUESS_SUBMITTED': handle_guess(uid, req)
                 elif req.get('status') == 'DECISION_SUBMITTED': handle_decision(uid, req)
                 elif req.get('status') == 'NEXT_ROUND_PENDING': handle_next_round_request(uid)
+            
+            # Check Luckybox request inside user data
+            lbox_req = event.data.get('luckyBoxRequest')
+            if lbox_req and lbox_req.get('status') == 'PENDING':
+                handle_luckybox_request(uid)
         
         elif len(path_parts) == 0:
             for uid, user_data in event.data.items():
@@ -381,6 +550,10 @@ def start_manager():
                     req = user_data.get('minigameRequest')
                     if req and req.get('status') == 'PENDING':
                         start_game(uid)
+                    
+                    lbox_req = user_data.get('luckyBoxRequest')
+                    if lbox_req and lbox_req.get('status') == 'PENDING':
+                        handle_luckybox_request(uid)
 
     main_db.child('user_activities').listen(on_request)
     

@@ -622,3 +622,156 @@
     min-height: 400px;
     color: var(--accent-blue);
 }
+
+/* Lucky Box Feature Styles */
+.game-init-grid {
+    display: flex;
+    gap: var(--spacing-xl);
+    justify-content: center;
+    padding: var(--spacing-md) 0;
+    max-width: 1000px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.luckybox-placeholder-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border: var(--glass-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex: 1;
+    min-width: 320px;
+    max-width: 480px;
+    position: relative;
+    overflow: hidden;
+}
+
+.luckybox-placeholder-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #facc15, #f59e0b, #ef4444);
+}
+
+.luckybox-icon-badge {
+    width: 80px;
+    height: 80px;
+    background: rgba(250, 204, 21, 0.1);
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--spacing-lg);
+    color: #facc15;
+    box-shadow: 0 0 30px rgba(250, 204, 21, 0.2);
+    animation: floating 3s ease-in-out infinite;
+}
+
+@keyframes floating {
+    0% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-8px);
+    }
+
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+.luckybox-placeholder-card h2 {
+    color: #facc15;
+    margin-bottom: var(--spacing-md);
+    font-size: 1.5rem;
+}
+
+.luckybox-placeholder-card .rules-text {
+    margin-bottom: var(--spacing-xl);
+}
+
+.luckybox-btn {
+    width: 100%;
+    padding: var(--spacing-md);
+    background: linear-gradient(135deg, #f59e0b, #ea580c);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.luckybox-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(234, 88, 12, 0.4);
+}
+
+.luckybox-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--card-border);
+}
+
+@media (max-width: 768px) {
+    .game-init-grid {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+
+/* Lucky Box Result Graphic */
+.luckybox-success-icon {
+    color: #facc15;
+    margin: 0 auto;
+    filter: drop-shadow(0 0 20px rgba(250, 204, 21, 0.5));
+    animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popIn {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+
+    80% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.luckybox-result-symbol {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--accent-blue);
+    margin: 10px 0 5px;
+    background: rgba(59, 130, 246, 0.1);
+    padding: 8px 20px;
+    border-radius: 8px;
+    display: inline-block;
+}
+
+.luckybox-result-name {
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Chart from 'react-apexcharts';
-import { Gamepad2, Loader2, Trophy, Coins, RotateCcw, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { Gamepad2, Loader2, Trophy, Coins, RotateCcw, AlertCircle, CheckCircle2, XCircle, Gift } from 'lucide-react';
 import { ref, onValue, set, get, push } from 'firebase/database';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { rtdb, db } from '../lib/firebase';
@@ -49,6 +49,12 @@ const MinigamePage: React.FC = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState('');
     const [showResultModal, setShowResultModal] = useState(false);
+
+    // Lucky Box States
+    const [showLuckyBoxModal, setShowLuckyBoxModal] = useState(false);
+    const [luckyBoxStatus, setLuckyBoxStatus] = useState<'IDLE' | 'PENDING' | 'SUCCESS' | 'FAILED'>('IDLE');
+    const [luckyBoxResult, setLuckyBoxResult] = useState<{ name: string, symbol: string } | null>(null);
+
     const isInitialLoad = useRef(true);
 
     useEffect(() => {
@@ -95,10 +101,26 @@ const MinigamePage: React.FC = () => {
             }
         });
 
+        // 4. Listen for Lucky Box Status
+        const luckyBoxRef = ref(rtdb, `user_activities/${user.uid}/luckyBoxRequest`);
+        const luckyBoxUnsub = onValue(luckyBoxRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                if (data.status === 'SUCCESS') {
+                    setLuckyBoxStatus('SUCCESS');
+                    setLuckyBoxResult({ name: data.rewardName, symbol: data.rewardSymbol });
+                } else if (data.status === 'FAILED') {
+                    setLuckyBoxStatus('FAILED');
+                    setError(data.errorMessage || '럭키박스 구매 처리에 실패했습니다.');
+                }
+            }
+        });
+
         return () => {
             userUnsub();
             sessionUnsub();
             requestUnsub();
+            luckyBoxUnsub();
         };
     }, [user]);
 
@@ -172,6 +194,30 @@ const MinigamePage: React.FC = () => {
         } finally {
             setActionLoading(false);
         }
+    };
+
+    const openLuckyBox = async () => {
+        if (!user || actionLoading) return;
+        setLuckyBoxStatus('PENDING');
+        setShowLuckyBoxModal(true);
+        setLuckyBoxResult(null);
+
+        try {
+            const reqRef = ref(rtdb, `user_activities/${user.uid}/luckyBoxRequest`);
+            await set(reqRef, {
+                status: 'PENDING',
+                requestedAt: new Date().toISOString()
+            });
+        } catch (err) {
+            setLuckyBoxStatus('FAILED');
+            setError('럭키박스 요청에 실패했습니다.');
+        }
+    };
+
+    const closeLuckyBoxModal = () => {
+        setShowLuckyBoxModal(false);
+        setLuckyBoxStatus('IDLE');
+        setLuckyBoxResult(null);
     };
 
     const getNextReward = (currentWins: number) => {
@@ -382,40 +428,67 @@ const MinigamePage: React.FC = () => {
 
             {!session || session.status === 'FINISHED' ? (
                 <div className="game-init-area">
-                    <div className="minigame-placeholder-card">
-                        <div className="icon-badge">
-                            <Gamepad2 size={40} />
-                        </div>
-                        <h2>{session?.status === 'FINISHED' ? '게임 종료!' : '새로운 도전을 시작하세요'}</h2>
-
-                        {session?.status === 'FINISHED' && (
-                            <div className="result-summary">
-                                <div className={`result-win-badge ${session.isSuccess ? 'win' : 'fail'}`}>
-                                    {session.isSuccess ? <CheckCircle2 /> : <RotateCcw />}
-                                    <span>{session.finalWins}연승 달성</span>
-                                </div>
-                                <div className="reward-points">+{session.reward?.toLocaleString()} P</div>
-                                {session.lastAnswer && (
-                                    <div className="answer-reveal">
-                                        마지막 종목: <strong>{session.lastAnswer.name}</strong> ({session.lastAnswer.date})
-                                    </div>
-                                )}
+                    <div className="game-init-grid">
+                        {/* 1. Minigame Card */}
+                        <div className="minigame-placeholder-card">
+                            <div className="icon-badge">
+                                <Gamepad2 size={40} />
                             </div>
-                        )}
+                            <h2>{session?.status === 'FINISHED' ? '게임 종료!' : '새로운 도전을 시작하세요'}</h2>
 
-                        <p className="rules-text">
-                            3연승 시 50만 포인트를 획득합니다.<br />
-                            3연승 이후에는 도전을 계속할지(성공 시 +10만, 실패 시 -5만) 선택할 수 있습니다.
-                        </p>
+                            {session?.status === 'FINISHED' && (
+                                <div className="result-summary">
+                                    <div className={`result-win-badge ${session.isSuccess ? 'win' : 'fail'}`}>
+                                        {session.isSuccess ? <CheckCircle2 /> : <RotateCcw />}
+                                        <span>{session.finalWins}연승 달성</span>
+                                    </div>
+                                    <div className="reward-points">+{session.reward?.toLocaleString()} P</div>
+                                    {session.lastAnswer && (
+                                        <div className="answer-reveal">
+                                            마지막 종목: <strong>{session.lastAnswer.name}</strong> ({session.lastAnswer.date})
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
-                        <button
-                            className="start-btn"
-                            onClick={startNewGame}
-                            disabled={actionLoading || dailyStats.attempts >= 2}
-                        >
-                            {actionLoading ? <Loader2 className="animate-spin" /> : '도전하기 (100% 무료)'}
-                        </button>
-                        {dailyStats.attempts >= 2 && <p className="limit-text">오늘의 도전 횟수를 모두 사용했습니다.</p>}
+                            <p className="rules-text">
+                                3연승 시 50만 포인트를 획득합니다.<br />
+                                3연승 이후에는 도전을 계속할지(성공 시 +10만, 실패 시 -5만) 선택할 수 있습니다.
+                            </p>
+
+                            <button
+                                className="start-btn"
+                                onClick={startNewGame}
+                                disabled={actionLoading || dailyStats.attempts >= 2}
+                            >
+                                {actionLoading ? <Loader2 className="animate-spin" /> : '도전하기 (100% 무료)'}
+                            </button>
+                            {dailyStats.attempts >= 2 && <p className="limit-text">오늘의 도전 횟수를 모두 사용했습니다.</p>}
+                        </div>
+
+                        {/* 2. Lucky Box Card */}
+                        <div className="luckybox-placeholder-card">
+                            <div className="luckybox-icon-badge">
+                                <Gift size={40} />
+                            </div>
+                            <h2>주식 럭키박스</h2>
+
+                            <p className="rules-text" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                                <strong>100,000 P</strong>를 사용하여 행운의 주식을 뽑아보세요!<br /><br />
+                                <span style={{ fontSize: '0.85rem' }}>KOSPI / KOSDAQ의 무작위 우량주 <strong>1주</strong>가 즉시 포트폴리오(내 잔고)에 지급됩니다.</span>
+                            </p>
+
+                            <div style={{ marginTop: 'auto', width: '100%' }}>
+                                <button
+                                    className="luckybox-btn"
+                                    onClick={() => setShowLuckyBoxModal(true)}
+                                    // onClick={() => openLuckyBox()} // Will do this from modal
+                                    disabled={actionLoading || taxPoints < 100000}
+                                >
+                                    {taxPoints < 100000 ? '포인트 부족' : '100,000 P로 뽑기'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             ) : (
@@ -489,7 +562,74 @@ const MinigamePage: React.FC = () => {
             {session?.status === 'ROUND_COMPLETED' && <ResultModal />}
             {session?.lastRoundResult && session.status === 'FINISHED' && <ResultModal />}
 
-            {error && <div className="game-error"><AlertCircle size={20} /> {error}</div>}
+            {showLuckyBoxModal && (
+                <div className="portfolio-modal-overlay">
+                    <div className="portfolio-modal-content">
+                        {luckyBoxStatus === 'SUCCESS' && luckyBoxResult ? (
+                            <>
+                                <Gift size={56} className="luckybox-success-icon" />
+                                <h3>축하합니다!</h3>
+                                <p>럭키박스에서 다음 주식을 획득했습니다.</p>
+
+                                <div className="luckybox-result-symbol">{luckyBoxResult.symbol}</div>
+                                <div className="luckybox-result-name">{luckyBoxResult.name} 1주</div>
+
+                                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>
+                                    해당 주식이 포트폴리오에 성공적으로 추가되었습니다.
+                                </p>
+
+                                <div className="portfolio-modal-actions">
+                                    <button className="btn-confirm" onClick={closeLuckyBoxModal}>수령 확인</button>
+                                </div>
+                            </>
+                        ) : luckyBoxStatus === 'FAILED' ? (
+                            <>
+                                <AlertCircle size={48} className="portfolio-error-icon" />
+                                <h3>뽑기 실패</h3>
+                                <p>{error || '서버 오류가 발생했습니다.'}</p>
+                                <div className="portfolio-modal-actions">
+                                    <button className="btn-cancel" onClick={closeLuckyBoxModal}>닫기</button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <Gift size={48} className="portfolio-modal-icon" style={{ color: '#facc15', background: 'rgba(250,204,21,0.1)' }} />
+                                <h3>주식 럭키박스 열기</h3>
+                                <p>
+                                    <strong>100,000 P</strong>를 사용하여 럭키박스를 엽니다.<br />
+                                    지급되는 주식은 무작위이며 반품은 불가능합니다!
+                                </p>
+
+                                <div className={`portfolio-modal-points ${taxPoints < 100000 ? 'insufficient' : ''}`}>
+                                    <span>현재 보유 포인트</span>
+                                    <span>{taxPoints.toLocaleString()} P</span>
+                                </div>
+                                {taxPoints < 100000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
+
+                                <div className="portfolio-modal-actions">
+                                    <button
+                                        className="btn-cancel"
+                                        onClick={closeLuckyBoxModal}
+                                        disabled={luckyBoxStatus === 'PENDING'}
+                                    >
+                                        취소
+                                    </button>
+                                    <button
+                                        className="btn-confirm"
+                                        style={{ background: '#f59e0b' }}
+                                        onClick={openLuckyBox}
+                                        disabled={luckyBoxStatus === 'PENDING' || taxPoints < 100000}
+                                    >
+                                        {luckyBoxStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 개봉 중...</> : '열기 (10만 P)'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {error && !showLuckyBoxModal && <div className="game-error"><AlertCircle size={20} /> {error}</div>}
         </div>
     );
 };
