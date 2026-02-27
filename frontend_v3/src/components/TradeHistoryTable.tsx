@@ -54,7 +54,7 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore,
                                         <span className={`type-badge ${item.type.toLowerCase()}`}>
                                             {item.type === 'BUY' ? '매수' :
                                                 item.type === 'REWARD' ? '적립' :
-                                                    item.type === 'TAX' ? '포인트' :
+                                                    item.type === 'TAX' ? '사용' :
                                                         item.type === 'LUCKY_BOX' ? '랜덤뽑기' : '매도'}
                                         </span>
                                     </td>

@@ -422,17 +422,3 @@
     padding: 4px 8px;
     border-radius: 6px;
 }
-
-.action-select-btn.sabotage-btn {
-    border-color: rgba(239, 68, 68, 0.3);
-}
-
-.action-select-btn.sabotage-btn:hover {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: rgba(239, 68, 68, 0.5);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
-}
-
-.sabotage-confirm-btn:hover:not(:disabled) {
-    background: #dc2626 !important;
-}

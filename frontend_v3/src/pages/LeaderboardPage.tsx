@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/Card';
-import { Trophy, Users, BarChart3, PieChart, Coins, Clock, ArrowUpRight, TrendingUp, Mail, AlertCircle, CheckCircle2, Loader2, X, Bomb, Search } from 'lucide-react';
+import { Trophy, Users, BarChart3, PieChart, Coins, Clock, ArrowUpRight, TrendingUp, Mail, AlertCircle, CheckCircle2, Loader2, X, Bomb, Search, TrendingDown } from 'lucide-react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useUserStore } from '../hooks/useUserStore';
 import { useAuth } from '../hooks/useAuth';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { ref, set, onValue } from 'firebase/database';
+import { ref, set, onValue, push, serverTimestamp } from 'firebase/database';
 import { db, rtdb } from '../lib/firebase';
 import './LeaderboardPage.css';
 
@@ -17,7 +17,7 @@ const LeaderboardPage: React.FC = () => {
     const [taxPoints, setTaxPoints] = useState(0);
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [showModal, setShowModal] = useState(false);
-    const [actionType, setActionType] = useState<'NONE' | 'PORTFOLIO' | 'SABOTAGE'>('NONE');
+    const [actionType, setActionType] = useState<'NONE' | 'PORTFOLIO' | 'SABOTAGE' | 'PENNY_STOCK'>('NONE');
     const [actionStatus, setActionStatus] = useState<'IDLE' | 'PENDING' | 'SUCCESS' | 'FAILED'>('IDLE');
     const [actionMessage, setActionMessage] = useState('');
 
@@ -53,7 +53,11 @@ const LeaderboardPage: React.FC = () => {
             if (val) {
                 if (val.status === 'SUCCESS') {
                     setActionStatus('SUCCESS');
-                    setActionMessage('목표에 대한 강제 매각 타격이 성공적으로 적용되었습니다!');
+                    if (val.type === 'PENNY_STOCK_ATTACK') {
+                        setActionMessage('동전주 강제 매수 공격이 성공적으로 적용되었습니다!');
+                    } else {
+                        setActionMessage('목표에 대한 강제 매각 타격이 성공적으로 적용되었습니다!');
+                    }
                 } else if (val.status === 'FAILED') {
                     setActionStatus('FAILED');
                     setActionMessage(val.errorMessage || '요청 처리에 실패했습니다.');
@@ -93,21 +97,24 @@ const LeaderboardPage: React.FC = () => {
         }
     };
 
-    const requestSabotage = async () => {
+    const requestSabotage = async (type: 'FORCED_SALE' | 'PENNY_STOCK_ATTACK') => {
         if (!user || !selectedUser) return;
-        setActionStatus('PENDING');
-        try {
-            const reqRef = ref(rtdb, `user_activities/${user.uid}/sabotageRequest`);
-            await set(reqRef, {
-                status: 'PENDING',
-                targetUid: selectedUser.uid,
-                targetName: selectedUser.displayName,
-                requestedAt: new Date().toISOString()
-            });
-        } catch (error) {
-            setActionStatus('FAILED');
-            setActionMessage('요청 서버에 접속할 수 없습니다.');
+
+        const cost = 100000;
+        if (taxPoints < cost) {
+            alert('포인트가 부족합니다.');
+            return;
         }
+
+        setActionStatus('PENDING');
+        const sabbRef = ref(rtdb, `user_activities/${user.uid}/sabotageRequest`);
+        await set(sabbRef, {
+            targetUid: selectedUser.uid,
+            targetName: selectedUser.displayName,
+            type: type,
+            status: 'PENDING',
+            timestamp: serverTimestamp()
+        });
     };
 
     if (loading || !data) {
@@ -319,11 +326,20 @@ const LeaderboardPage: React.FC = () => {
                                         <span className="action-cost">10,000 P 소모</span>
                                     </button>
                                     <button
-                                        className="action-select-btn sabotage-btn"
+                                        className="action-select-btn"
                                         onClick={() => setActionType('SABOTAGE')}
                                     >
                                         <Bomb size={28} />
                                         <span className="action-title">강제 매각 타격</span>
+                                        <span className="action-cost">100,000 P 소모</span>
+                                    </button>
+
+                                    <button
+                                        className="action-select-btn"
+                                        onClick={() => setActionType('PENNY_STOCK')}
+                                    >
+                                        <TrendingDown size={28} />
+                                        <span className="action-title">동전주 매수 공격</span>
                                         <span className="action-cost">100,000 P 소모</span>
                                     </button>
                                 </div>
@@ -364,7 +380,7 @@ const LeaderboardPage: React.FC = () => {
                                     </button>
                                 </div>
                             </>
-                        ) : (
+                        ) : actionType === 'SABOTAGE' ? (
                             <>
                                 <Bomb size={48} className="portfolio-modal-icon" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }} />
                                 <h3 style={{ color: '#ef4444' }}>강제 매각 타격</h3>
@@ -389,11 +405,44 @@ const LeaderboardPage: React.FC = () => {
                                     </button>
                                     <button
                                         className="btn-confirm sabotage-confirm-btn"
-                                        onClick={requestSabotage}
+                                        onClick={() => requestSabotage('FORCED_SALE')}
                                         disabled={actionStatus === 'PENDING' || taxPoints < 100000}
                                         style={{ background: '#ef4444' }}
                                     >
                                         {actionStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 폭격 중...</> : '100,000 P로 매각'}
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <TrendingDown size={48} className="portfolio-modal-icon" style={{ color: '#8b5cf6', background: 'rgba(139, 92, 246, 0.1)' }} />
+                                <h3 style={{ color: '#8b5cf6' }}>동전주 매수 공격</h3>
+                                <p>
+                                    코스피/코스닥 중 가장 저렴한 동전주를 <strong>{selectedUser.displayName}</strong>님 대신 강제 매수합니다!<br /><br />
+                                    대상자 현금의 <strong>5%</strong> (최대 500만원) 만큼 매수하며, <strong>100,000 P</strong>가 소모됩니다.
+                                </p>
+
+                                <div className={`portfolio-modal-points ${taxPoints < 100000 ? 'insufficient' : ''}`}>
+                                    <span>현재 포인트</span>
+                                    <span>{taxPoints.toLocaleString()} P</span>
+                                </div>
+                                {taxPoints < 100000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
+
+                                <div className="portfolio-modal-actions">
+                                    <button
+                                        className="btn-cancel"
+                                        onClick={() => setActionType('NONE')}
+                                        disabled={actionStatus === 'PENDING'}
+                                    >
+                                        뒤로 가기
+                                    </button>
+                                    <button
+                                        className="btn-confirm"
+                                        onClick={() => requestSabotage('PENNY_STOCK_ATTACK')}
+                                        disabled={actionStatus === 'PENDING' || taxPoints < 100000}
+                                        style={{ background: '#8b5cf6' }}
+                                    >
+                                        {actionStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 매수 중...</> : '100,000 P로 공격'}
                                     </button>
                                 </div>
                             </>
