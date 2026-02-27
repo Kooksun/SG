@@ -54,13 +54,18 @@ export const authService = {
             const allStocks: any[] = [];
             const processSnap = (snap: any) => {
                 if (snap.exists()) {
-                    Object.entries(snap.val()).forEach(([symbol, data]: [string, any]) => {
-                        allStocks.push({
-                            symbol,
-                            name: data.name,
-                            price: data.price,
-                            volume: data.volume || 0,
-                        });
+                    const data = snap.val();
+                    Object.values(data).forEach((marketData: any) => {
+                        if (typeof marketData === 'object' && marketData !== null) {
+                            Object.entries(marketData).forEach(([symbol, stockInfo]: [string, any]) => {
+                                allStocks.push({
+                                    symbol,
+                                    name: stockInfo.name,
+                                    price: stockInfo.price,
+                                    volume: stockInfo.volume || 0,
+                                });
+                            });
+                        }
                     });
                 }
             };

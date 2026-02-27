@@ -1,5 +1,6 @@
 from firebase_admin import firestore
 from .firebase_config import main_firestore
+from .supabase_client import get_supabase
 
 def init_bots():
     print("Initializing AI Bot accounts...")
@@ -39,6 +40,25 @@ def init_bots():
         
         if deleted_count > 0:
             print(f"  - Cleared {deleted_count} holdings for {uid}")
+
+        # Clear Firestore history
+        history_ref = user_ref.collection('history')
+        h_docs = history_ref.stream()
+        h_deleted = 0
+        for h in h_docs:
+            h.reference.delete()
+            h_deleted += 1
+        if h_deleted > 0:
+            print(f"  - Cleared {h_deleted} history records for {uid}")
+            
+        # Clear Supabase records
+        supabase = get_supabase()
+        if supabase:
+            try:
+                res = supabase.table("trade_records").delete().eq("uid", uid).execute()
+                print(f"  - Cleared Supabase trade records for {uid}")
+            except Exception as e:
+                print(f"  - Error clearing Supabase for {uid}: {e}")
 
         # Check if exists
         if user_ref.get().exists:

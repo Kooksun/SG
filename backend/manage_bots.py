@@ -64,31 +64,38 @@ def show_bot_info(index: int, limit: int = 10):
     if not has_holdings:
         print("  - 보유 종목 없음")
 
-    # 3. Trade History from Supabase
+    # 3. Trade History from Firestore
     print(f"\n [Recent Trade Records (Last {limit})]")
-    supabase = get_supabase()
-    if not supabase:
-        print("  - Supabase client not available.")
-    else:
-        try:
-            res = supabase.table("trade_records").select("*").eq("uid", uid).order("timestamp", desc=True).limit(limit).execute()
-            records = res.data
-            if not records:
-                print("  - 거래 기록 없음")
+    try:
+        history_ref = user_ref.collection('history').order_by('timestamp', direction='DESCENDING').limit(limit)
+        records = history_ref.stream()
+        
+        count = 0
+        for r in records:
+            count += 1
+            d = r.to_dict()
+            ts_obj = d.get('timestamp')
+            # Firestore timestamp (UTC) to KST
+            if hasattr(ts_obj, 'astimezone'):
+                ts_kst = ts_obj.astimezone(MARKET_TZ)
+                ts = ts_kst.strftime('%Y-%m-%d %H:%M:%S')
             else:
-                for r in records:
-                    ts = r.get('timestamp', '').replace('T', ' ')[:19]
-                    side = r.get('type')
-                    name = r.get('stock_name')
-                    symbol = r.get('symbol')
-                    price = r.get('price', 0)
-                    qty = r.get('quantity', 0)
-                    profit = r.get('profit', 0)
-                    
-                    p_str = f" | 수익: {profit:+,.0f}" if side == 'SELL' else ""
-                    print(f"  [{ts}] {side} {name}({symbol}) | {qty}주 @ {price:,.0f}원{p_str}")
-        except Exception as e:
-            print(f"  - Error fetching Supabase records: {e}")
+                ts = str(ts_obj)[:19]
+
+            side = d.get('type')
+            name = d.get('name', 'Unknown')
+            symbol = d.get('symbol')
+            price = d.get('price', 0)
+            qty = d.get('quantity', 0)
+            profit = d.get('profit', 0)
+            
+            p_str = f" | 수익: {profit:+,.0f}" if side == 'SELL' else ""
+            print(f"  [{ts}] {side} {name}({symbol}) | {qty}주 @ {price:,.0f}원{p_str}")
+        
+        if count == 0:
+            print("  - 거래 기록 없음")
+    except Exception as e:
+        print(f"  - Error fetching Firestore records: {e}")
             
     print("=" * 60)
 
