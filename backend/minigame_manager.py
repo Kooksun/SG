@@ -32,15 +32,30 @@ def get_reward(wins: int, failed: bool = False) -> int:
         return secured - 50000
 
 def get_random_top_stock():
-    """Fetches a random stock from the top pool."""
-    # Filter for top stocks and exclude ETFs (which are now in stocks/ETF)
-    stocks = kospi_db.child('stocks/KOSPI').get()
-    if not stocks: return None
+    """Fetches a random stock from KOSPI or KOSDAQ (excluding ETF)."""
+    valid_stocks = []
     
-    stock_list = list(stocks.values())
-    random.shuffle(stock_list)
-    return stock_list[0] if stock_list else None
-
+    # 1. Fetch KOSPI
+    kp_data = kospi_db.child('stocks/KOSPI').get()
+    if kp_data:
+        for symbol, stock_data in kp_data.items():
+            if isinstance(stock_data, dict) and 'name' in stock_data:
+                stock_data['symbol'] = symbol
+                valid_stocks.append(stock_data)
+        
+    # 2. Fetch KOSDAQ
+    kq_data = kosdaq_db.child('stocks/KOSDAQ').get()
+    if kq_data:
+        for symbol, stock_data in kq_data.items():
+            if isinstance(stock_data, dict) and 'name' in stock_data:
+                stock_data['symbol'] = symbol
+                valid_stocks.append(stock_data)
+        
+    if not valid_stocks:
+        return None
+        
+    random.shuffle(valid_stocks)
+    return valid_stocks[0]
 def start_game(uid: str):
     """Initializes a new mini-game session."""
     print(f"  -> Starting Mini-game for {uid}")

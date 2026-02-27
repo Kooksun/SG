@@ -280,10 +280,14 @@ const MinigamePage: React.FC = () => {
                     const ma5 = w.globals.series[1][dataPointIndex];
                     const ma20 = w.globals.series[2][dataPointIndex];
 
+                    // Safely parse the date. ApexCharts stores labels as timestamps.
+                    const timestamp = w.globals.labels[dataPointIndex];
+                    const dateStr = timestamp ? new Date(timestamp).toLocaleDateString() : '날짜 정보 없음';
+
                     return `
                         <div class="chart-tooltip-mini">
                             <div style="margin-bottom: 5px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 3px;">
-                                ${new Date(w.globals.labels[dataPointIndex]).toLocaleDateString()}
+                                ${dateStr}
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 2px;">
                                 <div>시가: ${o?.toLocaleString()}</div>
