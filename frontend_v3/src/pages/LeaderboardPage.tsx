@@ -1,13 +1,77 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from '../components/Card';
-import { Trophy, Users, BarChart3, PieChart, Coins, Clock, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { Trophy, Users, BarChart3, PieChart, Coins, Clock, ArrowUpRight, TrendingUp, Mail, AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useUserStore } from '../hooks/useUserStore';
+import { useAuth } from '../hooks/useAuth';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { ref, set, onValue } from 'firebase/database';
+import { db, rtdb } from '../lib/firebase';
 import './LeaderboardPage.css';
 
 const LeaderboardPage: React.FC = () => {
     const { data, loading } = useLeaderboard();
     const { nickname } = useUserStore();
+    const { user } = useAuth();
+
+    const [taxPoints, setTaxPoints] = useState(0);
+    const [selectedUser, setSelectedUser] = useState<any>(null);
+    const [showModal, setShowModal] = useState(false);
+    const [actionStatus, setActionStatus] = useState<'IDLE' | 'PENDING' | 'SUCCESS' | 'FAILED'>('IDLE');
+    const [actionMessage, setActionMessage] = useState('');
+
+    useEffect(() => {
+        if (!user) return;
+        const unsub = onSnapshot(doc(db, 'users', user.uid), (docSnap) => {
+            if (docSnap.exists()) {
+                setTaxPoints(docSnap.data().taxPoints || 0);
+            }
+        });
+        return () => unsub();
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+        const reqRef = ref(rtdb, `user_activities/${user.uid}/portfolioRequest`);
+        const unsub = onValue(reqRef, (snap) => {
+            const val = snap.val();
+            if (val) {
+                if (val.status === 'SUCCESS') {
+                    setActionStatus('SUCCESS');
+                    setActionMessage('포트폴리오 리포트가 이메일로 전송되었습니다.');
+                } else if (val.status === 'FAILED') {
+                    setActionStatus('FAILED');
+                    setActionMessage(val.errorMessage || '요청 처리에 실패했습니다.');
+                }
+            }
+        });
+        return () => unsub();
+    }, [user]);
+
+    const handleRowClick = (clickedUser: any) => {
+        if (clickedUser.displayName === nickname) return;
+        setSelectedUser(clickedUser);
+        setShowModal(true);
+        setActionStatus('IDLE');
+        setActionMessage('');
+    };
+
+    const requestPortfolio = async () => {
+        if (!user || !selectedUser) return;
+        setActionStatus('PENDING');
+        try {
+            const reqRef = ref(rtdb, `user_activities/${user.uid}/portfolioRequest`);
+            await set(reqRef, {
+                status: 'PENDING',
+                targetUid: selectedUser.uid,
+                targetName: selectedUser.displayName,
+                requestedAt: new Date().toISOString()
+            });
+        } catch (error) {
+            setActionStatus('FAILED');
+            setActionMessage('요청 서버에 접속할 수 없습니다.');
+        }
+    };
 
     if (loading || !data) {
         return (
@@ -98,27 +162,31 @@ const LeaderboardPage: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {rankings.map((user) => (
-                                            <tr key={user.uid} className={user.displayName === nickname ? 'highlight-row' : ''}>
+                                        {rankings.map((u) => (
+                                            <tr
+                                                key={u.uid}
+                                                className={u.displayName === nickname ? 'highlight-row' : 'clickable-row'}
+                                                onClick={() => handleRowClick(u)}
+                                            >
                                                 <td>
-                                                    <div className={`rank-badge ${user.rank <= 3 ? `top-${user.rank}` : ''}`}>
-                                                        {user.rank}
+                                                    <div className={`rank-badge ${u.rank <= 3 ? `top-${u.rank}` : ''}`}>
+                                                        {u.rank}
                                                     </div>
                                                 </td>
                                                 <td>
                                                     <div className="user-cell">
-                                                        {user.photoURL && <img src={user.photoURL} alt="" className="user-avatar-mini" />}
-                                                        <span className="user-name">{user.displayName}</span>
+                                                        {u.photoURL && <img src={u.photoURL} alt="" className="user-avatar-mini" />}
+                                                        <span className="user-name">{u.displayName}</span>
                                                     </div>
                                                 </td>
                                                 <td className="text-right font-mono">
-                                                    {user.equity >= 100000000
-                                                        ? `${(user.equity / 100000000).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억`
-                                                        : `${(user.equity / 10000).toLocaleString('ko-KR')}만`
+                                                    {u.equity >= 100000000
+                                                        ? `${(u.equity / 100000000).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}억`
+                                                        : `${(u.equity / 10000).toLocaleString('ko-KR')}만`
                                                     }
                                                 </td>
-                                                <td className={`text-right font-mono ${user.yield >= 0 ? 'up' : 'down'}`}>
-                                                    {user.yield >= 0 ? '+' : ''}{user.yield.toFixed(1)}%
+                                                <td className={`text-right font-mono ${u.yield >= 0 ? 'up' : 'down'}`}>
+                                                    {u.yield >= 0 ? '+' : ''}{u.yield.toFixed(1)}%
                                                 </td>
                                             </tr>
                                         ))}
@@ -167,6 +235,65 @@ const LeaderboardPage: React.FC = () => {
                     </section>
                 </div>
             </div>
+
+            {showModal && selectedUser && (
+                <div className="portfolio-modal-overlay">
+                    <div className="portfolio-modal-content">
+                        {actionStatus === 'SUCCESS' ? (
+                            <>
+                                <CheckCircle2 size={48} className="portfolio-success-icon" />
+                                <h3>전송 완료!</h3>
+                                <p>{actionMessage}</p>
+                                <div className="portfolio-modal-actions">
+                                    <button className="btn-confirm" onClick={() => setShowModal(false)}>확인</button>
+                                </div>
+                            </>
+                        ) : actionStatus === 'FAILED' ? (
+                            <>
+                                <AlertCircle size={48} className="portfolio-error-icon" />
+                                <h3>요청 실패</h3>
+                                <p>{actionMessage}</p>
+                                <div className="portfolio-modal-actions">
+                                    <button className="btn-cancel" onClick={() => setShowModal(false)}>닫기</button>
+                                    <button className="btn-confirm" onClick={requestPortfolio}>다시 시도</button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <Mail size={48} className="portfolio-modal-icon" />
+                                <h3>포트폴리오 열람 요청</h3>
+                                <p>
+                                    <strong>{selectedUser.displayName}</strong>님의 포트폴리오를 열람하시겠습니까? <br /><br />
+                                    요청 시 <strong>10,000 P</strong>가 소모되며, 상세 포트폴리오 리포트가 이메일로 전송됩니다.
+                                </p>
+
+                                <div className={`portfolio-modal-points ${taxPoints < 10000 ? 'insufficient' : ''}`}>
+                                    <span>내 포인트</span>
+                                    <span>{taxPoints.toLocaleString()} P</span>
+                                </div>
+                                {taxPoints < 10000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
+
+                                <div className="portfolio-modal-actions">
+                                    <button
+                                        className="btn-cancel"
+                                        onClick={() => setShowModal(false)}
+                                        disabled={actionStatus === 'PENDING'}
+                                    >
+                                        취소
+                                    </button>
+                                    <button
+                                        className="btn-confirm"
+                                        onClick={requestPortfolio}
+                                        disabled={actionStatus === 'PENDING' || taxPoints < 10000}
+                                    >
+                                        {actionStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 요청 중...</> : '10,000 P 사용하기'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </main>
     );
 };

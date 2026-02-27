@@ -252,3 +252,131 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Portfolio Modal Styles */
+.portfolio-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.portfolio-modal-content {
+    background: rgba(20, 20, 25, 0.95);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 32px;
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.portfolio-modal-icon {
+    color: #3b82f6;
+    margin: 0 auto;
+    background: rgba(59, 130, 246, 0.1);
+    padding: 16px;
+    border-radius: 50%;
+}
+
+.portfolio-modal-content h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--text-primary);
+}
+
+.portfolio-modal-content p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.portfolio-modal-points {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.portfolio-modal-points.insufficient {
+    color: #f43f5e;
+    background: rgba(244, 63, 94, 0.1);
+}
+
+.portfolio-modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.portfolio-modal-actions button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-confirm {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn-confirm:hover:not(:disabled) {
+    background: #2563eb;
+}
+
+.btn-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ranking-table tr.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.ranking-table tr.clickable-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.portfolio-success-icon {
+    color: #10b981;
+    margin: 0 auto;
+}
+
+.portfolio-error-icon {
+    color: #f43f5e;
+    margin: 0 auto;
+}
