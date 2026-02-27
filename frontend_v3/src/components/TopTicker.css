@@ -19,12 +19,6 @@
     overflow: hidden;
 }
 
-.indices-track {
-    display: flex;
-    white-space: nowrap;
-    animation: scroll-ticker 60s linear infinite;
-}
-
 .index-item {
     display: flex;
     align-items: center;
@@ -58,22 +52,6 @@
     display: flex;
     align-items: center;
     overflow: hidden;
-}
-
-.ticker-track {
-    display: flex;
-    white-space: nowrap;
-    animation: scroll-ticker 40s linear infinite;
-}
-
-@keyframes scroll-ticker {
-    0% {
-        transform: translateX(0);
-    }
-
-    100% {
-        transform: translateX(-50%);
-    }
 }
 
 .ticker-item {

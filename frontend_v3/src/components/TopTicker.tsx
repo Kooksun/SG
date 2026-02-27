@@ -2,6 +2,7 @@ import React from 'react';
 import './TopTicker.css';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useRealtimeData } from '../hooks/useRealtimeData';
+import Marquee from 'react-fast-marquee';
 
 const TopTicker: React.FC = () => {
     const { indices, exchangeRate, tickers } = useRealtimeData();
@@ -19,8 +20,8 @@ const TopTicker: React.FC = () => {
         <div className="ticker-wrapper">
             {/* 시장 지수 바 */}
             <div className="market-indices-bar">
-                <div className="indices-track">
-                    {[...displayIndices, ...displayIndices, ...displayIndices].map((idx, i) => (
+                <Marquee speed={40} autoFill direction="left" className="indices-marquee">
+                    {displayIndices.map((idx, i) => (
                         <div key={`${idx.name}-${i}`} className="index-item">
                             <span className="index-name">{idx.name}</span>
                             <span className="index-value">
@@ -34,15 +35,14 @@ const TopTicker: React.FC = () => {
                             )}
                         </div>
                     ))}
-                </div>
+                </Marquee>
             </div>
 
             {/* 대형 거래 티커 바 */}
             <div className="trade-ticker-bar">
-                <div className="ticker-track">
-                    {tickers.length > 0 ? (
-                        // 데이터가 있을 때 반복 노출 (무한 스크롤 효과를 위해 중복)
-                        [...tickers, ...tickers].map((trade, index) => (
+                {tickers.length > 0 ? (
+                    <Marquee speed={70} autoFill direction="left" className="trade-marquee">
+                        {tickers.map((trade, index) => (
                             <div key={`${trade.timestamp}-${index}`} className="ticker-item">
                                 <span className={`trade-type-badge ${trade.type.toLowerCase()}`}>
                                     {trade.type === 'BUY' ? '매수' : '매도'}
@@ -58,13 +58,13 @@ const TopTicker: React.FC = () => {
                                     )}
                                 </span>
                             </div>
-                        ))
-                    ) : (
-                        <div className="ticker-item">
-                            <span className="ticker-text">실시간 대형 거래를 기다리는 중...</span>
-                        </div>
-                    )}
-                </div>
+                        ))}
+                    </Marquee>
+                ) : (
+                    <div className="ticker-item placeholder-item">
+                        <span className="ticker-text">실시간 대형 거래를 기다리는 중...</span>
+                    </div>
+                )}
             </div>
         </div>
     );
