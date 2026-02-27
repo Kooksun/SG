@@ -38,45 +38,52 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore,
                 </thead>
                 <tbody>
                     {history.length > 0 ? (
-                        history.map((item) => (
-                            <tr key={item.id}>
-                                <td className="text-xs text-secondary">{formatDate(item.timestamp)}</td>
-                                <td>
-                                    <div className="symbol-info">
-                                        <span className="name">{item.name}</span>
-                                        <span className="code">{item.symbol}</span>
-                                    </div>
-                                </td>
-                                <td className="text-center">
-                                    <span className={`type-badge ${item.type.toLowerCase()}`}>
-                                        {item.type === 'BUY' ? '매수' : item.type === 'REWARD' ? '적립' : '매도'}
-                                    </span>
-                                </td>
-                                <td className="text-right font-mono">{item.type === 'REWARD' ? '-' : item.price.toLocaleString()}</td>
-                                <td className="text-right font-mono">{item.type === 'REWARD' ? '-' : item.quantity.toLocaleString()}</td>
-                                <td className="text-right font-mono font-bold">
-                                    {item.totalAmount.toLocaleString()}{item.type === 'REWARD' ? ' P' : '원'}
-                                </td>
-                                <td className={`text-right font-mono ${item.profit && item.profit > 0 ? 'up' : item.profit && item.profit < 0 ? 'down' : ''}`}>
-                                    {item.type === 'SELL' && item.profit !== undefined ? (
-                                        <>
-                                            <div className="font-bold">{item.profit > 0 ? '+' : ''}{item.profit.toLocaleString()}</div>
-                                            <div className="text-xs opacity-80">({item.profitRatio ? (item.profitRatio * 100).toFixed(2) : '0.00'}%)</div>
-                                        </>
-                                    ) : '-'}
-                                </td>
-                                <td className="text-right font-mono text-xs">
-                                    {item.type === 'REWARD' ? '-' : (
-                                        <div className="fee-display">
-                                            <div>{item.fee.toLocaleString()}원</div>
-                                            {item.discount !== undefined && item.discount > 0 && (
-                                                <div className="discount-text">-{item.discount.toLocaleString()} 할인</div>
-                                            )}
+                        history.map((item) => {
+                            const isPointTrade = item.type === 'REWARD' || item.type === 'TAX' || item.type === 'LUCKY_BOX';
+
+                            return (
+                                <tr key={item.id}>
+                                    <td className="text-xs text-secondary">{formatDate(item.timestamp)}</td>
+                                    <td>
+                                        <div className="symbol-info">
+                                            <span className="name">{item.name}</span>
+                                            <span className="code">{item.symbol}</span>
                                         </div>
-                                    )}
-                                </td>
-                            </tr>
-                        ))
+                                    </td>
+                                    <td className="text-center">
+                                        <span className={`type-badge ${item.type.toLowerCase()}`}>
+                                            {item.type === 'BUY' ? '매수' :
+                                                item.type === 'REWARD' ? '적립' :
+                                                    item.type === 'TAX' ? '포인트' :
+                                                        item.type === 'LUCKY_BOX' ? '랜덤뽑기' : '매도'}
+                                        </span>
+                                    </td>
+                                    <td className="text-right font-mono">{isPointTrade ? '-' : item.price.toLocaleString()}</td>
+                                    <td className="text-right font-mono">{isPointTrade ? '-' : item.quantity.toLocaleString()}</td>
+                                    <td className="text-right font-mono font-bold">
+                                        {item.totalAmount.toLocaleString()}{isPointTrade ? ' P' : '원'}
+                                    </td>
+                                    <td className={`text-right font-mono ${item.profit && item.profit > 0 ? 'up' : item.profit && item.profit < 0 ? 'down' : ''}`}>
+                                        {item.type === 'SELL' && item.profit !== undefined ? (
+                                            <>
+                                                <div className="font-bold">{item.profit > 0 ? '+' : ''}{item.profit.toLocaleString()}</div>
+                                                <div className="text-xs opacity-80">({item.profitRatio ? (item.profitRatio * 100).toFixed(2) : '0.00'}%)</div>
+                                            </>
+                                        ) : '-'}
+                                    </td>
+                                    <td className="text-right font-mono text-xs">
+                                        {isPointTrade ? '-' : (
+                                            <div className="fee-display">
+                                                <div>{item.fee.toLocaleString()}원</div>
+                                                {item.discount !== undefined && item.discount > 0 && (
+                                                    <div className="discount-text">-{item.discount.toLocaleString()} 할인</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </td>
+                                </tr>
+                            )
+                        })
                     ) : (
                         <tr>
                             <td colSpan={8} className="text-center no-data">거래 내역이 없습니다.</td>

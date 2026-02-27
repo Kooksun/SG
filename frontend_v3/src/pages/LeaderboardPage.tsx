@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../components/Card';
-import { Trophy, Users, BarChart3, PieChart, Coins, Clock, ArrowUpRight, TrendingUp, Mail, AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
+import { Trophy, Users, BarChart3, PieChart, Coins, Clock, ArrowUpRight, TrendingUp, Mail, AlertCircle, CheckCircle2, Loader2, X, Bomb, Search } from 'lucide-react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useUserStore } from '../hooks/useUserStore';
 import { useAuth } from '../hooks/useAuth';
@@ -17,6 +17,7 @@ const LeaderboardPage: React.FC = () => {
     const [taxPoints, setTaxPoints] = useState(0);
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [showModal, setShowModal] = useState(false);
+    const [actionType, setActionType] = useState<'NONE' | 'PORTFOLIO' | 'SABOTAGE'>('NONE');
     const [actionStatus, setActionStatus] = useState<'IDLE' | 'PENDING' | 'SUCCESS' | 'FAILED'>('IDLE');
     const [actionMessage, setActionMessage] = useState('');
 
@@ -32,8 +33,8 @@ const LeaderboardPage: React.FC = () => {
 
     useEffect(() => {
         if (!user) return;
-        const reqRef = ref(rtdb, `user_activities/${user.uid}/portfolioRequest`);
-        const unsub = onValue(reqRef, (snap) => {
+        const portRef = ref(rtdb, `user_activities/${user.uid}/portfolioRequest`);
+        const unsubPort = onValue(portRef, (snap) => {
             const val = snap.val();
             if (val) {
                 if (val.status === 'SUCCESS') {
@@ -45,13 +46,32 @@ const LeaderboardPage: React.FC = () => {
                 }
             }
         });
-        return () => unsub();
+
+        const sabRef = ref(rtdb, `user_activities/${user.uid}/sabotageRequest`);
+        const unsubSab = onValue(sabRef, (snap) => {
+            const val = snap.val();
+            if (val) {
+                if (val.status === 'SUCCESS') {
+                    setActionStatus('SUCCESS');
+                    setActionMessage('목표에 대한 강제 매각 타격이 성공적으로 적용되었습니다!');
+                } else if (val.status === 'FAILED') {
+                    setActionStatus('FAILED');
+                    setActionMessage(val.errorMessage || '요청 처리에 실패했습니다.');
+                }
+            }
+        });
+
+        return () => {
+            unsubPort();
+            unsubSab();
+        };
     }, [user]);
 
     const handleRowClick = (clickedUser: any) => {
         if (clickedUser.displayName === nickname) return;
         setSelectedUser(clickedUser);
         setShowModal(true);
+        setActionType('NONE');
         setActionStatus('IDLE');
         setActionMessage('');
     };
@@ -61,6 +81,23 @@ const LeaderboardPage: React.FC = () => {
         setActionStatus('PENDING');
         try {
             const reqRef = ref(rtdb, `user_activities/${user.uid}/portfolioRequest`);
+            await set(reqRef, {
+                status: 'PENDING',
+                targetUid: selectedUser.uid,
+                targetName: selectedUser.displayName,
+                requestedAt: new Date().toISOString()
+            });
+        } catch (error) {
+            setActionStatus('FAILED');
+            setActionMessage('요청 서버에 접속할 수 없습니다.');
+        }
+    };
+
+    const requestSabotage = async () => {
+        if (!user || !selectedUser) return;
+        setActionStatus('PENDING');
+        try {
+            const reqRef = ref(rtdb, `user_activities/${user.uid}/sabotageRequest`);
             await set(reqRef, {
                 status: 'PENDING',
                 targetUid: selectedUser.uid,
@@ -255,10 +292,47 @@ const LeaderboardPage: React.FC = () => {
                                 <p>{actionMessage}</p>
                                 <div className="portfolio-modal-actions">
                                     <button className="btn-cancel" onClick={() => setShowModal(false)}>닫기</button>
-                                    <button className="btn-confirm" onClick={requestPortfolio}>다시 시도</button>
+                                    <button className="btn-confirm" onClick={() => {
+                                        setActionStatus('IDLE');
+                                        setActionType('NONE');
+                                    }}>다시 선택</button>
                                 </div>
                             </>
-                        ) : (
+                        ) : actionType === 'NONE' ? (
+                            <>
+                                <Users size={48} className="portfolio-modal-icon" style={{ color: '#8b5cf6', background: 'rgba(139,92,246,0.1)' }} />
+                                <h3>{selectedUser.displayName}</h3>
+                                <p>대상 플레이어에게 취할 액션을 선택하세요.</p>
+
+                                <div className={`portfolio-modal-points`}>
+                                    <span>내 잔여 포인트</span>
+                                    <span>{taxPoints.toLocaleString()} P</span>
+                                </div>
+
+                                <div className="action-select-grid">
+                                    <button
+                                        className="action-select-btn"
+                                        onClick={() => setActionType('PORTFOLIO')}
+                                    >
+                                        <Search size={28} />
+                                        <span className="action-title">포트폴리오 열람</span>
+                                        <span className="action-cost">10,000 P 소모</span>
+                                    </button>
+                                    <button
+                                        className="action-select-btn sabotage-btn"
+                                        onClick={() => setActionType('SABOTAGE')}
+                                    >
+                                        <Bomb size={28} />
+                                        <span className="action-title">강제 매각 타격</span>
+                                        <span className="action-cost">50,000 P 소모</span>
+                                    </button>
+                                </div>
+
+                                <div className="portfolio-modal-actions" style={{ marginTop: '24px' }}>
+                                    <button className="btn-cancel" onClick={() => setShowModal(false)} style={{ width: '100%' }}>닫기</button>
+                                </div>
+                            </>
+                        ) : actionType === 'PORTFOLIO' ? (
                             <>
                                 <Mail size={48} className="portfolio-modal-icon" />
                                 <h3>포트폴리오 열람 요청</h3>
@@ -276,10 +350,10 @@ const LeaderboardPage: React.FC = () => {
                                 <div className="portfolio-modal-actions">
                                     <button
                                         className="btn-cancel"
-                                        onClick={() => setShowModal(false)}
+                                        onClick={() => setActionType('NONE')}
                                         disabled={actionStatus === 'PENDING'}
                                     >
-                                        취소
+                                        뒤로 가기
                                     </button>
                                     <button
                                         className="btn-confirm"
@@ -287,6 +361,39 @@ const LeaderboardPage: React.FC = () => {
                                         disabled={actionStatus === 'PENDING' || taxPoints < 10000}
                                     >
                                         {actionStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 요청 중...</> : '10,000 P 사용하기'}
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <Bomb size={48} className="portfolio-modal-icon" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }} />
+                                <h3 style={{ color: '#ef4444' }}>강제 매각 타격</h3>
+                                <p>
+                                    <strong>{selectedUser.displayName}</strong>님의 포트폴리오 중 평가액이 가장 큰 종목의 <strong>5%</strong>(최소 1주)를 강제로 매각시킵니다!<br /><br />
+                                    요청 시 <strong>50,000 P</strong>가 소모되며 취소할 수 없습니다.
+                                </p>
+
+                                <div className={`portfolio-modal-points ${taxPoints < 50000 ? 'insufficient' : ''}`}>
+                                    <span>현재 포인트</span>
+                                    <span>{taxPoints.toLocaleString()} P</span>
+                                </div>
+                                {taxPoints < 50000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
+
+                                <div className="portfolio-modal-actions">
+                                    <button
+                                        className="btn-cancel"
+                                        onClick={() => setActionType('NONE')}
+                                        disabled={actionStatus === 'PENDING'}
+                                    >
+                                        뒤로 가기
+                                    </button>
+                                    <button
+                                        className="btn-confirm sabotage-confirm-btn"
+                                        onClick={requestSabotage}
+                                        disabled={actionStatus === 'PENDING' || taxPoints < 50000}
+                                        style={{ background: '#ef4444' }}
+                                    >
+                                        {actionStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 폭격 중...</> : '50,000 P로 매각'}
                                     </button>
                                 </div>
                             </>

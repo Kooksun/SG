@@ -6,7 +6,7 @@ export interface TradeHistoryItem {
     id: string;
     symbol: string;
     name: string;
-    type: 'BUY' | 'SELL';
+    type: 'BUY' | 'SELL' | 'REWARD' | 'TAX' | 'LUCKY_BOX';
     price: number;
     quantity: number;
     totalAmount: number;

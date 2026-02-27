@@ -1,4 +1,5 @@
 import time
+import math
 import urllib.parse
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -203,11 +204,211 @@ def process_portfolio_request(uid: str, req: dict):
         mark_request_failed(uid, "이메일 시스템 연결 오류가 발생했습니다.")
 
 
-def mark_request_failed(uid: str, msg: str):
-    main_db.child(f'user_activities/{uid}/portfolioRequest').update({
+def mark_request_failed(uid: str, msg: str, req_type: str = 'portfolioRequest'):
+    main_db.child(f'user_activities/{uid}/{req_type}').update({
         'status': 'FAILED',
         'errorMessage': msg
     })
+
+def process_sabotage_request(uid: str, req: dict):
+    print(f"[{datetime.now(MARKET_TZ)}] Processing Sabotage Request from {uid}")
+    
+    target_uid = req.get('targetUid')
+    target_name = req.get('targetName', 'Anonymous')
+    
+    if not target_uid:
+        mark_request_failed(uid, "대상 유저 정보가 누락되었습니다.", 'sabotageRequest')
+        return
+
+    # 1. Fetch Requesting User to get nickname (optional, might use Anonymous)
+    requester_ref = main_firestore.collection('users').document(uid)
+    req_snap = requester_ref.get()
+    
+    if not req_snap.exists:
+        mark_request_failed(uid, "요청자 정보를 찾을 수 없습니다.", 'sabotageRequest')
+        return
+        
+    req_data = req_snap.to_dict()
+    requester_name = req_data.get('nickname', '익명 플레이어')
+    tax_points = req_data.get('taxPoints', 0)
+    
+    if tax_points < 50000:
+        mark_request_failed(uid, "포인트가 부족합니다 (50,000 P 필요).", 'sabotageRequest')
+        return
+
+    # 2. Pick target's largest holding outside of transaction
+    all_prices = get_all_prices()
+    target_portfolio_ref = main_firestore.collection('users').document(target_uid).collection('portfolio')
+    portfolio_docs = list(target_portfolio_ref.stream())
+    
+    if not portfolio_docs:
+        mark_request_failed(uid, "대상이 보유한 주식이 없습니다.", 'sabotageRequest')
+        return
+        
+    largest_stock = None
+    max_eval = -1
+    
+    for item in portfolio_docs:
+        p_data = item.to_dict()
+        qty = float(p_data.get('quantity', 0))
+        if qty <= 0: continue
+            
+        symbol = p_data.get('symbol')
+        avg_price = float(p_data.get('averagePrice', 0))
+        live_price = float(all_prices.get(symbol, {}).get('price', avg_price))
+        stock_name = p_data.get('name', symbol)
+        
+        eval_amount = qty * live_price
+        if eval_amount > max_eval:
+            max_eval = eval_amount
+            largest_stock = {
+                'symbol': symbol,
+                'name': stock_name,
+                'qty': qty,
+                'live_price': live_price
+            }
+            
+    if not largest_stock:
+        mark_request_failed(uid, "대상이 보유한 주식이 없습니다.", 'sabotageRequest')
+        return
+
+    target_ref = main_firestore.collection('users').document(target_uid)
+    hist_req_ref = requester_ref.collection('history').document()
+    hist_tgt_ref = target_ref.collection('history').document()
+    tgt_stock_doc = target_portfolio_ref.document(largest_stock['symbol'])
+
+    # 3. Transaction
+    try:
+        @firestore.transactional
+        def execute_sabotage(transaction):
+            # Reads
+            req_snap_tx = requester_ref.get(transaction=transaction)
+            tgt_snap_tx = target_ref.get(transaction=transaction)
+            stock_snap_tx = tgt_stock_doc.get(transaction=transaction)
+
+            if not req_snap_tx.exists or not tgt_snap_tx.exists or not stock_snap_tx.exists:
+                return False, "유저 또는 보유 종목 데이터를 찾을 수 없습니다."
+
+            req_pts = req_snap_tx.to_dict().get('taxPoints', 0)
+            if req_pts < 50000:
+                return False, "포인트가 부족합니다."
+
+            stock_data = stock_snap_tx.to_dict()
+            current_qty = float(stock_data.get('quantity', 0))
+            if current_qty < 1:
+                return False, "대상의 주식 수량이 부족합니다."
+
+            # Math
+            sell_qty = max(1, math.floor(current_qty * 0.05))
+            sell_amount = sell_qty * largest_stock['live_price']
+            new_qty = current_qty - sell_qty
+            
+            # PnL Calculation
+            avg_price = float(stock_data.get('averagePrice', 0))
+            profit = (largest_stock['live_price'] - avg_price) * sell_qty if avg_price > 0 else 0
+            profitRatio = (largest_stock['live_price'] / avg_price - 1) if avg_price > 0 else 0
+
+            tgt_cash = tgt_snap_tx.to_dict().get('cash', 0)
+            tgt_email = tgt_snap_tx.to_dict().get('email')
+
+            # Writes
+            transaction.update(requester_ref, {
+                'taxPoints': req_pts - 50000
+            })
+            
+            transaction.set(hist_req_ref, {
+                'symbol': 'SABOTAGE',
+                'name': '강제 매각 타격',
+                'type': 'TAX',
+                'price': 0,
+                'quantity': 1,
+                'totalAmount': -50000,
+                'fee': 0,
+                'timestamp': firestore.SERVER_TIMESTAMP,
+                'details': f"{target_name}님의 {largest_stock['name']} 타격"
+            })
+
+            transaction.update(target_ref, {
+                'cash': tgt_cash + sell_amount
+            })
+
+            # Target history
+            transaction.set(hist_tgt_ref, {
+                'symbol': largest_stock['symbol'],
+                'name': largest_stock['name'],
+                'type': 'SELL', # Treat as a standard sell layout
+                'price': largest_stock['live_price'],
+                'quantity': sell_qty,
+                'totalAmount': sell_amount,
+                'fee': 0,
+                'profit': profit,
+                'profitRatio': profitRatio,
+                'timestamp': firestore.SERVER_TIMESTAMP,
+                'details': f"{requester_name}에 의한 강제 매각"
+            })
+
+            if new_qty <= 0:
+                transaction.delete(tgt_stock_doc)
+            else:
+                transaction.update(tgt_stock_doc, {
+                    'quantity': new_qty
+                })
+
+            return True, {
+                'target_email': tgt_email,
+                'stock_name': largest_stock['name'],
+                'sell_qty': sell_qty,
+                'live_price': largest_stock['live_price'],
+                'sell_amount': sell_amount
+            }
+
+        transaction = main_firestore.transaction()
+        success, result = execute_sabotage(transaction)
+    except Exception as e:
+        print(f"  !! Sabotage Transaction failed for {uid}: {e}")
+        mark_request_failed(uid, "결제 처리 중 오류가 발생했습니다.", 'sabotageRequest')
+        return
+
+    if not success:
+        mark_request_failed(uid, result, 'sabotageRequest')
+        return
+
+    # Success
+    print(f"  -> Sabotage executed on {target_uid} by {uid}. Sold {result['sell_qty']} of {result['stock_name']}")
+    main_db.child(f'user_activities/{uid}/sabotageRequest').update({
+        'status': 'SUCCESS'
+    })
+
+    # 4. Email Notification logic
+    email_mgr = EmailManager()
+    target_email = result.get('target_email')
+    
+    if target_email:
+        subject = f"[긴급] 누군가 회원님의 보유 주식을 강제 매각했습니다!"
+        html_content = f"""
+        <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #fef2f2; border-radius: 10px; border: 1px solid #fecaca;">
+            <h2 style="color: #b91c1c; text-align: center; margin-bottom: 20px;">💣 주의 요망! 강제 매각 발생</h2>
+            <p style="color: #4b5563; font-size: 15px; line-height: 1.6;">
+                <strong>{requester_name}</strong>님이 50,000 포인트를 사용하여 회원님의 포트폴리오를 타격했습니다! <br/>
+                평가 금액이 가장 높았던 우량 자산 일부가 로컬 시장가로 즉시 매각 처리되었습니다.
+            </p>
+            <div style="background-color: white; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb;">
+                <p style="margin: 0; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6;"><strong>매각 종목:</strong> {result['stock_name']}</p>
+                <p style="margin: 8px 0; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6;"><strong>매각 수량:</strong> {result['sell_qty']:,.0f}주</p>
+                <p style="margin: 8px 0; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6;"><strong>적용 단가:</strong> {result['live_price']:,.0f}원</p>
+                <p style="margin: 8px 0; color: #10b981; font-weight: bold;"><strong>입금된 금액:</strong> +{result['sell_amount']:,.0f}원</p>
+            </div>
+            <p style="color: #6b7280; font-size: 13px; text-align: center;">
+                입금된 대금은 캐시 잔고에서 확인하실 수 있습니다. 복수전은 리더보드에서 누구나 가능합니다!
+            </p>
+        </div>
+        """
+        # Note: currently EmailManager send_game_report takes internal uid instead of email, assuming it looks up real email
+        try:
+            # We must use target_uid for the existing mail method, as it resolves via UID in `users` coll.
+            email_mgr.send_game_report(target_uid, subject, html_content)
+        except Exception as e:
+            print(f"  !! Failed to send sabotage email to {target_uid}: {e}")
 
 def start_manager():
     print("Season 3 Portfolio Request Manager Started.")
@@ -216,24 +417,37 @@ def start_manager():
         if event.data is None: return
         path_parts = event.path.strip('/').split('/')
         
-        if len(path_parts) == 2 and path_parts[1] == 'portfolioRequest':
+        if len(path_parts) == 2:
             uid = path_parts[0]
+            req_type = path_parts[1]
             req = event.data
-            if req.get('status') == 'PENDING': 
-                process_portfolio_request(uid, req)
+            if req and req.get('status') == 'PENDING':
+                if req_type == 'portfolioRequest':
+                    process_portfolio_request(uid, req)
+                elif req_type == 'sabotageRequest':
+                    process_sabotage_request(uid, req)
                 
         elif len(path_parts) == 1:
             uid = path_parts[0]
-            req = event.data.get('portfolioRequest')
-            if req and req.get('status') == 'PENDING':
-                process_portfolio_request(uid, req)
+            
+            req_port = event.data.get('portfolioRequest')
+            if req_port and req_port.get('status') == 'PENDING':
+                process_portfolio_request(uid, req_port)
+                
+            req_sab = event.data.get('sabotageRequest')
+            if req_sab and req_sab.get('status') == 'PENDING':
+                process_sabotage_request(uid, req_sab)
                 
         elif len(path_parts) == 0:
             for uid, user_data in event.data.items():
                 if isinstance(user_data, dict):
-                    req = user_data.get('portfolioRequest')
-                    if req and req.get('status') == 'PENDING':
-                        process_portfolio_request(uid, req)
+                    req_port = user_data.get('portfolioRequest')
+                    if req_port and req_port.get('status') == 'PENDING':
+                        process_portfolio_request(uid, req_port)
+                    
+                    req_sab = user_data.get('sabotageRequest')
+                    if req_sab and req_sab.get('status') == 'PENDING':
+                        process_sabotage_request(uid, req_sab)
 
     main_db.child('user_activities').listen(on_request)
     

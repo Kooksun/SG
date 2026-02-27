@@ -380,3 +380,59 @@
     color: #f43f5e;
     margin: 0 auto;
 }
+
+/* Action Selection UI */
+.action-select-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.action-select-btn {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+    padding: 16px;
+    border-radius: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    gap: 16px;
+}
+
+.action-select-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.action-select-btn .action-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    flex: 1;
+    text-align: left;
+}
+
+.action-select-btn .action-cost {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.action-select-btn.sabotage-btn {
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.action-select-btn.sabotage-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.5);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.sabotage-confirm-btn:hover:not(:disabled) {
+    background: #dc2626 !important;
+}
