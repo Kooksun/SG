@@ -242,6 +242,14 @@
     font-variant-numeric: tabular-nums;
 }
 
+.row-value.up {
+    color: var(--accent-rose);
+}
+
+.row-value.down {
+    color: var(--accent-down);
+}
+
 .flip-v {
     transform: rotate(180deg);
 }

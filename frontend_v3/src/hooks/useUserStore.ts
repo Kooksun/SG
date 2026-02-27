@@ -7,6 +7,7 @@ interface UserState {
     equity: number;
     totalPnl: number;
     pnlRate: number;
+    startingBalance: number;
     stocks: number;
     watchlist: string[]; // List of symbols
     holdings: string[]; // List of symbols
@@ -22,6 +23,7 @@ export const useUserStore = create<UserState>((set) => ({
     equity: 0,
     totalPnl: 0,
     pnlRate: 0,
+    startingBalance: 300_000_000,
     stocks: 0,
     watchlist: [],
     holdings: [],

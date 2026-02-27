@@ -18,18 +18,24 @@ interface MyPageProps {
 
 const MyPage: React.FC<MyPageProps> = ({ onViewChange }) => {
     const { user } = useAuth();
-    const { nickname, balance, uid } = useUserStore();
+    const { nickname, balance, uid, startingBalance } = useUserStore();
     const { detailedHoldings } = useDetailedHoldings(uid);
 
     const assetStats = useMemo(() => {
         const stockValue = detailedHoldings.reduce((sum, h) => sum + h.marketValue, 0);
         const equity = balance + stockValue;
-        const totalPnl = detailedHoldings.reduce((sum, h) => sum + (h.currentPrice - h.averagePrice) * h.quantity, 0);
-        const investmentCost = detailedHoldings.reduce((sum, h) => sum + (h.averagePrice * h.quantity), 0);
-        const pnlRate = investmentCost > 0 ? (totalPnl / investmentCost) * 100 : 0;
 
-        return { stockValue, equity, totalPnl, pnlRate };
-    }, [balance, detailedHoldings]);
+        // 초기 자본 대비 수익률 (리더보드와 동일)
+        const totalPnl = equity - startingBalance;
+        const pnlRate = startingBalance > 0 ? (totalPnl / startingBalance) * 100 : 0;
+
+        // 보유 주식 종합 수익률
+        const stockPnl = detailedHoldings.reduce((sum, h) => sum + (h.currentPrice - h.averagePrice) * h.quantity, 0);
+        const investmentCost = detailedHoldings.reduce((sum, h) => sum + (h.averagePrice * h.quantity), 0);
+        const stockPnlRate = investmentCost > 0 ? (stockPnl / investmentCost) * 100 : 0;
+
+        return { stockValue, equity, totalPnl, pnlRate, stockPnl, stockPnlRate };
+    }, [balance, detailedHoldings, startingBalance]);
 
     return (
         <main className="dashboard my-page">
@@ -84,6 +90,15 @@ const MyPage: React.FC<MyPageProps> = ({ onViewChange }) => {
                                         <span>주식 평가금</span>
                                     </div>
                                     <span className="row-value">{assetStats.stockValue.toLocaleString()}원</span>
+                                </div>
+                                <div className="asset-row">
+                                    <div className="row-label">
+                                        <TrendingUp size={18} className="stock-icon" />
+                                        <span>주식 수익률</span>
+                                    </div>
+                                    <span className={`row-value ${assetStats.stockPnl >= 0 ? 'up' : 'down'}`}>
+                                        {assetStats.stockPnlRate >= 0 ? '+' : ''}{assetStats.stockPnlRate.toFixed(2)}% ({assetStats.stockPnl >= 0 ? '+' : ''}{assetStats.stockPnl.toLocaleString()}원)
+                                    </span>
                                 </div>
                             </div>
                         </Card>

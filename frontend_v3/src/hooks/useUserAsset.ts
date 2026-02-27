@@ -26,6 +26,7 @@ export function useUserAsset(uid: string | null) {
                     equity: (data.balance || 0) + (data.totalStockValue || 0),
                     totalPnl: data.totalPnl || 0,
                     pnlRate: data.pnlRate || 0,
+                    startingBalance: data.startingBalance || 300_000_000,
                     stocks: data.stockCount || 0,
                     hasSeenPrologue: data.hasSeenPrologue || false,
                 });
