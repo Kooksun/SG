@@ -524,19 +524,16 @@ def process_sabotage_request(uid: str, req: dict):
                     매각 대금은 회원님의 계좌(Cash)로 즉시 입금되었습니다. <br/>
                     포인트 거래소에서 포인트를 모아 복수(?)를 준비해보세요!
                 </p>
-                <div style="text-align: center; margin-top: 30px;">
-                    <a href="https://stock-game-v3.web.app" style="background-color: #b91c1c; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 14px;">게임으로 이동하여 확인하기</a>
-                </div>
             </div>
             """
         else: # PENNY_STOCK_ATTACK
-            subject = f"📉 [{result['target_name']}님] 원치 않는 동전주가 강제 매수되었습니다!"
+            subject = f"🛑 [{result['target_name']}님] 원치 않는 동전주가 강제 매수되었습니다!"
             body = f"""
-            <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f3ff; border-radius: 10px; border: 1px solid #ddd6fe;">
-                <h2 style="color: #7c3aed; text-align: center; margin-bottom: 20px;">📉 주의! 동전주 강제 매수 발생</h2>
+            <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #fef2f2; border-radius: 10px; border: 1px solid #fecaca;">
+                <h2 style="color: #b91c1c; text-align: center; margin-bottom: 20px;">💣 주의 요망! 동전주 강제 매수 발생</h2>
                 <p style="color: #4b5563; font-size: 15px; line-height: 1.6;">
-                    <strong>{requester_name}</strong>님이 100,000 포인트를 사용하여 회원님의 현금을 동전주에 투자(?)했습니다! <br/>
-                    회원님의 현금 자산 일부가 시장에서 가장 저렴한 동전주를 매수하는 데 사용되었습니다.
+                    <strong>{requester_name}</strong>님이 100,000 포인트를 사용하여 회원님의 포트폴리오를 타격했습니다! <br/>
+                    회원님의 현금 자산 일부가 시장에서 가장 저렴한 동전주를 매수하는 데 강제로 사용되었습니다.
                 </p>
                 <div style="background-color: white; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb;">
                     <table style="width: 100%; border-collapse: collapse;">
@@ -556,11 +553,8 @@ def process_sabotage_request(uid: str, req: dict):
                 </div>
                 <p style="color: #4b5563; font-size: 13px; text-align: center; margin-top: 20px;">
                     해당 종목은 회원님의 포트폴리오에 즉시 추가되었습니다. <br/>
-                    동전주의 기적을 바랄 것인지, 아니면 즉시 손절할 것인지 결정하세요!
+                    포인트 거래소에서 포인트를 모아 복수(?)를 준비해보세요!
                 </p>
-                <div style="text-align: center; margin-top: 30px;">
-                    <a href="https://stock-game-v3.web.app" style="background-color: #7c3aed; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 14px;">게임으로 이동하여 확인하기</a>
-                </div>
             </div>
             """
             
