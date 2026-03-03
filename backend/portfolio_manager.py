@@ -261,6 +261,7 @@ def process_sabotage_request(uid: str, req: dict):
         
     req_data = req_snap.to_dict()
     requester_name = req_data.get('displayName', '익명 플레이어')
+    requester_email = req_data.get('email')
     tax_points = req_data.get('taxPoints', 0)
     
     if tax_points < 100000:
@@ -422,7 +423,8 @@ def process_sabotage_request(uid: str, req: dict):
                     'stock_name': largest_stock['name'],
                     'qty': sell_qty,
                     'amount': sell_amount,
-                    'target_email': tgt_email
+                    'target_email': tgt_email,
+                    'requester_email': requester_email
                 }
             else: # PENNY_STOCK_ATTACK
                 # PENNY STOCK ATTACK LOGIC
@@ -501,7 +503,8 @@ def process_sabotage_request(uid: str, req: dict):
                     'stock_name': selected_penny['name'],
                     'qty': buy_qty,
                     'amount': actual_cost,
-                    'target_email': tgt_email
+                    'target_email': tgt_email,
+                    'requester_email': requester_email
                 }
 
         transaction = main_firestore.transaction()
@@ -615,6 +618,78 @@ def process_sabotage_request(uid: str, req: dict):
             email_manager.send_email(result['target_email'], subject, body, is_html=True)
         except Exception as e:
             print(f"  !! Failed to send sabotage email to {target_uid}: {e}")
+
+    # 5. Attacker Email Report (New)
+    if success and result and result.get('requester_email'):
+        email_manager = EmailManager()
+        
+        if result['type'] == 'FORCED_SALE':
+            subject = f"🎯 [작전 성공] {result['target_name']}님 습격 리포트 (강제 매각)"
+            body = f"""
+            <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f0f9ff; border-radius: 10px; border: 1px solid #bae6fd;">
+                <h2 style="color: #0369a1; text-align: center; margin-bottom: 20px;">🎯 작전 성공: 강제 매각 완료</h2>
+                <p style="color: #4b5563; font-size: 15px; line-height: 1.6;">
+                    회원님이 요청하신 <strong>{result['target_name']}</strong>님에 대한 강제 매각 작전이 성공적으로 집행되었습니다. <br/>
+                    대상의 우량 자산을 시장가로 처분하여 타격을 입혔습니다.
+                </p>
+                <div style="background-color: white; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #e0f2fe;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">타격 종목</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #111827;">{result['stock_name']}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">매각 수량</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #111827;">{result['qty']:,} 주</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">타격 규모 (매각액)</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #e11d48;">{result['amount']:,} 원</td>
+                        </tr>
+                    </table>
+                </div>
+                <p style="color: #4b5563; font-size: 13px; text-align: center; margin-top: 20px;">
+                    소모된 100,000 포인트는 반환되지 않습니다. <br/>
+                    랭킹 페이지에서 대상의 자산 변화를 확인해보세요!
+                </p>
+            </div>
+            """
+        else: # PENNY_STOCK_ATTACK
+            subject = f"🎯 [작전 성공] {result['target_name']}님 습격 리포트 (동전주 투하)"
+            body = f"""
+            <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f0f9ff; border-radius: 10px; border: 1px solid #bae6fd;">
+                <h2 style="color: #0369a1; text-align: center; margin-bottom: 20px;">🎯 작전 성공: 동전주 강제 매수 완료</h2>
+                <p style="color: #4b5563; font-size: 15px; line-height: 1.6;">
+                    회원님이 요청하신 <strong>{result['target_name']}</strong>님에 대한 동전주 투하 작전이 성공적으로 집행되었습니다. <br/>
+                    대상의 현금을 활용해 가치가 낮은 동전주를 강제로 매수하게 하여 포트폴리오를 교란했습니다.
+                </p>
+                <div style="background-color: white; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #e0f2fe;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">투하 종목</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #111827;">{result['stock_name']}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">매수 수량</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #111827;">{result['qty']:,} 주</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">소모시킨 현금</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #e11d48;">{result['amount']:,} 원</td>
+                        </tr>
+                    </table>
+                </div>
+                <p style="color: #4b5563; font-size: 13px; text-align: center; margin-top: 20px;">
+                    소모된 100,000 포인트는 반환되지 않습니다. <br/>
+                    대상의 포트폴리오를 지켜보며 다음 작전을 구상해보세요!
+                </p>
+            </div>
+            """
+            
+        try:
+            email_manager.send_email(result['requester_email'], subject, body, is_html=True)
+        except Exception as e:
+            print(f"  !! Failed to send sabotage report email to {uid}: {e}")
 
 def start_manager():
     print("Season 3 Portfolio Request Manager Started.")
