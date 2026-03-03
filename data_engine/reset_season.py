@@ -125,7 +125,7 @@ def delete_firestore_users(dry_run=False):
 # --- Step 3: RTDB ---
 def delete_rtdb_nodes(dry_run=False):
     """Delete user-related RTDB nodes (orders, rankings, user_activities, commands)."""
-    nodes = ['orders', 'rankings', 'user_activities', 'commands']
+    nodes = ['orders', 'rankings', 'user_activities', 'commands', 'system/tickers']
     print(f"Cleaning RTDB nodes: {', '.join(nodes)}")
 
     for node in nodes:

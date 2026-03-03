@@ -319,7 +319,7 @@ def process_sabotage_request(uid: str, req: dict):
             if req_pts < 100000:
                 return False, "포인트가 부족합니다."
 
-            tgt_cash = tgt_snap_tx.to_dict().get('cash', 0)
+            tgt_cash = tgt_snap_tx.to_dict().get('balance', 0)
             tgt_email = tgt_snap_tx.to_dict().get('email')
 
             if attack_type == 'FORCED_SALE':
@@ -344,7 +344,7 @@ def process_sabotage_request(uid: str, req: dict):
 
                 # Writes
                 transaction.update(target_ref, {
-                    'cash': tgt_cash + sell_amount
+                    'balance': tgt_cash + sell_amount
                 })
                 
                 if new_qty <= 0:
@@ -432,7 +432,7 @@ def process_sabotage_request(uid: str, req: dict):
                     })
                     
                 transaction.update(target_ref, {
-                    'cash': target_cash - actual_cost
+                    'balance': target_cash - actual_cost
                 })
                 
                 # Requester deduction & history
