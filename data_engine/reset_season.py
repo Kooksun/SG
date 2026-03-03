@@ -1,29 +1,44 @@
+"""
+Season 3 Reset Script
+Deletes all user data (including AI bots) to prepare for a fresh season start.
+
+Targets:
+  - Firebase Auth: All users
+  - Firestore (Main): 'users' collection and all subcollections (portfolio, history)
+  - RTDB (Main): orders, rankings, user_activities, commands
+  - Supabase: trade_records, user_ranking_history tables
+"""
 import argparse
 import sys
-from firebase_admin import db as rtdb_admin
-from firebase_admin import firestore, auth
-import firestore_client  # Initializes Firebase app
-from firestore_client import db as firestore_db
-from supabase_client import get_supabase
+import os
 
-def delete_collection(coll_ref, batch_size, dry_run=False):
-    """
-    Recursively delete a collection and all its documents and subcollections in batches.
-    """
+# Add project root so we can import backend modules
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from backend.firebase_config import main_firestore, main_db
+from firebase_admin import auth
+
+# Supabase
+try:
+    from backend.supabase_client import get_supabase
+except ImportError:
+    from data_engine.supabase_client import get_supabase
+
+
+def delete_collection(coll_ref, batch_size=100, dry_run=False):
+    """Recursively delete a Firestore collection including all subcollections."""
     docs = coll_ref.limit(batch_size).stream()
     deleted = 0
 
     for doc in docs:
-        # First, recursively delete all subcollections of this document
-        subcollections = doc.reference.collections()
-        for sub_coll in subcollections:
-            if not dry_run:
-                print(f"    Processing subcollection: {doc.id}/{sub_coll.id}")
-                delete_collection(sub_coll, batch_size, dry_run)
+        # Recursively delete subcollections first
+        for sub_coll in doc.reference.collections():
+            if dry_run:
+                print(f"    [Dry Run] Would delete subcollection: {doc.id}/{sub_coll.id}")
             else:
-                print(f"    [Dry Run] Would process subcollection: {doc.id}/{sub_coll.id}")
+                print(f"    Deleting subcollection: {doc.id}/{sub_coll.id}")
+            delete_collection(sub_coll, batch_size, dry_run)
 
-        print(f"    Deleting document {doc.id}...")
         if not dry_run:
             doc.reference.delete()
         deleted += 1
@@ -32,134 +47,172 @@ def delete_collection(coll_ref, batch_size, dry_run=False):
         return deleted + delete_collection(coll_ref, batch_size, dry_run)
     return deleted
 
+
+# --- Step 1: Firebase Auth ---
 def delete_auth_users(dry_run=False):
+    """Delete ALL Firebase Authentication users (regular + bot accounts)."""
     print("Fetching Firebase Authentication users...")
-    
+
+    # Use main app for auth
+    from backend.firebase_config import main_app
     users = []
-    page = auth.list_users()
+    page = auth.list_users(app=main_app)
     while page:
         users.extend(page.users)
         page = page.get_next_page()
-    
+
     count = len(users)
     print(f"Found {count} users in Firebase Authentication.")
-    
+
     if count == 0:
         return
 
     if not dry_run:
         uids = [user.uid for user in users]
-        # auth.delete_users can handle up to 1000 users per call
         for i in range(0, len(uids), 1000):
             batch = uids[i:i+1000]
-            result = auth.delete_users(batch)
+            result = auth.delete_users(batch, app=main_app)
             print(f"  - Deleted {result.success_count} users. Errors: {result.failure_count}")
     else:
-        for user in users[:5]:
-            print(f"  [Dry Run] Would delete user: {user.uid} ({user.email or 'No Email'})")
-        if count > 5:
-            print(f"  [Dry Run] ... and {count - 5} more users.")
+        for user in users[:10]:
+            bot_tag = " [BOT]" if (user.custom_claims or {}).get("isBot") else ""
+            print(f"  [Dry Run] Would delete: {user.uid} ({user.email or user.display_name or 'N/A'}){bot_tag}")
+        if count > 10:
+            print(f"  [Dry Run] ... and {count - 10} more users.")
 
-def delete_all_firestore_collections(dry_run=False):
-    print("Fetching all top-level Firestore collections...")
-    collections = firestore_db.collections()
-    
-    count = 0
-    for coll_ref in collections:
-        print(f"Processing collection: {coll_ref.id}")
-        if not dry_run:
-            deleted_items = delete_collection(coll_ref, 100, dry_run=False)
-            print(f"  - Deleted {deleted_items} documents from '{coll_ref.id}'.")
-        else:
-            deleted_items = delete_collection(coll_ref, 100, dry_run=True)
-            print(f"  [Dry Run] Would delete {deleted_items} documents and their subcollections in '{coll_ref.id}'.")
-        count += 1
-    
+
+# --- Step 2: Firestore ---
+def delete_firestore_users(dry_run=False):
+    """Delete 'users' collection and all subcollections (portfolio, history)."""
+    print("Deleting Firestore 'users' collection (includes portfolio, history subcollections)...")
+
+    users_ref = main_firestore.collection('users')
+    docs = list(users_ref.stream())
+    count = len(docs)
+    print(f"Found {count} user documents in Firestore.")
+
     if count == 0:
-        print("No Firestore collections found.")
-    else:
-        print(f"Total collections processed: {count}")
+        return
 
-# delete_transactions is now redundant as we delete ALL collections, but kept here for reference if needed
-# or can be removed. Let's remove it to keep it clean.
+    for doc in docs:
+        uid = doc.id
+        data = doc.to_dict()
+        name = data.get('displayName', uid)
+        is_bot = data.get('isBot', False)
+        tag = " [BOT]" if is_bot else ""
 
-def delete_rtdb_nodes(dry_run=False):
-    nodes = ['ai_requests', 'custom_symbols', 'search_requests', 'search_results']
-    print(f"Checking RTDB nodes: {', '.join(nodes)}")
-    
-    for node in nodes:
-        ref = rtdb_admin.reference(node)
+        # Delete subcollections (portfolio, history)
+        for sub_name in ['portfolio', 'history']:
+            sub_ref = doc.reference.collection(sub_name)
+            sub_docs = list(sub_ref.stream())
+            sub_count = len(sub_docs)
+            if sub_count > 0:
+                if dry_run:
+                    print(f"  [Dry Run] Would delete {sub_count} docs from {uid}/{sub_name}")
+                else:
+                    for sub_doc in sub_docs:
+                        sub_doc.reference.delete()
+                    print(f"  - Deleted {sub_count} docs from {uid}/{sub_name}")
+
+        # Delete the user document itself
         if dry_run:
-            data = ref.get()
-            if data:
-                print(f"  [Dry Run] Would delete '{node}' node containing {len(data) if isinstance(data, (dict, list)) else 1} items.")
-            else:
-                print(f"  [Dry Run] '{node}' node is empty or missing.")
+            print(f"  [Dry Run] Would delete user: {name} ({uid}){tag}")
         else:
-            ref.delete()
-            print(f"Deleted '{node}' node from RTDB.")
+            doc.reference.delete()
+            print(f"  - Deleted user: {name} ({uid}){tag}")
 
+
+# --- Step 3: RTDB ---
+def delete_rtdb_nodes(dry_run=False):
+    """Delete user-related RTDB nodes (orders, rankings, user_activities, commands)."""
+    nodes = ['orders', 'rankings', 'user_activities', 'commands']
+    print(f"Cleaning RTDB nodes: {', '.join(nodes)}")
+
+    for node in nodes:
+        ref = main_db.child(node)
+        data = ref.get()
+        if data:
+            item_count = len(data) if isinstance(data, (dict, list)) else 1
+            if dry_run:
+                print(f"  [Dry Run] Would delete '{node}' ({item_count} items)")
+            else:
+                ref.delete()
+                print(f"  - Deleted '{node}' ({item_count} items)")
+        else:
+            print(f"  - '{node}' is already empty.")
+
+
+# --- Step 4: Supabase ---
 def delete_supabase_data(dry_run=False):
+    """Delete all rows from trade_records and user_ranking_history tables."""
     print("Connecting to Supabase...")
     supabase = get_supabase()
     if not supabase:
         print("Supabase client not initialized. Skipping.")
         return
 
-    table = "user_ranking_history"
-    print(f"Checking Supabase table: {table}")
-    
-    if not dry_run:
-        try:
-            # PostgREST requires a filter to perform a delete. 
-            # We'll delete all rows where 'uid' is not empty (which should be all rows).
-            response = supabase.table(table).delete().neq("uid", "").execute()
-            print(f"  - Deleted rows from Supabase table '{table}'.")
-        except Exception as e:
-            print(f"  - Error deleting from Supabase: {e}")
-    else:
-        print(f"  [Dry Run] Would delete all rows from Supabase table '{table}'.")
+    tables = ["trade_records", "user_ranking_history"]
 
+    for table in tables:
+        print(f"  Cleaning table: {table}")
+        if not dry_run:
+            try:
+                supabase.table(table).delete().neq("uid", "").execute()
+                print(f"  - Deleted all rows from '{table}'.")
+            except Exception as e:
+                print(f"  - Error deleting from '{table}': {e}")
+        else:
+            print(f"  [Dry Run] Would delete all rows from '{table}'.")
+
+
+# --- Main ---
 def main():
-    parser = argparse.ArgumentParser(description="RESET SEASON: Deletes all user data to start a new season.")
-    parser.add_argument("--dry-run", action="store_true", help="Scan and print what would be deleted without actually deleting.")
+    parser = argparse.ArgumentParser(description="SEASON 3 RESET: Deletes all user data (including AI bots) for a fresh start.")
+    parser.add_argument("--dry-run", action="store_true", help="Preview what would be deleted without actually deleting.")
     parser.add_argument("--force", action="store_true", help="Skip confirmation prompt.")
-    
+
     args = parser.parse_args()
-    
-    print("="*60)
-    print("SEASON RESET SCRIPT")
-    print("="*60)
-    
+
+    print("=" * 60)
+    print("  SEASON 3 RESET SCRIPT")
+    print("=" * 60)
+
     if args.dry_run:
-        print("!!! DRY RUN MODE - NO DATA WILL BE DELETED !!!")
-    
+        print("!!! DRY RUN MODE - NO DATA WILL BE DELETED !!!\n")
+
     if not args.dry_run and not args.force:
-        print("WARNING: THIS WILL PERMANENTLY DELETE ALL USER DATA (Portfolios, Users, Transactions).")
-        print("Stock market data and history will be PRESERVED.")
-        confirm = input("Are you sure you want to proceed? Type 'RESET' to confirm: ")
+        print("⚠️  WARNING: This will PERMANENTLY DELETE all user data:")
+        print("   - All Firebase Auth users")
+        print("   - All Firestore user documents (portfolios, trade history)")
+        print("   - All RTDB user data (orders, rankings, activities)")
+        print("   - All Supabase records (trade_records, ranking_history)")
+        print("   - ALL AI bot accounts and their data")
+        print()
+        confirm = input("Type 'RESET' to confirm: ")
         if confirm != "RESET":
             print("Aborted.")
             sys.exit(0)
 
-    print("\n--- Step 1: Cleaning Firebase Authentication Users ---")
+    print("\n--- Step 1/4: Firebase Authentication Users ---")
     delete_auth_users(dry_run=args.dry_run)
 
-    print("\n--- Step 2: Cleaning ALL Firestore Collections ---")
-    delete_all_firestore_collections(dry_run=args.dry_run)
-    
-    print("\n--- Step 3: Cleaning RTDB User Data ---")
+    print("\n--- Step 2/4: Firestore Users & Subcollections ---")
+    delete_firestore_users(dry_run=args.dry_run)
+
+    print("\n--- Step 3/4: RTDB User Data ---")
     delete_rtdb_nodes(dry_run=args.dry_run)
-    
-    print("\n--- Step 4: Cleaning Supabase Ranking History ---")
+
+    print("\n--- Step 4/4: Supabase Tables ---")
     delete_supabase_data(dry_run=args.dry_run)
-    
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     if args.dry_run:
-        print("Dry run completed. No changes made.")
+        print("  Dry run completed. No changes were made.")
     else:
-        print("SEASON RESET COMPLETED SUCCESSFULLY.")
-    print("="*60)
+        print("  ✅ SEASON 3 RESET COMPLETED SUCCESSFULLY.")
+        print("  Run 'python -m backend.init_bots' to re-initialize AI bots.")
+    print("=" * 60)
+
 
 if __name__ == "__main__":
     main()
