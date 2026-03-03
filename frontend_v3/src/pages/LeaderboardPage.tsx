@@ -174,7 +174,12 @@ const LeaderboardPage: React.FC = () => {
                                 </div>
                                 <div className="summary-stat-row">
                                     <div className="stat-label"><Coins size={18} /> 총 자산 규모</div>
-                                    <div className="stat-value">{(stats?.totalMarketCap ? (stats.totalMarketCap / 100000000).toFixed(1) : '0')}억</div>
+                                    <div className="stat-value">
+                                        {stats?.totalMarketCap && stats.totalMarketCap >= 100000000
+                                            ? `${(stats.totalMarketCap / 100000000).toFixed(1)}억`
+                                            : `${Math.floor((stats?.totalMarketCap || 0) / 10000).toLocaleString()}만`
+                                        }
+                                    </div>
                                 </div>
                                 <div className="summary-stat-row">
                                     <div className="stat-label"><BarChart3 size={18} /> 시장 평균 수익률</div>

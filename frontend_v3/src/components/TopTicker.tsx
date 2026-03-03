@@ -7,6 +7,15 @@ import Marquee from 'react-fast-marquee';
 const TopTicker: React.FC = () => {
     const { indices, exchangeRate, tickers } = useRealtimeData();
 
+    // 금액 포맷팅 함수 (1억 이상은 '억', 미만은 '만원')
+    const formatAmount = (amount: number) => {
+        if (amount >= 100_000_000) {
+            return `${(amount / 100_000_000).toFixed(1)}억`;
+        } else {
+            return `${Math.floor(amount / 10000).toLocaleString()}만원`;
+        }
+    };
+
     // 지수 리스트 변환
     const indexList = Object.values(indices);
 
@@ -63,7 +72,7 @@ const TopTicker: React.FC = () => {
                                             <>
                                                 <strong className="user">{trade.displayName}</strong>님이
                                                 <strong className="stock">{trade.name}</strong>
-                                                <span className="amount">{(trade.amount / 100000000).toFixed(1)}억</span> 체결
+                                                <span className="amount">{formatAmount(trade.amount)}</span> 체결
                                                 {trade.profitRatio !== undefined && (
                                                     <span className={`profit-tag ${trade.profitRatio >= 0 ? 'up' : 'down'}`}>
                                                         ({trade.profitRatio >= 0 ? '▲' : '▼'}{Math.abs(trade.profitRatio).toFixed(1)}%)
