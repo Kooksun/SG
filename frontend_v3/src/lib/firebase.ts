@@ -53,7 +53,6 @@ const auth = getAuth(mainApp);
 // Firestore 네트워크 오류 해결을 위해 Long Polling 및 Fetch Streams 비활성화 설정 추가
 const db = initializeFirestore(mainApp, {
     experimentalForceLongPolling: true,
-    useFetchStreams: false,
 });
 const rtdb = getDatabase(mainApp);
 const kospiRtdb = getDatabase(kospiApp);
