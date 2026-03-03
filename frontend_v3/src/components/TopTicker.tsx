@@ -42,23 +42,39 @@ const TopTicker: React.FC = () => {
             <div className="trade-ticker-bar">
                 {tickers.length > 0 ? (
                     <Marquee speed={70} autoFill direction="left" className="trade-marquee">
-                        {tickers.map((trade, index) => (
-                            <div key={`${trade.timestamp}-${index}`} className="ticker-item">
-                                <span className={`trade-type-badge ${trade.type.toLowerCase()}`}>
-                                    {trade.type === 'BUY' ? '매수' : '매도'}
-                                </span>
-                                <span className="ticker-text">
-                                    <strong className="user">{trade.displayName}</strong>님이
-                                    <strong className="stock">{trade.name}</strong>
-                                    <span className="amount">{(trade.amount / 100000000).toFixed(1)}억</span> 체결
-                                    {trade.profitRatio !== undefined && (
-                                        <span className={`profit-tag ${trade.profitRatio >= 0 ? 'up' : 'down'}`}>
-                                            ({trade.profitRatio >= 0 ? '▲' : '▼'}{Math.abs(trade.profitRatio).toFixed(1)}%)
-                                        </span>
-                                    )}
-                                </span>
-                            </div>
-                        ))}
+                        {tickers.map((trade, index) => {
+                            const isSabotage = trade.type.startsWith('SABOTAGE');
+                            const actionText = trade.type === 'SABOTAGE_SELL' ? '강제매도' : '강제매수';
+
+                            return (
+                                <div key={`${trade.timestamp}-${index}`} className="ticker-item">
+                                    <span className={`trade-type-badge ${isSabotage ? 'sabotage' : trade.type.toLowerCase()}`}>
+                                        {isSabotage ? '공격' : (trade.type === 'BUY' ? '매수' : '매도')}
+                                    </span>
+                                    <span className="ticker-text">
+                                        {isSabotage ? (
+                                            <>
+                                                <strong className="user">{trade.displayName}</strong>님이
+                                                <strong className="target"> {trade.targetName}</strong>님의
+                                                <strong className="stock"> {trade.name}</strong>을
+                                                <span className="action"> {actionText}!</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <strong className="user">{trade.displayName}</strong>님이
+                                                <strong className="stock">{trade.name}</strong>
+                                                <span className="amount">{(trade.amount / 100000000).toFixed(1)}억</span> 체결
+                                                {trade.profitRatio !== undefined && (
+                                                    <span className={`profit-tag ${trade.profitRatio >= 0 ? 'up' : 'down'}`}>
+                                                        ({trade.profitRatio >= 0 ? '▲' : '▼'}{Math.abs(trade.profitRatio).toFixed(1)}%)
+                                                    </span>
+                                                )}
+                                            </>
+                                        )}
+                                    </span>
+                                </div>
+                            );
+                        })}
                     </Marquee>
                 ) : (
                     <div className="ticker-item placeholder-item">

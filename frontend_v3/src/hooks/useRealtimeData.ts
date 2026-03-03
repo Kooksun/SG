@@ -11,9 +11,10 @@ export interface MarketIndex {
 
 export interface BroadcastTrade {
     displayName: string;
+    targetName?: string;
     symbol: string;
     name: string;
-    type: 'BUY' | 'SELL';
+    type: 'BUY' | 'SELL' | 'SABOTAGE_BUY' | 'SABOTAGE_SELL';
     amount: number;
     timestamp: string;
     profitRatio?: number;

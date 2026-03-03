@@ -75,13 +75,24 @@
     color: var(--accent-up);
 }
 
-.trade-type-badge.sell {
-    background: rgba(59, 130, 246, 0.1);
-    color: var(--accent-down);
+.trade-type-badge.sabotage {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .ticker-text {
     color: var(--text-secondary);
+}
+
+.ticker-text .target {
+    color: var(--accent-up);
+    margin: 0 4px;
+}
+
+.ticker-text .action {
+    color: var(--text-primary);
+    font-weight: 700;
 }
 
 .ticker-text .user {

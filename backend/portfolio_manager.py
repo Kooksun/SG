@@ -9,6 +9,7 @@ from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db
 from .email_utils import EmailManager
 
 MARKET_TZ = ZoneInfo("Asia/Seoul")
+MAX_TICKERS = 50
 
 def get_all_prices():
     """Fetch all prices from KOSPI/KOSDAQ RTDBs to use as a local cache."""
@@ -210,6 +211,35 @@ def mark_request_failed(uid: str, msg: str, req_type: str = 'portfolioRequest'):
         'status': 'FAILED',
         'errorMessage': msg
     })
+
+def broadcast_sabotage_ticker(attacker_name, target_name, symbol, name, tx_type, amount):
+    """Broadcasts sabotage event to Main RTDB system/tickers."""
+    try:
+        ticker_ref = main_db.child('system/tickers')
+        current_tickers = ticker_ref.child('list').get() or []
+        
+        new_ticker = {
+            "displayName": attacker_name,
+            "targetName": target_name,
+            "symbol": symbol,
+            "name": name,
+            "type": tx_type, # 'SABOTAGE_BUY' or 'SABOTAGE_SELL'
+            "amount": float(amount),
+            "timestamp": datetime.now(MARKET_TZ).isoformat()
+        }
+        
+        # Prepend and slice
+        updated_list = [new_ticker] + current_tickers
+        updated_list = updated_list[:MAX_TICKERS]
+        
+        ticker_ref.set({
+            "list": updated_list,
+            "lastUpdate": datetime.now(MARKET_TZ).isoformat()
+        })
+        
+        print(f"  [SABOTAGE TICKER] Broadcasted: {attacker_name} attacked {target_name} | {tx_type} {name}")
+    except Exception as e:
+        print(f"Error broadcasting sabotage ticker: {e}")
 
 def process_sabotage_request(uid: str, req: dict):
     print(f"[{datetime.now(MARKET_TZ)}] Processing Sabotage Request from {uid}")
@@ -490,6 +520,29 @@ def process_sabotage_request(uid: str, req: dict):
     main_db.child(f'user_activities/{uid}/sabotageRequest').update({
         'status': 'SUCCESS'
     })
+
+    # Broadcast to Ticker
+    try:
+        if result['type'] == 'FORCED_SALE':
+            broadcast_sabotage_ticker(
+                requester_name,
+                target_name,
+                largest_stock['symbol'],
+                largest_stock['name'],
+                'SABOTAGE_SELL',
+                result['amount']
+            )
+        else: # PENNY_STOCK_ATTACK
+            broadcast_sabotage_ticker(
+                requester_name,
+                target_name,
+                selected_penny['symbol'],
+                selected_penny['name'],
+                'SABOTAGE_BUY',
+                result['amount']
+            )
+    except Exception as ticker_err:
+        print(f"  !! Failed to broadcast sabotage ticker: {ticker_err}")
 
     # 4. Email notification
     if success and result and result.get('target_email'):
