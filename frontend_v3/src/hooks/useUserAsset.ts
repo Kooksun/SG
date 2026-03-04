@@ -27,7 +27,7 @@ export function useUserAsset(uid: string | null) {
                     balance: data.balance || 0,
                     startingBalance: data.startingBalance || 300_000_000,
                     taxPoints: data.taxPoints || 0,
-                    minigameStats: data.minigameStats || {},
+                    minigameStats: data.minigameStats || { lastDate: '', attempts: 0 },
                     hasSeenPrologue: data.hasSeenPrologue || false,
                 });
             }

@@ -60,19 +60,35 @@ def start_game(uid: str):
     """Initializes a new mini-game session."""
     print(f"  -> Starting Mini-game for {uid}")
     
-    # 1. Check Daily Attempts
+    # 1. Check and Update Daily Attempts using transaction
     today_str = datetime.now(MARKET_TZ).strftime('%Y-%m-%d')
     user_ref = main_firestore.collection('users').document(uid)
-    
-    user_snap = user_ref.get()
-    attempts = 0
-    if user_snap.exists:
-        user_data = user_snap.to_dict()
-        stats_data = user_data.get('minigameStats', {})
-        if stats_data.get('lastDate') == today_str:
-            attempts = stats_data.get('attempts', 0)
-    
-    if attempts >= 2:
+
+    @firestore.transactional
+    def check_and_increment_attempts(transaction):
+        user_snap = user_ref.get(transaction=transaction)
+        attempts = 0
+        if user_snap.exists:
+            user_data = user_snap.to_dict()
+            stats_data = user_data.get('minigameStats', {})
+            if stats_data.get('lastDate') == today_str:
+                attempts = stats_data.get('attempts', 0)
+        
+        if attempts >= 2:
+            return False, attempts
+        
+        transaction.update(user_ref, {
+            'minigameStats': {
+                'lastDate': today_str,
+                'attempts': attempts + 1
+            }
+        })
+        return True, attempts + 1
+
+    transaction = main_firestore.transaction()
+    success, current_attempts = check_and_increment_attempts(transaction)
+
+    if not success:
         main_db.child(f'user_activities/{uid}/minigameRequest').update({
             'status': 'FAILED',
             'errorMessage': '오늘의 도전 횟수(2회)를 모두 소모했습니다.'
@@ -81,80 +97,6 @@ def start_game(uid: str):
 
     # 2. Pick a random stock
     stock = get_random_top_stock()
-    if not stock:
-        main_db.child(f'user_activities/{uid}/minigameRequest').update({
-            'status': 'FAILED',
-            'errorMessage': '종목 데이터를 불러오지 못했습니다.'
-        })
-        return
-    
-    symbol = stock['symbol']
-    name = stock['name']
-    
-    # 3. Fetch Historical Data (120 sessions) with retries
-    max_retries = 3
-    history = None
-    target_stock = stock
-    
-    for i in range(max_retries):
-        history = fetch_stock_chart(target_stock['symbol'], page_size=120, page=1)
-        if history and len(history) >= 45:
-            break
-        print(f"  !! Retry {i+1} for starting game ({uid})")
-        target_stock = get_random_top_stock()
-        if not target_stock: break
-
-    if not history or len(history) < 45:
-        main_db.child(f'user_activities/{uid}/minigameRequest').update({
-            'status': 'FAILED',
-            'errorMessage': '충분한 차트 데이터를 확보하지 못했습니다. 다시 시도해 주세요.'
-        })
-        return
-
-    symbol = target_stock['symbol']
-    name = target_stock['name']
-
-    # 4. Select Window
-    # Naver returns latest first. We reverse it in fetcher or here?
-    # fetch_stock_chart returns [Date, O, H, L, C, V]
-    # Let's assume Naver order (latest first) or reversed.
-    # Actually fetcher doesn't reverse. It returns as is.
-    # Let's reverse to make it chronological.
-    history.reverse()
-    
-    max_start = len(history) - 41
-    start_idx = random.randint(0, max_start)
-    window_data = history[start_idx : start_idx + 40]
-    answer_candle = history[start_idx + 40] # The 41st candle
-    
-    # Calculate direction: 1 for UP, -1 for DOWN, 0 for FLAT
-    direction = 1 if answer_candle[4] > answer_candle[1] else -1
-    if answer_candle[4] == answer_candle[1]: direction = 0 # Do it as fail or neutral? User said UP/DOWN.
-    
-    # 5. Store Session Data securely
-    session_id = f"{int(time.time())}"
-    main_db.child(f'user_activities/{uid}/minigameData').set({
-        'sessionId': session_id,
-        'window': window_data,
-        'answer': {
-            'direction': direction,
-            'symbol': symbol,
-            'name': name,
-            'date': answer_candle[0],
-            'details': answer_candle
-        },
-        'wins': 0,
-        'securedReward': get_reward(0),
-        'status': 'ACTIVE'
-    })
-    
-    # Update Daily Attempts in User Document
-    user_ref.update({
-        'minigameStats': {
-            'lastDate': today_str,
-            'attempts': attempts + 1
-        }
-    })
 
     print(f"  -> {uid} Session Created: {session_id} with {name}")
     

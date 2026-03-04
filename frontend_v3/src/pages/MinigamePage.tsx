@@ -57,7 +57,13 @@ const MinigamePage: React.FC = () => {
     const isInitialLoad = useRef(true);
 
     // Filter attempts by current date (Seoul time) to allow reset appearance
-    const todaySeoul = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+    // Robust date generation for Asia/Seoul
+    const seoulDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+    const y = seoulDate.getFullYear();
+    const m = String(seoulDate.getMonth() + 1).padStart(2, '0');
+    const d = String(seoulDate.getDate()).padStart(2, '0');
+    const todaySeoul = `${y}-${m}-${d}`;
+
     const currentAttempts = dailyStats.lastDate === todaySeoul ? dailyStats.attempts : 0;
 
     useEffect(() => {
