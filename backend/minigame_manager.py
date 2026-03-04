@@ -97,12 +97,70 @@ def start_game(uid: str):
 
     # 2. Pick a random stock
     stock = get_random_top_stock()
+    if not stock:
+        main_db.child(f'user_activities/{uid}/minigameRequest').update({
+            'status': 'FAILED',
+            'errorMessage': '종목 데이터를 불러오지 못했습니다.'
+        })
+        return
+    
+    # 3. Fetch Historical Data (120 sessions) with retries
+    max_retries = 3
+    history = None
+    target_stock = stock
+    
+    for i in range(max_retries):
+        history = fetch_stock_chart(target_stock['symbol'], page_size=120, page=1)
+        if history and len(history) >= 45:
+            break
+        print(f"  !! Retry {i+1} for starting game ({uid})")
+        target_stock = get_random_top_stock()
+        if not target_stock: break
+
+    if not history or len(history) < 45:
+        main_db.child(f'user_activities/{uid}/minigameRequest').update({
+            'status': 'FAILED',
+            'errorMessage': '충분한 차트 데이터를 확보하지 못했습니다. 다시 시도해 주세요.'
+        })
+        return
+
+    symbol = target_stock['symbol']
+    name = target_stock['name']
+
+    # 4. Select Window
+    history.reverse()
+    
+    max_start = len(history) - 41
+    start_idx = random.randint(0, max_start)
+    window_data = history[start_idx : start_idx + 40]
+    answer_candle = history[start_idx + 40] # The 41st candle
+    
+    # Calculate direction: 1 for UP, -1 for DOWN, 0 for FLAT
+    direction = 1 if answer_candle[4] > answer_candle[1] else -1
+    if answer_candle[4] == answer_candle[1]: direction = 0 
+    
+    # 5. Store Session Data securely
+    session_id = f"{int(time.time())}"
+    main_db.child(f'user_activities/{uid}/minigameData').set({
+        'sessionId': session_id,
+        'window': window_data,
+        'answer': {
+            'direction': direction,
+            'symbol': symbol,
+            'name': name,
+            'date': answer_candle[0],
+            'details': answer_candle
+        },
+        'wins': 0,
+        'securedReward': REWARDS[0], # Using 0 wins reward
+        'status': 'ACTIVE'
+    })
 
     print(f"  -> {uid} Session Created: {session_id} with {name}")
     
     # 6. Update Request status
     main_db.child(f'user_activities/{uid}/minigameRequest').update({
-        'status': 'SUCCESS', # Use SUCCESS to indicate readiness
+        'status': 'SUCCESS', 
         'sessionId': session_id
     })
 
