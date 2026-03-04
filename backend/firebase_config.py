@@ -47,6 +47,58 @@ kosdaq_db = db.reference(app=kosdaq_app)
 # Firestore (Main only usually)
 main_firestore = firestore.client(app=main_app)
 
+def sync_user_to_rtdb(uid: str):
+    """
+    Syncs essential user data and portfolio from Firestore to RTDB.
+    This serves as a cache for the leaderboard to avoid scanning Firestore.
+    """
+    try:
+        user_ref = main_firestore.collection('users').document(uid)
+        user_snap = user_ref.get()
+        if not user_snap.exists:
+            return
+
+        user_data = user_snap.to_dict()
+        
+        # 1. Fetch Portfolio
+        portfolio_ref = user_ref.collection('portfolio')
+        portfolio_docs = portfolio_ref.stream()
+        
+        portfolio_items = {}
+        for doc in portfolio_docs:
+            data = doc.to_dict()
+            symbol = doc.id
+            qty = float(data.get('quantity', 0))
+            if qty > 0:
+                portfolio_items[symbol] = {
+                    'symbol': symbol,
+                    'quantity': qty,
+                    'averagePrice': float(data.get('averagePrice', 0))
+                }
+
+        # 2. Prepare Sync Payload
+        import time
+        now_ms = int(time.time() * 1000)
+        
+        sync_payload = {
+            'uid': uid,
+            'displayName': user_data.get('displayName', 'Anonymous'),
+            'photoURL': user_data.get('photoURL', ''),
+            'balance': float(user_data.get('balance', 0)),
+            'startingBalance': float(user_data.get('startingBalance', user_data.get('starting_balance', 300_000_000))),
+            'portfolio': portfolio_items,
+            'updatedAt': now_ms,
+            'lastSync': now_ms
+        }
+
+        # 3. Update RTDB Cache
+        # We store it in ranking_cache/uid
+        main_db.child('ranking_cache').child(uid).set(sync_payload)
+        
+        print(f"  [SYNC] {uid} synced to RTDB cache.")
+    except Exception as e:
+        print(f"Error syncing user {uid} to RTDB: {e}")
+
 if __name__ == "__main__":
     print("Testing Firebase connections...")
     try:

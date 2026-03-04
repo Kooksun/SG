@@ -5,7 +5,7 @@ import urllib.parse
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from firebase_admin import firestore
-from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db
+from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db, sync_user_to_rtdb
 from .email_utils import EmailManager
 
 MARKET_TZ = ZoneInfo("Asia/Seoul")
@@ -82,6 +82,9 @@ def process_portfolio_request(uid: str, req: dict):
         return
 
     print(f"  -> Deducted 10,000 P from {uid}. Fetching portfolio for {target_name} ({target_uid})")
+    
+    # Sync requester to RTDB Cache for point update
+    sync_user_to_rtdb(uid)
 
     # 3. Fetch Target Portfolio & Prices
     all_prices = get_all_prices()
@@ -523,6 +526,10 @@ def process_sabotage_request(uid: str, req: dict):
     main_db.child(f'user_activities/{uid}/sabotageRequest').update({
         'status': 'SUCCESS'
     })
+
+    # Sync both parties to RTDB Cache
+    sync_user_to_rtdb(uid)
+    sync_user_to_rtdb(target_uid)
 
     # Broadcast to Ticker
     try:

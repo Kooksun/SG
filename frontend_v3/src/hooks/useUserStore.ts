@@ -9,6 +9,11 @@ interface UserState {
     pnlRate: number;
     startingBalance: number;
     stocks: number;
+    taxPoints: number;
+    minigameStats: {
+        lastDate: string;
+        attempts: number;
+    };
     watchlist: string[]; // List of symbols
     holdings: string[]; // List of symbols
     hasSeenPrologue: boolean;
@@ -25,6 +30,8 @@ export const useUserStore = create<UserState>((set) => ({
     pnlRate: 0,
     startingBalance: 300_000_000,
     stocks: 0,
+    taxPoints: 0,
+    minigameStats: { lastDate: '', attempts: 0 },
     watchlist: [],
     holdings: [],
     hasSeenPrologue: true,

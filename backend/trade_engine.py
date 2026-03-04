@@ -2,7 +2,7 @@ import time
 import math
 from datetime import datetime
 from firebase_admin import firestore
-from .firebase_config import main_db, kospi_db, kosdaq_db, main_firestore
+from .firebase_config import main_db, kospi_db, kosdaq_db, main_firestore, sync_user_to_rtdb
 from .supabase_client import get_supabase
 from .fetcher import MARKET_TZ, fetch_custom_stocks
 
@@ -294,6 +294,9 @@ def process_order(uid: str, order_id: str, order_data: dict):
             # Log to Supabase
             record_to_supabase(**result)
             print(f"  -> SUCCESS: {uid} | {side} {symbol} @ {curr_price}")
+            
+            # Sync to RTDB Cache for Leaderboard (Zero-Read Optimization)
+            sync_user_to_rtdb(uid)
             
             # Ticker for large trades or high profit/loss
             is_large_trade = result['amount'] >= TICKER_THRESHOLD

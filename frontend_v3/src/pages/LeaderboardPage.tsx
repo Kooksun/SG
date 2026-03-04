@@ -11,25 +11,16 @@ import './LeaderboardPage.css';
 
 const LeaderboardPage: React.FC = () => {
     const { data, loading } = useLeaderboard();
-    const { nickname } = useUserStore();
+    const { nickname, taxPoints } = useUserStore();
     const { user } = useAuth();
 
-    const [taxPoints, setTaxPoints] = useState(0);
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [showModal, setShowModal] = useState(false);
     const [actionType, setActionType] = useState<'NONE' | 'PORTFOLIO' | 'SABOTAGE' | 'PENNY_STOCK'>('NONE');
     const [actionStatus, setActionStatus] = useState<'IDLE' | 'PENDING' | 'SUCCESS' | 'FAILED'>('IDLE');
     const [actionMessage, setActionMessage] = useState('');
 
-    useEffect(() => {
-        if (!user) return;
-        const unsub = onSnapshot(doc(db, 'users', user.uid), (docSnap) => {
-            if (docSnap.exists()) {
-                setTaxPoints(docSnap.data().taxPoints || 0);
-            }
-        });
-        return () => unsub();
-    }, [user]);
+    // Unified onSnapshot is handled in App.tsx via useUserAsset
 
     useEffect(() => {
         if (!user) return;

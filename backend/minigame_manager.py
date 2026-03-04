@@ -2,7 +2,7 @@ import time
 import random
 from datetime import datetime
 from firebase_admin import firestore
-from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db
+from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db, sync_user_to_rtdb
 from .fetcher import fetch_stock_chart, MARKET_TZ
 
 # Reward Table
@@ -330,6 +330,9 @@ def finalize_game(uid: str, wins: int, reward: int, success: bool, answer: dict 
 
     transaction = main_firestore.transaction()
     update_points(transaction)
+    
+    # Sync to RTDB Cache
+    sync_user_to_rtdb(uid)
 
     # 2. Update RTDB status for Frontend
     session_ref = main_db.child(f'user_activities/{uid}/minigameData')
@@ -496,6 +499,8 @@ def handle_luckybox_request(uid: str):
             'rewardSymbol': selected_stock['symbol'],
             'rewardName': selected_stock['name']
         })
+        # Sync to RTDB Cache
+        sync_user_to_rtdb(uid)
 
     except Exception as e:
         print(f"Error processing Lucky Box: {e}")

@@ -23,47 +23,31 @@ def get_all_prices():
     return prices
 
 def leaderboard_update_job():
-    print(f"[{datetime.now(MARKET_TZ)}] Calculating Leaderboard...")
+    print(f"[{datetime.now(MARKET_TZ)}] Calculating Leaderboard (Zero-Read Optimization)...")
     
     # 1. Get all current prices
     all_prices = get_all_prices()
     
-    # 2. Get all users from Firestore
+    # 2. Get all users from RTDB Cache (Zero Firestore Reads!)
     try:
-        users_ref = main_firestore.collection('users')
-        users_docs = users_ref.stream()
+        ranking_cache = main_db.child('ranking_cache').get() or {}
         
         rankings = []
         stock_yield_agg = {} # {symbol: {'sum_yield': 0, 'count': 0, 'name': ''}}
-        DEFAULT_STARTING_BALANCE = 300000000.0 # 3억 KRW as default for Season 3
         
-        # Aggregate stats
         total_equity_sum = 0
         total_yield_sum = 0
         total_players = 0
         
-        print(f"  -> Processing users and syncing to Firestore...")
-        
-        for user_doc_stream in users_docs:
+        for uid, user_data in ranking_cache.items():
             total_players += 1
-            uid = user_doc_stream.id
-            
-            # [Fix 4.6B Issue] 
-            # We must fetch the portfolio FIRST, and THEN fetch the user document (balance).
-            # This ensures we never pair an OLD (higher) balance with a NEW (larger) portfolio.
-            # (If we do the opposite, we get Old Balance + New Portfolio = 460M. 
-            #  If we do this order, we might get New Balance + Old Portfolio = 140M, which is a temporary under-estimation, 
-            #  but much safer and will correct itself in the next run).
             
             # 3. Calculate Portfolio Value
             portfolio_value = 0
             stock_count = 0
-            portfolio_ref = users_ref.document(uid).collection('portfolio')
-            portfolio_items = list(portfolio_ref.stream()) # Fetch all portfolio items first
+            portfolio = user_data.get('portfolio', {})
             
-            for item in portfolio_items:
-                p_data = item.to_dict()
-                symbol = p_data.get('symbol')
+            for symbol, p_data in portfolio.items():
                 qty = float(p_data.get('quantity', 0))
                 avg_price = float(p_data.get('averagePrice', 0))
                 
@@ -81,15 +65,11 @@ def leaderboard_update_job():
                         stock_yield_agg[symbol]['sum_yield'] += item_yield
                         stock_yield_agg[symbol]['count'] += 1
 
-            # 4. Now fetch the User document freshly to get the most recent Balance
-            user_snap = users_ref.document(uid).get()
-            if not user_snap.exists: continue
-            
-            user_data = user_snap.to_dict()
+            # 4. Use cached data
             cash = float(user_data.get('balance', 0))
             display_name = user_data.get('displayName', 'Anonymous')
             photo_url = user_data.get('photoURL', '')
-            starting_balance = float(user_data.get('starting_balance', user_data.get('startingBalance', DEFAULT_STARTING_BALANCE)))
+            starting_balance = float(user_data.get('startingBalance', 300000000.0))
             
             total_equity = cash + portfolio_value
             yield_percent = ((total_equity - starting_balance) / starting_balance) * 100 if starting_balance > 0 else 0
@@ -108,8 +88,8 @@ def leaderboard_update_job():
             }
             rankings.append(user_rank_data)
             
-            # Update Firestore User Doc for Frontend Header Consistency
-            users_ref.document(uid).update({
+            # Update RTDB live stats for Frontend instead of Firestore update
+            main_db.child(f'users/{uid}/live_stats').update({
                 'totalStockValue': round(portfolio_value, 2),
                 'totalEquity': round(total_equity, 2),
                 'pnlRate': round(yield_percent, 2),
@@ -120,15 +100,11 @@ def leaderboard_update_job():
         # 4. Sort by Equity descending
         rankings.sort(key=lambda x: x['equity'], reverse=True)
         
-        # 5. Add Rank and Sync individual rank back to Firestore
+        # 5. Add Rank
         for i, item in enumerate(rankings):
-            rank = i + 1
-            item['rank'] = rank
-            # Optional: Sync rank to Firestore if needed for profile
-            # users_ref.document(item['uid']).update({'rank': rank})
+            item['rank'] = i + 1
             
-        # 6. Process Top/Worst Stocks by Yield (Based on Participant Portfolios)
-        # (This is now part of the main loop above for efficiency)
+        # 6. Process Top/Worst Stocks by Yield
         held_stock_yield_list = []
         for symbol, agg in stock_yield_agg.items():
             avg_yield = agg['sum_yield'] / agg['count'] if agg['count'] > 0 else 0
@@ -138,11 +114,9 @@ def leaderboard_update_job():
                 'yield': round(avg_yield, 2)
             })
         
-        # Sort for Top 10
         held_stock_yield_list.sort(key=lambda x: x['yield'], reverse=True)
         top_yielding_stocks = held_stock_yield_list[:10]
         
-        # Sort for Worst 10
         held_stock_yield_list.sort(key=lambda x: x['yield'], reverse=False)
         worst_yielding_stocks = held_stock_yield_list[:10]
         
@@ -160,7 +134,7 @@ def leaderboard_update_job():
         }
         
         main_db.child('rankings').set(leaderboard_payload)
-        print(f"  -> Leaderboard successfully updated and synced to Firestore.")
+        print(f"  -> Leaderboard successfully updated (Zero Firestore Reads).")
         
     except Exception as e:
         import traceback

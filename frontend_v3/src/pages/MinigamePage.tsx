@@ -2,9 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import Chart from 'react-apexcharts';
 import { Gamepad2, Loader2, Trophy, Coins, RotateCcw, AlertCircle, CheckCircle2, XCircle, Gift } from 'lucide-react';
 import { ref, onValue, set, get, push } from 'firebase/database';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { rtdb, db } from '../lib/firebase';
+import { rtdb } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
+import { useUserStore } from '../hooks/useUserStore';
 import './MinigamePage.css';
 
 interface MinigameSession {
@@ -42,9 +42,8 @@ interface MinigameSession {
 
 const MinigamePage: React.FC = () => {
     const { user } = useAuth();
+    const { taxPoints, minigameStats: dailyStats } = useUserStore();
     const [session, setSession] = useState<MinigameSession | null>(null);
-    const [dailyStats, setDailyStats] = useState({ attempts: 0, lastDate: '' });
-    const [taxPoints, setTaxPoints] = useState(0);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState('');
@@ -60,19 +59,8 @@ const MinigamePage: React.FC = () => {
     useEffect(() => {
         if (!user) return;
 
-        // 1. Listen for User Document (Tax Points & Daily Stats)
-        const userUnsub = onSnapshot(doc(db, 'users', user.uid), (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                setTaxPoints(data.taxPoints || 0);
-                setDailyStats(data.minigameStats || { attempts: 0, lastDate: '' });
-            }
-            setLoading(false);
-        }, (err) => {
-            console.error('Firestore Read Error:', err);
-            setError('데이터를 불러오는데 실패했습니다 (권한 오류).');
-            setLoading(false);
-        });
+        // 1. Unified User Document is handled in useUserAsset/App.tsx
+        setLoading(false);
 
         // 2. Listen for Game Session
         const sessionRef = ref(rtdb, `user_activities/${user.uid}/minigameData`);
@@ -117,7 +105,6 @@ const MinigamePage: React.FC = () => {
         });
 
         return () => {
-            userUnsub();
             sessionUnsub();
             requestUnsub();
             luckyBoxUnsub();
