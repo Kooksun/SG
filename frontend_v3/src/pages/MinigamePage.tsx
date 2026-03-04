@@ -412,7 +412,7 @@ const MinigamePage: React.FC = () => {
                     </div>
                     <div className="mg-stat-card">
                         <span className="mg-label">오늘의 도전</span>
-                        <span className="mg-value">{dailyStats.attempts} / 2</span>
+                        <span className="mg-value">{currentAttempts} / 2</span>
                     </div>
                 </div>
             </header>
