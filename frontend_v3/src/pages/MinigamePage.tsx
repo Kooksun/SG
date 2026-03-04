@@ -56,6 +56,10 @@ const MinigamePage: React.FC = () => {
 
     const isInitialLoad = useRef(true);
 
+    // Filter attempts by current date (Seoul time) to allow reset appearance
+    const todaySeoul = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+    const currentAttempts = dailyStats.lastDate === todaySeoul ? dailyStats.attempts : 0;
+
     useEffect(() => {
         if (!user) return;
 
@@ -446,11 +450,11 @@ const MinigamePage: React.FC = () => {
                             <button
                                 className="start-btn"
                                 onClick={startNewGame}
-                                disabled={actionLoading || dailyStats.attempts >= 2}
+                                disabled={actionLoading || currentAttempts >= 2}
                             >
                                 {actionLoading ? <Loader2 className="animate-spin" /> : '도전하기 (100% 무료)'}
                             </button>
-                            {dailyStats.attempts >= 2 && <p className="limit-text">오늘의 도전 횟수를 모두 사용했습니다.</p>}
+                            {currentAttempts >= 2 && <p className="limit-text">오늘의 도전 횟수를 모두 사용했습니다.</p>}
                         </div>
 
                         {/* 2. Lucky Box Card */}
