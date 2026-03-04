@@ -86,9 +86,16 @@ def process_portfolio_request(uid: str, req: dict):
     # Sync requester to RTDB Cache for point update
     sync_user_to_rtdb(uid)
 
-    # 3. Fetch Target Portfolio & Prices
+    # 3. Fetch Target User Data & Portfolio & Prices
+    target_ref = main_firestore.collection('users').document(target_uid)
+    target_snap = target_ref.get()
+    
+    target_balance = 0
+    if target_snap.exists:
+        target_balance = float(target_snap.to_dict().get('balance', 0))
+
     all_prices = get_all_prices()
-    target_portfolio_ref = main_firestore.collection('users').document(target_uid).collection('portfolio')
+    target_portfolio_ref = target_ref.collection('portfolio')
     portfolio_docs = list(target_portfolio_ref.stream())
     
     portfolio_items = []
@@ -129,6 +136,7 @@ def process_portfolio_request(uid: str, req: dict):
     portfolio_items.sort(key=lambda x: x['eval_amount'], reverse=True)
     
     total_yield = ((total_val / total_investment) - 1) * 100 if total_investment > 0 else 0
+    total_assets = total_val + target_balance
 
     # 4. Generate Email HTML
     html_content = f"""
@@ -136,10 +144,21 @@ def process_portfolio_request(uid: str, req: dict):
         <h2 style="color: #1f2937; text-align: center; margin-bottom: 20px;">📊 {target_name}님의 포트폴리오 리포트</h2>
         
         <div style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 24px;">
-            <p style="margin: 0; color: #4b5563; font-size: 14px;">총 주식 평가 금액</p>
-            <h3 style="margin: 8px 0 0 0; color: #1f2937; font-size: 24px;">{total_val:,.0f} 원</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6; padding-bottom: 12px; margin-bottom: 12px;">
+                <div style="text-align: left;">
+                    <p style="margin: 0; color: #4b5563; font-size: 13px;">총 주식 평가액</p>
+                    <p style="margin: 4px 0 0 0; color: #1f2937; font-size: 18px; font-weight: bold;">{total_val:,.0f} 원</p>
+                </div>
+                <div style="text-align: right;">
+                    <p style="margin: 0; color: #4b5563; font-size: 13px;">현금 잔고</p>
+                    <p style="margin: 4px 0 0 0; color: #1f2937; font-size: 18px; font-weight: bold;">{target_balance:,.0f} 원</p>
+                </div>
+            </div>
+            
+            <p style="margin: 0; color: #4b5563; font-size: 14px;">총 자산 (평가액 + 현금)</p>
+            <h3 style="margin: 8px 0 0 0; color: #1f2937; font-size: 28px;">{total_assets:,.0f} 원</h3>
             <p style="margin: 8px 0 0 0; font-size: 15px; font-weight: bold; color: {'#ef4444' if total_yield < 0 else '#10b981'};">
-                종합 수익률: {total_yield:+.2f}%
+                종합 수익률 (주식): {total_yield:+.2f}%
             </p>
         </div>
         

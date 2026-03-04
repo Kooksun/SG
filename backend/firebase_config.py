@@ -34,15 +34,24 @@ def initialize_firebase_apps():
         'databaseURL': kosdaq_url
     }, name='kosdaq')
     
-    return main_app, kospi_app, kosdaq_app
+    # 4. Ranking Project
+    ranking_key = os.getenv('RANKING_FIREBASE_KEY')
+    ranking_url = os.getenv('RANKING_RTDB_URL')
+    ranking_cred = credentials.Certificate(os.path.join(os.path.dirname(__file__), ranking_key))
+    ranking_app = firebase_admin.initialize_app(ranking_cred, {
+        'databaseURL': ranking_url
+    }, name='ranking')
+    
+    return main_app, kospi_app, kosdaq_app, ranking_app
 
 # Global accessors
-main_app, kospi_app, kosdaq_app = initialize_firebase_apps()
+main_app, kospi_app, kosdaq_app, ranking_app = initialize_firebase_apps()
 
 # DB references
 main_db = db.reference(app=main_app)
 kospi_db = db.reference(app=kospi_app)
 kosdaq_db = db.reference(app=kosdaq_app)
+ranking_db = db.reference(app=ranking_app)
 
 # Firestore (Main only usually)
 main_firestore = firestore.client(app=main_app)

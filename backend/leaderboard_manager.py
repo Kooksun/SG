@@ -1,7 +1,7 @@
 import schedule
 import time
 from datetime import datetime
-from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db
+from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db, ranking_db
 from .fetcher import MARKET_TZ
 from .price_updater import is_kr_market_open
 
@@ -120,7 +120,7 @@ def leaderboard_update_job():
         held_stock_yield_list.sort(key=lambda x: x['yield'], reverse=False)
         worst_yielding_stocks = held_stock_yield_list[:10]
         
-        # 7. Update to Main RTDB
+        # 7. Update to Ranking RTDB
         leaderboard_payload = {
             'updatedAt': datetime.now(MARKET_TZ).isoformat(),
             'stats': {
@@ -133,8 +133,8 @@ def leaderboard_update_job():
             'list': rankings
         }
         
-        main_db.child('rankings').set(leaderboard_payload)
-        print(f"  -> Leaderboard successfully updated (Zero Firestore Reads).")
+        ranking_db.child('rankings').set(leaderboard_payload)
+        print(f"  -> Leaderboard successfully updated to Ranking Project.")
         
     except Exception as e:
         import traceback

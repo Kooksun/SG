@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ref, onValue, off } from 'firebase/database';
-import { rtdb } from '../lib/firebase';
+import { rtdb, rankingRtdb } from '../lib/firebase';
 
 export interface MarketIndex {
     name: string;
@@ -40,8 +40,8 @@ export function useRealtimeData() {
             }
         });
 
-        // 2. 대형 거래 티커 구독
-        const tickerRef = ref(rtdb, 'system/tickers/list');
+        // 2. 대형 거래 티커 구독 (분산된 DB에서 읽기)
+        const tickerRef = ref(rankingRtdb, 'system/tickers/list');
         const unsubscribeTickers = onValue(tickerRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {

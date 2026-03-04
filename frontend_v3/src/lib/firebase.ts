@@ -37,6 +37,17 @@ const kosdaqConfig = {
     databaseURL: "https://kooksun-stock-kosdaq-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 
+// 대형 거래 티커 및 랭킹 프로젝트 (부하 분산용)
+const rankingConfig = {
+    apiKey: "AIzaSyDjb158PShdCZ3k73DIG-5gXmhoOrsCeKg",
+    authDomain: "kooksun-lotto.firebaseapp.com",
+    projectId: "kooksun-lotto",
+    storageBucket: "kooksun-lotto.firebasestorage.app",
+    messagingSenderId: "19568825811",
+    appId: "1:19568825811:web:99586512ebc442bdcfcb26",
+    databaseURL: "https://kooksun-lotto-default-rtdb.firebaseio.com"
+};
+
 const mainApp = !getApps().some(app => app.name === '[DEFAULT]')
     ? initializeApp(mainConfig)
     : getApps().find(app => app.name === '[DEFAULT]')!;
@@ -49,6 +60,10 @@ const kosdaqApp = !getApps().some(app => app.name === 'kosdaq')
     ? initializeApp(kosdaqConfig, 'kosdaq')
     : getApps().find(app => app.name === 'kosdaq')!;
 
+const rankingApp = !getApps().some(app => app.name === 'ranking')
+    ? initializeApp(rankingConfig, 'ranking')
+    : getApps().find(app => app.name === 'ranking')!;
+
 const auth = getAuth(mainApp);
 // Firestore 네트워크 오류 해결을 위해 Long Polling 및 Fetch Streams 비활성화 설정 추가
 const db = initializeFirestore(mainApp, {
@@ -57,5 +72,6 @@ const db = initializeFirestore(mainApp, {
 const rtdb = getDatabase(mainApp);
 const kospiRtdb = getDatabase(kospiApp);
 const kosdaqRtdb = getDatabase(kosdaqApp);
+const rankingRtdb = getDatabase(rankingApp);
 
-export { mainApp, auth, db, rtdb, kospiRtdb, kosdaqRtdb };
+export { mainApp, auth, db, rtdb, kospiRtdb, kosdaqRtdb, rankingRtdb };

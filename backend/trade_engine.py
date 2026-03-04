@@ -2,7 +2,7 @@ import time
 import math
 from datetime import datetime
 from firebase_admin import firestore
-from .firebase_config import main_db, kospi_db, kosdaq_db, main_firestore, sync_user_to_rtdb
+from .firebase_config import main_db, kospi_db, kosdaq_db, main_firestore, sync_user_to_rtdb, ranking_db
 from .supabase_client import get_supabase
 from .fetcher import MARKET_TZ, fetch_custom_stocks
 
@@ -96,7 +96,7 @@ def record_to_supabase(uid, symbol, name, tx_type, price, quantity, amount, raw_
 def broadcast_ticker(display_name, symbol, name, tx_type, amount, profit_ratio=None):
     """Broadcasts large trade to Main RTDB system/tickers."""
     try:
-        ticker_ref = main_db.child('system/tickers')
+        ticker_ref = ranking_db.child('system/tickers')
         current_tickers = ticker_ref.child('list').get() or []
         
         new_ticker = {
