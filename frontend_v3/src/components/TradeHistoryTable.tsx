@@ -39,7 +39,8 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore,
                 <tbody>
                     {history.length > 0 ? (
                         history.map((item) => {
-                            const isPointTrade = item.type === 'REWARD' || item.type === 'TAX' || item.type === 'LUCKY_BOX';
+                            const isDonation = item.symbol === 'DONATION';
+                            const isPointTrade = (item.type === 'REWARD' || item.type === 'TAX' || item.type === 'LUCKY_BOX') && !isDonation;
 
                             return (
                                 <tr key={item.id}>
@@ -52,23 +53,28 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore,
                                     </td>
                                     <td className="text-center">
                                         <span className={`type-badge ${item.type.toLowerCase()}`}>
-                                            {item.type === 'BUY' ? '매수' :
-                                                item.type === 'REWARD' ? '적립' :
-                                                    item.type === 'TAX' ? '사용' :
-                                                        item.type === 'LUCKY_BOX' ? '랜덤뽑기' : '매도'}
+                                            {isDonation ? '기부' :
+                                                item.type === 'BUY' ? '매수' :
+                                                    item.type === 'REWARD' ? '적립' :
+                                                        item.type === 'TAX' ? '사용' :
+                                                            item.type === 'LUCKY_BOX' ? '랜덤뽑기' : '매도'}
                                         </span>
                                     </td>
-                                    <td className="text-right font-mono">{isPointTrade ? '-' : item.price.toLocaleString()}</td>
-                                    <td className="text-right font-mono">{isPointTrade ? '-' : item.quantity.toLocaleString()}</td>
+                                    <td className="text-right font-mono">{isPointTrade || isDonation ? '-' : item.price.toLocaleString()}</td>
+                                    <td className="text-right font-mono">{isPointTrade || isDonation ? '-' : item.quantity.toLocaleString()}</td>
                                     <td className="text-right font-mono font-bold">
-                                        {item.totalAmount.toLocaleString()}{isPointTrade ? ' P' : '원'}
+                                        {isDonation ? '-' : (
+                                            <>{item.totalAmount.toLocaleString()}{isPointTrade ? ' P' : '원'}</>
+                                        )}
                                     </td>
-                                    <td className={`text-right font-mono ${item.profit && item.profit > 0 ? 'up' : item.profit && item.profit < 0 ? 'down' : ''}`}>
+                                    <td className={`text-right font-mono ${item.profit && item.profit > 0 ? 'up' : (item.profit && item.profit < 0) || isDonation ? 'down' : ''}`}>
                                         {item.type === 'SELL' && item.profit !== undefined ? (
                                             <>
                                                 <div className="font-bold">{item.profit > 0 ? '+' : ''}{item.profit.toLocaleString()}</div>
                                                 <div className="text-xs opacity-80">({item.profitRatio ? (item.profitRatio * 100).toFixed(2) : '0.00'}%)</div>
                                             </>
+                                        ) : isDonation ? (
+                                            <div className="font-bold">{item.totalAmount.toLocaleString()}</div>
                                         ) : '-'}
                                     </td>
                                     <td className="text-right font-mono text-xs">
