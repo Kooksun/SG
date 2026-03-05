@@ -460,9 +460,17 @@ def process_sabotage_request(uid: str, req: dict):
                     'requester_email': requester_email
                 }
             elif attack_type == 'FORCED_DONATION':
-                # FORCED DONATION LOGIC: 1% of total equity
+                # FORCED DONATION LOGIC: 3% of Profit (Total Assets - Starting Balance)
+                tgt_data = tgt_snap_tx.to_dict()
+                starting_balance = float(tgt_data.get('startingBalance', 300000000))
                 total_equity = tgt_cash + total_stock_eval
-                donation_amount = math.floor(total_equity * 0.01)
+                
+                profit = total_equity - starting_balance
+                
+                if profit <= 0:
+                    return False, f"대상유저({target_name})님이 현재 손실 중이어서 사회 환원 공격을 할 수 없습니다."
+                
+                donation_amount = math.floor(profit * 0.03)
                 
                 if donation_amount < 1:
                     donation_amount = 1 # Minimum 1 won
@@ -495,7 +503,7 @@ def process_sabotage_request(uid: str, req: dict):
                         new_qty = current_qty - sell_qty
                         
                         avg_price = float(stock_data.get('averagePrice', 0))
-                        profit = (live_price - avg_price) * sell_qty if avg_price > 0 else 0
+                        p_profit = (live_price - avg_price) * sell_qty if avg_price > 0 else 0
                         profitRatio = (live_price / avg_price - 1) if avg_price > 0 else 0
                         
                         if new_qty <= 0:
@@ -513,7 +521,7 @@ def process_sabotage_request(uid: str, req: dict):
                             'quantity': sell_qty,
                             'totalAmount': sell_amount,
                             'fee': 0,
-                            'profit': profit,
+                            'profit': p_profit,
                             'profitRatio': profitRatio,
                             'isSystemOrder': True,
                             'timestamp': firestore.SERVER_TIMESTAMP,
@@ -528,6 +536,7 @@ def process_sabotage_request(uid: str, req: dict):
                     'taxPoints': tgt_snap_tx.to_dict().get('taxPoints', 0) + 300000
                 })
                 
+                # Only deduct point if success
                 transaction.update(requester_ref, {
                     'taxPoints': req_pts - required_points
                 })
@@ -742,12 +751,12 @@ def process_sabotage_request(uid: str, req: dict):
                 <h2 style="color: #166534; text-align: center; margin-bottom: 20px;">😇 강제 기부 타격 발생</h2>
                 <p style="color: #4b5563; font-size: 15px; line-height: 1.6;">
                     <strong>익명의 기부천사</strong>가 200,000 포인트를 소모하여 회원님의 자산을 강제로 기부 처리했습니다. <br/>
-                    회원님의 총 자산 중 1%가 사회로 환원되는 아름다운(?) 순간입니다.
+                    회원님의 현재 수익금 중 3%가 사회로 환원되는 아름다운(?) 순간입니다.
                 </p>
                 <div style="background-color: white; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #dcfce7;">
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr>
-                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">기부 금액 (총 자산 1%)</td>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">기부 금액 (수익금의 3%)</td>
                             <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #dc2626;">- {result['donation_amount']:,} 원</td>
                         </tr>
                         <tr>
@@ -757,8 +766,9 @@ def process_sabotage_request(uid: str, req: dict):
                     </table>
                 </div>
                 <p style="color: #4b5563; font-size: 13px; text-align: center; margin-top: 20px;">
-                    기부금 충당을 위해 현금(Cash)이 먼저 사용되었으며, 부족 시 주식 일부가 강제 매각되었습니다. <br/>
-                    보상으로 지급된 포인트는 '포인트 거래소'에서 확인 가능합니다.
+                    * 손실 중인 플레이어는 공격 대상에서 제외됩니다. <br/>
+                    기부금 충당을 위해 현금(Cash)이 먼저 사용되며, 부족 시 주식 일부가 강제 매각됩니다. <br/>
+                    보상으로 지급된 포인트는 '거래내역'에서 확인 가능합니다.
                 </p>
             </div>
             """

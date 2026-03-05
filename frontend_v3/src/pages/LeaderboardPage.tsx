@@ -47,7 +47,7 @@ const LeaderboardPage: React.FC = () => {
                     if (val.type === 'PENNY_STOCK_ATTACK') {
                         setActionMessage('동전주 강제 매수 공격이 성공적으로 적용되었습니다!');
                     } else if (val.type === 'FORCED_DONATION') {
-                        setActionMessage('대상의 자산 1%를 기부 처리하고 익명으로 타격했습니다!');
+                        setActionMessage('대상의 수익금 3%를 기부 처리하고 익명으로 타격했습니다!');
                     } else {
                         setActionMessage('목표에 대한 강제 매각 타격이 성공적으로 적용되었습니다!');
                     }
@@ -460,11 +460,11 @@ const LeaderboardPage: React.FC = () => {
                                 <TrendingUp size={48} className="portfolio-modal-icon" style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)' }} />
                                 <h3 style={{ color: '#f59e0b' }}>강제 기부 공격</h3>
                                 <p>
-                                    <strong>{selectedUser.displayName}</strong>님의 총 자산 <strong>1%</strong>를 강제로 기부(삭제)하게 합니다!<br /><br />
+                                    <strong>{selectedUser.displayName}</strong>님의 현재 수익금 중 <strong>3%</strong>를 강제로 기부(삭제)하게 합니다!<br /><br />
                                     대신 대상에게는 위로금으로 <strong>30만 포인트</strong>가 지급되며, 당신의 정체는 <strong>'익명의 기부천사'</strong>로 숨겨집니다.
                                 </p>
                                 <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '10px' }}>
-                                    * 현금이 부족할 경우 보유 비중이 가장 큰 주식을 시스템 가격으로 강제 매각하여 기부금을 충당합니다.
+                                    * 수익이 없는(손실 중인) 플레이어는 공격할 수 없으며, 공격 실패 시 포인트는 차감되지 않습니다.
                                 </p>
 
                                 <div className={`portfolio-modal-points ${taxPoints < 200000 ? 'insufficient' : ''}`}>
