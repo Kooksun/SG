@@ -142,7 +142,7 @@ def process_order(uid: str, order_id: str, order_data: dict):
     side = order_data.get('type') # BUY or SELL
     order_type = order_data.get('orderType') # MARKET or LIMIT
     target_price = order_data.get('targetPrice') or order_data.get('price')
-    is_welcome = order_data.get('isWelcomeOrder', False)
+    is_system = order_data.get('isSystemOrder', False)
 
     # Status check (Idempotency)
     if order_data.get('status') != 'PENDING':
@@ -150,10 +150,8 @@ def process_order(uid: str, order_id: str, order_data: dict):
 
     # [Reality Engine] Market Hours Check
     is_open = is_kr_market_open()
-    if not is_open and not is_welcome:
+    if not is_open and not is_system:
         # Keep PENDING for next market open
-        # We don't return, we just wait. The listener will trigger again or polling will handle it.
-        # But to avoid constant processing, we skip if not open.
         return
 
     # 1. Price Check
@@ -166,8 +164,8 @@ def process_order(uid: str, order_id: str, order_data: dict):
         return
 
     # [Reality Engine] Freshness Check: Is the price from today?
-    # If the market just opened, we must wait for the FIRST update of the day.
-    if is_open and not is_welcome:
+    # Systems orders (Welcome/Sabotage etc.) skip this to work 24/7 with available price.
+    if is_open and not is_system:
         now = datetime.now(MARKET_TZ)
         today_start = now.replace(hour=9, minute=0, second=0, microsecond=0)
         

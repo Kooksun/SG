@@ -138,7 +138,7 @@ export const authService = {
                             type: 'BUY',
                             price: etf.price,
                             quantity: quantity,
-                            isWelcomeOrder: true
+                            isSystemOrder: true
                         });
                     } catch (err) {
                         console.error(`Auto-buy failed for ${etf.name}:`, err);

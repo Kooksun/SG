@@ -15,12 +15,12 @@ export interface TradeRequest {
     price: number;
     quantity: number;
     orderType?: 'MARKET' | 'LIMIT';
-    isWelcomeOrder?: boolean;
+    isSystemOrder?: boolean;
 }
 
 export const tradeService = {
     // 실시간 거래 처리 (RTDB 주문 요청 방식 - 시즌3 엔진 연동)
-    async executeTrade({ uid, symbol, name, type, price, quantity, orderType = 'MARKET', isWelcomeOrder = false }: TradeRequest) {
+    async executeTrade({ uid, symbol, name, type, price, quantity, orderType = 'MARKET', isSystemOrder = false }: TradeRequest) {
         if (!uid) throw new Error("로그인이 필요합니다.");
 
         // RTDB orders/{uid} 경로에 주문 추가
@@ -33,7 +33,7 @@ export const tradeService = {
             price, // 요청 당시 가격 (시장가 주문의 기준가 또는 지정가 주문의 타겟가)
             quantity,
             orderType,
-            isWelcomeOrder,
+            isSystemOrder,
             status: 'PENDING',
             createdAt: rtdbTimestamp()
         };
