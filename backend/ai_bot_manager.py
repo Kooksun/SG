@@ -12,6 +12,11 @@ from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db
 from .fetcher import fetch_kr_stocks, fetch_etf_stocks, MARKET_TZ
 from .trade_engine import get_latest_price
 
+try:
+    from duckduckgo_search import DDGS
+except ImportError:
+    DDGS = None
+
 # Configure LLMs
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
@@ -39,6 +44,24 @@ PERSONAS = {
         "prompt_vibe": "극도로 조심스럽고 원칙을 사수하며, 변동성을 혐오하는 자산 관리 전문가 스타일"
     }
 }
+
+def search_news(query: str, max_results: int = 5) -> str:
+    """Search for latest news using DuckDuckGo."""
+    if not DDGS:
+        return "Search functionality unavailable."
+    
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, region='kr-kr', safesearch='off', timelimit='d', max_results=max_results))
+            if not results:
+                return "No recent news found."
+            
+            lines = []
+            for r in results:
+                lines.append(f"- {r.get('title')}: {r.get('body')[:150]}...")
+            return "\n".join(lines)
+    except Exception as e:
+        return f"Search error: {e}"
 
 class AIBotManager:
     def __init__(self, bot_uid: str):
@@ -85,6 +108,11 @@ class AIBotManager:
         context += format_list("거래량 상위 종목", volume_leaders) + "\n\n"
         context += format_list("기타 시장 종목 샘플", sample)
         
+        # Add Web Search Context for Market Pulse
+        print(f"  -> Fetching global market news...")
+        market_news = search_news("오늘의 한국 증시 시황 테마 뉴스", max_results=5)
+        context = f"[오늘의 증시 시황 및 뉴스]\n{market_news}\n\n" + context
+        
         return context
 
     def get_bot_portfolio_context(self) -> str:
@@ -126,6 +154,25 @@ class AIBotManager:
         market_ctx = self.get_market_context()
         portfolio_ctx = self.get_bot_portfolio_context()
         
+        # Add specific search for top holdings if any
+        holdings_news = ""
+        top_symbols = list(self.current_holdings.keys())[:2] # Search for top 2 holdings to avoid too many queries
+        for sym in top_symbols:
+             # Get name for the symbol
+             name = "Unknown"
+             for m in ['KOSPI', 'KOSDAQ', 'ETF']:
+                target_db = kospi_db if m in ['KOSPI', 'ETF'] else kosdaq_db
+                s_data = target_db.child(f'stocks/{m}/{sym}').get()
+                if s_data:
+                    name = s_data.get('name', 'Unknown')
+                    break
+             print(f"  -> Fetching news for {name} ({sym})...")
+             news = search_news(f"주식 {name} {sym} 최신 호재 악재 뉴스", max_results=3)
+             holdings_news += f"\n[{name} ({sym}) 관련 뉴스]\n{news}\n"
+        
+        if holdings_news:
+            portfolio_ctx += "\n" + holdings_news
+
         prompt = f"""
 당신은 주식 투자 게임의 AI 참가자 '{self.persona['name']}'입니다.
 당신의 투자 전략 지침: {self.persona['description']}
@@ -136,17 +183,18 @@ class AIBotManager:
 {portfolio_ctx}
 
 위 정보를 바탕으로 어떤 행동을 할지 결정하세요. 우선순위에 따라 최대 3개의 후보를 선택하세요.
+최근 뉴스 정보가 있다면 이를 적극적으로 참고하여 시장의 분위기와 테마를 매매에 반영하세요.
 
 반드시 아래 JSON 형식으로만 답변하세요 (주석이나 다른 설명 없이 순수 JSON만 출력):
 {{
-    "analysis": "현재 상황 분석 및 투자 지침 이행 근거",
+    "analysis": "현재 상황 및 뉴스 분석(반드시 언급된 뉴스와 연계하여 설명), 투자 지침 이행 근거",
     "decisions": [
         {{
             "rank": 1,
             "decision": "BUY" | "SELL" | "HOLD",
             "symbol": "종목코드 (6자리)",
             "percentage": 사용하고자 하는 비율 (숫자, 1~100),
-            "reason": "결정 이유"
+            "reason": "결정 이유 (뉴스/테마 기반 근거 포함)"
         }}
     ]
 }}
@@ -158,6 +206,7 @@ class AIBotManager:
 2. **페르소나 준수**: 각자의 투자 지침(버핏: 가치주 발굴, 불나방: 상한가/급등주 올인, 안전지구: 대형주 전용)을 엄격히 따르세요.
 3. **상한가 허용**: 현재 상한가(+30%)에 도달한 종목이더라도 불나방은 원한다면 매수할 수 있습니다. 시스템이 허용합니다.
 4. **JSON 무결성**: 절대로 JSON 안에 주석(// 또는 #)을 포함하지 마세요.
+5. **현실감 반영**: 제공된 '오늘의 증시 시황'과 '종목 뉴스'를 분석에 반드시 포함시켜 왜 지금 이 종목을 사거나 파는지 논리적으로 설명하세요.
 """
         
         # LLM Call
