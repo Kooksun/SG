@@ -139,11 +139,16 @@ def run_scheduler():
     # Track the current operational mode
     current_market_open = None
     
-    def setup_schedule():
+    def setup_schedule(immediate=False):
         nonlocal current_market_open
         is_open = is_kr_market_open()
         
-        if current_market_open == is_open:
+        # If market just opened OR it's the initial call
+        if current_market_open == False and is_open == True:
+            print("!!! Market just opened. Triggering immediate update.")
+            price_update_job()
+        
+        if current_market_open == is_open and not immediate:
             return # No change needed
             
         schedule.clear('price_job')
@@ -155,7 +160,7 @@ def run_scheduler():
 
     # Initial run and setup
     price_update_job()
-    setup_schedule()
+    setup_schedule(immediate=True)
     
     # Check for schedule change every 10 seconds
     schedule.every(10).seconds.do(setup_schedule)

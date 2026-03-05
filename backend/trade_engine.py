@@ -1,6 +1,6 @@
 import time
 import math
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from firebase_admin import firestore
 from .firebase_config import main_db, kospi_db, kosdaq_db, main_firestore, sync_user_to_rtdb, ranking_db
 from .supabase_client import get_supabase
@@ -128,6 +128,13 @@ def broadcast_ticker(display_name, symbol, name, tx_type, amount, profit_ratio=N
     except Exception as e:
         print(f"Error broadcasting ticker: {e}")
 
+def is_kr_market_open() -> bool:
+    """Check if the KR market is open (9:00 - 15:30, Weekdays)."""
+    now = datetime.now(MARKET_TZ)
+    if now.weekday() >= 5: # Sat, Sun
+        return False
+    return dt_time(9, 0) <= now.time() <= dt_time(15, 30)
+
 def process_order(uid: str, order_id: str, order_data: dict):
     """Executes order with Firestore Transaction and RTDB status update."""
     symbol = order_data.get('symbol')
@@ -135,9 +142,18 @@ def process_order(uid: str, order_id: str, order_data: dict):
     side = order_data.get('type') # BUY or SELL
     order_type = order_data.get('orderType') # MARKET or LIMIT
     target_price = order_data.get('targetPrice') or order_data.get('price')
+    is_welcome = order_data.get('isWelcomeOrder', False)
 
     # Status check (Idempotency)
     if order_data.get('status') != 'PENDING':
+        return
+
+    # [Reality Engine] Market Hours Check
+    is_open = is_kr_market_open()
+    if not is_open and not is_welcome:
+        # Keep PENDING for next market open
+        # We don't return, we just wait. The listener will trigger again or polling will handle it.
+        # But to avoid constant processing, we skip if not open.
         return
 
     # 1. Price Check
@@ -148,6 +164,22 @@ def process_order(uid: str, order_id: str, order_data: dict):
             'errorMessage': 'Stock price not found.'
         })
         return
+
+    # [Reality Engine] Freshness Check: Is the price from today?
+    # If the market just opened, we must wait for the FIRST update of the day.
+    if is_open and not is_welcome:
+        now = datetime.now(MARKET_TZ)
+        today_start = now.replace(hour=9, minute=0, second=0, microsecond=0)
+        
+        # Check system/updatedAt to see if the updater has run today
+        system_status = main_db.child('system').get() or {}
+        last_update_str = system_status.get('updatedAt')
+        if last_update_str:
+            last_update_dt = datetime.fromisoformat(last_update_str)
+            if last_update_dt < today_start:
+                # Still yesterday's price. Wait for the updater to run.
+                print(f"  .. Waiting for fresh price for {symbol} (Last Update: {last_update_str})")
+                return
 
     # [Reality Engine] Market Limit Protection (±29.5%)
     # Skip for Bots as requested
