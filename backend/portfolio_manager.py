@@ -435,6 +435,7 @@ def process_sabotage_request(uid: str, req: dict):
                     'fee': 0,
                     'profit': profit,
                     'profitRatio': profitRatio,
+                    'isSystemOrder': True,
                     'timestamp': firestore.SERVER_TIMESTAMP,
                     'details': f"{requester_name}에 의한 강제 매각"
                 })
@@ -515,6 +516,7 @@ def process_sabotage_request(uid: str, req: dict):
                     'quantity': buy_qty,
                     'totalAmount': actual_cost,
                     'fee': 0,
+                    'isSystemOrder': True,
                     'timestamp': firestore.SERVER_TIMESTAMP,
                     'details': f"{requester_name}에 의한 동전주 강제 매수"
                 })
