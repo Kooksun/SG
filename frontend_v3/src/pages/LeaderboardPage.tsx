@@ -461,7 +461,7 @@ const LeaderboardPage: React.FC = () => {
                                 <h3 style={{ color: '#f59e0b' }}>강제 기부 공격</h3>
                                 <p>
                                     <strong>{selectedUser.displayName}</strong>님의 현재 수익금 중 <strong>3%</strong>를 강제로 기부(삭제)하게 합니다!<br /><br />
-                                    대신 대상에게는 위로금으로 <strong>30만 포인트</strong>가 지급되며, 당신의 정체는 <strong>'익명의 기부천사'</strong>로 숨겨집니다.
+                                    대신 대상에게는 위로금으로 <strong>10만 포인트</strong>가 지급되며, 당신의 정체는 <strong>'익명의 기부천사'</strong>로 숨겨집니다.
                                 </p>
                                 <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '10px' }}>
                                     * 수익이 없는(손실 중인) 플레이어는 공격할 수 없으며, 공격 실패 시 포인트는 차감되지 않습니다.

@@ -533,7 +533,7 @@ def process_sabotage_request(uid: str, req: dict):
                 
                 transaction.update(target_ref, {
                     'balance': new_tgt_cash,
-                    'taxPoints': tgt_snap_tx.to_dict().get('taxPoints', 0) + 300000
+                    'taxPoints': tgt_snap_tx.to_dict().get('taxPoints', 0) + 100000
                 })
                 
                 # Only deduct point if success
@@ -563,14 +563,14 @@ def process_sabotage_request(uid: str, req: dict):
                     'fee': 0,
                     'isSystemOrder': True,
                     'timestamp': firestore.SERVER_TIMESTAMP,
-                    'details': "익명의 기부천사에 의한 강제 기부 (30만 P 보상)"
+                    'details': "익명의 기부천사에 의한 강제 기부 (10만 P 보상)"
                 })
                 
                 return True, {
                     'type': 'FORCED_DONATION',
                     'target_name': target_name,
                     'donation_amount': donation_amount,
-                    'reward_points': 300000,
+                    'reward_points': 100000,
                     'target_email': tgt_email,
                     'requester_email': requester_email
                 }
