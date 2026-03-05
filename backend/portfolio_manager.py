@@ -286,8 +286,11 @@ def process_sabotage_request(uid: str, req: dict):
     requester_email = req_data.get('email')
     tax_points = req_data.get('taxPoints', 0)
     
-    if tax_points < 100000:
-        mark_request_failed(uid, "포인트가 부족합니다 (100,000 P 필요).", 'sabotageRequest')
+    attack_type = req.get('type', 'FORCED_SALE')
+    required_points = 200000 if attack_type == 'FORCED_DONATION' else 100000
+    
+    if tax_points < required_points:
+        mark_request_failed(uid, f"포인트가 부족합니다 ({required_points:,} P 필요).", 'sabotageRequest')
         return
 
     # 2. Pick target's largest holding or penny stock based on type
@@ -299,8 +302,10 @@ def process_sabotage_request(uid: str, req: dict):
     selected_penny = None
 
     target_ref = main_firestore.collection('users').document(target_uid) # Define target_ref here
-
-    if attack_type == 'FORCED_SALE':
+    
+    # 2. pre-calculation: total equity and largest stock
+    total_stock_eval = 0
+    if attack_type == 'FORCED_SALE' or attack_type == 'FORCED_DONATION':
         target_portfolio_ref = target_ref.collection('portfolio')
         stock_snaps = target_portfolio_ref.stream()
         
@@ -315,6 +320,8 @@ def process_sabotage_request(uid: str, req: dict):
             stock_name = stock_data.get('name', symbol)
             
             eval_amount = qty * live_price
+            total_stock_eval += eval_amount
+            
             if not largest_stock or eval_amount > (largest_stock['quantity'] * largest_stock['live_price']):
                 largest_stock = {
                     'symbol': symbol,
@@ -323,7 +330,7 @@ def process_sabotage_request(uid: str, req: dict):
                     'live_price': live_price
                 }
                 
-        if not largest_stock:
+        if not largest_stock and attack_type == 'FORCED_SALE':
             mark_request_failed(uid, "대상이 보유한 주식이 없습니다.", 'sabotageRequest')
             return
             
@@ -350,10 +357,13 @@ def process_sabotage_request(uid: str, req: dict):
 
     hist_req_ref = requester_ref.collection('history').document()
     hist_tgt_ref = target_ref.collection('history').document()
+    hist_sys_ref = target_ref.collection('history').document() # For system sell if donation needs it
     
-    if attack_type == 'FORCED_SALE':
-        tgt_stock_doc = target_ref.collection('portfolio').document(largest_stock['symbol'])
-    else:
+    tgt_stock_doc = None
+    if attack_type == 'FORCED_SALE' or attack_type == 'FORCED_DONATION':
+        if largest_stock:
+            tgt_stock_doc = target_ref.collection('portfolio').document(largest_stock['symbol'])
+    elif attack_type == 'PENNY_STOCK_ATTACK':
         tgt_stock_doc = target_ref.collection('portfolio').document(selected_penny['symbol'])
 
     # 3. Transaction
@@ -369,7 +379,7 @@ def process_sabotage_request(uid: str, req: dict):
                 return False, "유저 데이터를 찾을 수 없습니다."
 
             req_pts = req_snap_tx.to_dict().get('taxPoints', 0)
-            if req_pts < 100000:
+            if req_pts < required_points:
                 return False, "포인트가 부족합니다."
 
             tgt_cash = tgt_snap_tx.to_dict().get('balance', 0)
@@ -446,6 +456,112 @@ def process_sabotage_request(uid: str, req: dict):
                     'stock_name': largest_stock['name'],
                     'qty': sell_qty,
                     'amount': sell_amount,
+                    'target_email': tgt_email,
+                    'requester_email': requester_email
+                }
+            elif attack_type == 'FORCED_DONATION':
+                # FORCED DONATION LOGIC: 1% of total equity
+                total_equity = tgt_cash + total_stock_eval
+                donation_amount = math.floor(total_equity * 0.01)
+                
+                if donation_amount < 1:
+                    donation_amount = 1 # Minimum 1 won
+                
+                sell_amount = 0
+                sell_qty = 0
+                
+                # Check if cash is enough
+                new_tgt_cash = tgt_cash
+                if tgt_cash < donation_amount:
+                    # Need to sell stock to cover donation
+                    if not stock_snap_tx or not stock_snap_tx.exists:
+                        if tgt_cash > 0:
+                            donation_amount = tgt_cash
+                        else:
+                            return False, "대상유저의 자산이 없어 기부할 수 없습니다."
+                    else:
+                        # Sell largest stock
+                        stock_data = stock_snap_tx.to_dict()
+                        current_qty = float(stock_data.get('quantity', 0))
+                        needed_cash = donation_amount - tgt_cash
+                        live_price = largest_stock['live_price']
+                        
+                        sell_qty = math.ceil(needed_cash / live_price)
+                        if sell_qty > current_qty:
+                            sell_qty = current_qty 
+                        
+                        sell_amount = sell_qty * live_price
+                        new_tgt_cash += sell_amount
+                        new_qty = current_qty - sell_qty
+                        
+                        avg_price = float(stock_data.get('averagePrice', 0))
+                        profit = (live_price - avg_price) * sell_qty if avg_price > 0 else 0
+                        profitRatio = (live_price / avg_price - 1) if avg_price > 0 else 0
+                        
+                        if new_qty <= 0:
+                            transaction.delete(tgt_stock_doc)
+                        else:
+                            transaction.update(tgt_stock_doc, {
+                                'quantity': new_qty
+                            })
+                            
+                        transaction.set(hist_sys_ref, {
+                            'symbol': largest_stock['symbol'],
+                            'name': largest_stock['name'],
+                            'type': 'SELL',
+                            'price': live_price,
+                            'quantity': sell_qty,
+                            'totalAmount': sell_amount,
+                            'fee': 0,
+                            'profit': profit,
+                            'profitRatio': profitRatio,
+                            'isSystemOrder': True,
+                            'timestamp': firestore.SERVER_TIMESTAMP,
+                            'details': "기부금 충당을 위한 강제 매각"
+                        })
+                
+                donation_amount = min(donation_amount, new_tgt_cash) 
+                new_tgt_cash -= donation_amount
+                
+                transaction.update(target_ref, {
+                    'balance': new_tgt_cash,
+                    'taxPoints': tgt_snap_tx.to_dict().get('taxPoints', 0) + 300000
+                })
+                
+                transaction.update(requester_ref, {
+                    'taxPoints': req_pts - required_points
+                })
+                
+                transaction.set(hist_req_ref, {
+                    'symbol': 'SABOTAGE',
+                    'name': '사회 환원 공격',
+                    'type': 'TAX',
+                    'price': 0,
+                    'quantity': 1,
+                    'totalAmount': -required_points,
+                    'fee': 0,
+                    'timestamp': firestore.SERVER_TIMESTAMP,
+                    'details': f"{target_name}님을 자선가로 만듦"
+                })
+                
+                transaction.set(hist_tgt_ref, {
+                    'symbol': 'DONATION',
+                    'name': '강제 기부',
+                    'type': 'TAX',
+                    'price': 0,
+                    'quantity': 1,
+                    'totalAmount': -donation_amount,
+                    'fee': 0,
+                    'isSystemOrder': True,
+                    'timestamp': firestore.SERVER_TIMESTAMP,
+                    'details': "익명의 기부천사에 의한 강제 기부 (30만 P 보상)"
+                })
+                
+                return True, {
+                    'type': 'FORCED_DONATION',
+                    'target_name': target_name,
+                    'donation_amount': donation_amount,
+                    'reward_points': 300000,
                     'target_email': tgt_email,
                     'requester_email': requester_email
                 }
@@ -563,6 +679,15 @@ def process_sabotage_request(uid: str, req: dict):
                 'SABOTAGE_SELL',
                 result['amount']
             )
+        elif result['type'] == 'FORCED_DONATION':
+            broadcast_sabotage_ticker(
+                "익명의 기부천사",
+                target_name,
+                "DONATION",
+                "사회환원",
+                "SABOTAGE_DONATION",
+                result['donation_amount']
+            )
         else: # PENNY_STOCK_ATTACK
             broadcast_sabotage_ticker(
                 requester_name,
@@ -607,6 +732,33 @@ def process_sabotage_request(uid: str, req: dict):
                 <p style="color: #4b5563; font-size: 13px; text-align: center; margin-top: 20px;">
                     매각 대금은 회원님의 계좌(Cash)로 즉시 입금되었습니다. <br/>
                     포인트 거래소에서 포인트를 모아 복수(?)를 준비해보세요!
+                </p>
+            </div>
+            """
+        elif result['type'] == 'FORCED_DONATION':
+            subject = f"🕊️ [{result['target_name']}님] 선행의 기회가 찾아왔습니다 (강제 기부)"
+            body = f"""
+            <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f0fdf4; border-radius: 10px; border: 1px solid #bbf7d0;">
+                <h2 style="color: #166534; text-align: center; margin-bottom: 20px;">😇 강제 기부 타격 발생</h2>
+                <p style="color: #4b5563; font-size: 15px; line-height: 1.6;">
+                    <strong>익명의 기부천사</strong>가 200,000 포인트를 소모하여 회원님의 자산을 강제로 기부 처리했습니다. <br/>
+                    회원님의 총 자산 중 1%가 사회로 환원되는 아름다운(?) 순간입니다.
+                </p>
+                <div style="background-color: white; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #dcfce7;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">기부 금액 (총 자산 1%)</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #dc2626;">- {result['donation_amount']:,} 원</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">지급 보상</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #16a34a;">+ {result['reward_points']:,} P (즉시 지급)</td>
+                        </tr>
+                    </table>
+                </div>
+                <p style="color: #4b5563; font-size: 13px; text-align: center; margin-top: 20px;">
+                    기부금 충당을 위해 현금(Cash)이 먼저 사용되었으며, 부족 시 주식 일부가 강제 매각되었습니다. <br/>
+                    보상으로 지급된 포인트는 '포인트 거래소'에서 확인 가능합니다.
                 </p>
             </div>
             """
@@ -679,6 +831,33 @@ def process_sabotage_request(uid: str, req: dict):
                 <p style="color: #4b5563; font-size: 13px; text-align: center; margin-top: 20px;">
                     소모된 100,000 포인트는 반환되지 않습니다. <br/>
                     랭킹 페이지에서 대상의 자산 변화를 확인해보세요!
+                </p>
+            </div>
+            """
+        elif result['type'] == 'FORCED_DONATION':
+            subject = f"🎯 [작전 성공] {result['target_name']}님 사회 환원 시나리오 완료"
+            body = f"""
+            <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f0fdf4; border-radius: 10px; border: 1px solid #bbf7d0;">
+                <h2 style="color: #166534; text-align: center; margin-bottom: 20px;">🎯 작전 성공: 강제 기부 집행</h2>
+                <p style="color: #4b5563; font-size: 15px; line-height: 1.6;">
+                    회원님이 요청하신 <strong>{result['target_name']}</strong>님에 대한 강제 기부 작전이 성공적으로 집행되었습니다. <br/>
+                    대상의 총 자산 중 1%를 삭제 처리하여 타격을 입혔으며, 회원님의 정체는 노출되지 않았습니다.
+                </p>
+                <div style="background-color: white; padding: 16px; border-radius: 8px; margin: 20px 0; border: 1px solid #dcfce7;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">대상</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #111827;">{result['target_name']}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">기부(삭제) 처리액</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #166534;">{result['donation_amount']:,} 원</td>
+                        </tr>
+                    </table>
+                </div>
+                <p style="color: #4b5563; font-size: 13px; text-align: center; margin-top: 20px;">
+                    대상의 자산 손실을 확인하고 다음 전략을 구상해보세요! <br/>
+                    (참고: 대상에게는 위로금으로 30만 포인트가 지급되었습니다.)
                 </p>
             </div>
             """

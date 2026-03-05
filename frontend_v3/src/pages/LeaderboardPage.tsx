@@ -16,7 +16,7 @@ const LeaderboardPage: React.FC = () => {
 
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [showModal, setShowModal] = useState(false);
-    const [actionType, setActionType] = useState<'NONE' | 'PORTFOLIO' | 'SABOTAGE' | 'PENNY_STOCK'>('NONE');
+    const [actionType, setActionType] = useState<'NONE' | 'PORTFOLIO' | 'SABOTAGE' | 'PENNY_STOCK' | 'FORCED_DONATION'>('NONE');
     const [actionStatus, setActionStatus] = useState<'IDLE' | 'PENDING' | 'SUCCESS' | 'FAILED'>('IDLE');
     const [actionMessage, setActionMessage] = useState('');
 
@@ -46,6 +46,8 @@ const LeaderboardPage: React.FC = () => {
                     setActionStatus('SUCCESS');
                     if (val.type === 'PENNY_STOCK_ATTACK') {
                         setActionMessage('동전주 강제 매수 공격이 성공적으로 적용되었습니다!');
+                    } else if (val.type === 'FORCED_DONATION') {
+                        setActionMessage('대상의 자산 1%를 기부 처리하고 익명으로 타격했습니다!');
                     } else {
                         setActionMessage('목표에 대한 강제 매각 타격이 성공적으로 적용되었습니다!');
                     }
@@ -88,10 +90,12 @@ const LeaderboardPage: React.FC = () => {
         }
     };
 
-    const requestSabotage = async (type: 'FORCED_SALE' | 'PENNY_STOCK_ATTACK') => {
+    const requestSabotage = async (type: 'FORCED_SALE' | 'PENNY_STOCK_ATTACK' | 'FORCED_DONATION') => {
         if (!user || !selectedUser) return;
 
-        const cost = 100000;
+        let cost = 100000;
+        if (type === 'FORCED_DONATION') cost = 200000;
+
         if (taxPoints < cost) {
             alert('포인트가 부족합니다.');
             return;
@@ -338,6 +342,15 @@ const LeaderboardPage: React.FC = () => {
                                         <span className="action-title">동전주 매수 공격</span>
                                         <span className="action-cost">100,000 P 소모</span>
                                     </button>
+
+                                    <button
+                                        className="action-select-btn"
+                                        onClick={() => setActionType('FORCED_DONATION')}
+                                    >
+                                        <TrendingUp size={28} />
+                                        <span className="action-title">강제 기부 공격</span>
+                                        <span className="action-cost">200,000 P 소모</span>
+                                    </button>
                                 </div>
 
                                 <div className="portfolio-modal-actions" style={{ marginTop: '24px' }}>
@@ -409,7 +422,7 @@ const LeaderboardPage: React.FC = () => {
                                     </button>
                                 </div>
                             </>
-                        ) : (
+                        ) : actionType === 'PENNY_STOCK' ? (
                             <>
                                 <TrendingDown size={48} className="portfolio-modal-icon" style={{ color: '#8b5cf6', background: 'rgba(139, 92, 246, 0.1)' }} />
                                 <h3 style={{ color: '#8b5cf6' }}>동전주 매수 공격</h3>
@@ -442,7 +455,43 @@ const LeaderboardPage: React.FC = () => {
                                     </button>
                                 </div>
                             </>
-                        )}
+                        ) : actionType === 'FORCED_DONATION' ? (
+                            <>
+                                <TrendingUp size={48} className="portfolio-modal-icon" style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)' }} />
+                                <h3 style={{ color: '#f59e0b' }}>강제 기부 공격</h3>
+                                <p>
+                                    <strong>{selectedUser.displayName}</strong>님의 총 자산 <strong>1%</strong>를 강제로 기부(삭제)하게 합니다!<br /><br />
+                                    대신 대상에게는 위로금으로 <strong>30만 포인트</strong>가 지급되며, 당신의 정체는 <strong>'익명의 기부천사'</strong>로 숨겨집니다.
+                                </p>
+                                <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '10px' }}>
+                                    * 현금이 부족할 경우 보유 비중이 가장 큰 주식을 시스템 가격으로 강제 매각하여 기부금을 충당합니다.
+                                </p>
+
+                                <div className={`portfolio-modal-points ${taxPoints < 200000 ? 'insufficient' : ''}`}>
+                                    <span>현재 포인트</span>
+                                    <span>{taxPoints.toLocaleString()} P</span>
+                                </div>
+                                {taxPoints < 200000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
+
+                                <div className="portfolio-modal-actions">
+                                    <button
+                                        className="btn-cancel"
+                                        onClick={() => setActionType('NONE')}
+                                        disabled={actionStatus === 'PENDING'}
+                                    >
+                                        뒤로 가기
+                                    </button>
+                                    <button
+                                        className="btn-confirm"
+                                        onClick={() => requestSabotage('FORCED_DONATION')}
+                                        disabled={actionStatus === 'PENDING' || taxPoints < 200000}
+                                        style={{ background: '#f59e0b' }}
+                                    >
+                                        {actionStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 기부 집행 중...</> : '200,000 P로 공격'}
+                                    </button>
+                                </div>
+                            </>
+                        ) : null}
                     </div>
                 </div>
             )}
