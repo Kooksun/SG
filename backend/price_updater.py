@@ -26,13 +26,11 @@ def is_kr_market_open() -> bool:
     return dt_time(9, 0) <= now.time() <= dt_time(15, 30)
 
 def has_stock_changed(new_dict: dict, old_dict: dict) -> bool:
-    """Compare key fields to determine if an update is needed."""
+    """Compare price field to determine if an update is needed.
+    Only sync to RTDB when price changes to save bandwidth.
+    """
     if not old_dict: return True
-    # Compare core price fields
-    for field in ['price', 'change', 'change_percent', 'volume']:
-        if new_dict.get(field) != old_dict.get(field):
-            return True
-    return False
+    return new_dict.get('price') != old_dict.get('price')
 
 def price_update_job():
     global last_snapshot
@@ -42,8 +40,8 @@ def price_update_job():
     
     # 1. Fetch Latest Data
     try:
-        kr_stocks = fetch_kr_stocks(kospi_limit=600, kosdaq_limit=900)
-        etf_stocks = fetch_etf_stocks(limit=200)
+        kr_stocks = fetch_kr_stocks(kospi_limit=900, kosdaq_limit=1200)
+        etf_stocks = fetch_etf_stocks(limit=300)
         
         # 1-B. Fetch Custom Stocks from RTDB
         custom_info = main_db.child('system/custom_stocks').get() or {}
@@ -89,13 +87,13 @@ def price_update_job():
     }
     
     for symbol, stock in all_stocks.items():
-        new_dict = stock.to_dict()
+        new_dict = stock.to_dict() # Use full dict for snapshot comparison
         old_dict = last_snapshot.get(symbol)
         
         if has_stock_changed(new_dict, old_dict):
-            # Group by market
+            # Group by market and use compressed format for RTDB
             m_type = stock.market if stock.market in updates_by_market else 'KOSPI'
-            updates_by_market[m_type][symbol] = new_dict
+            updates_by_market[m_type][symbol] = stock.to_rtdb_dict()
             
             # Update local snapshot
             last_snapshot[symbol] = new_dict

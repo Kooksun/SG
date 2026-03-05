@@ -27,13 +27,15 @@ export function useStockSync() {
                 Object.entries(data).forEach(([market, stocks]: [string, any]) => {
                     if (typeof stocks === 'object') {
                         Object.entries(stocks).forEach(([symbol, stock]: [string, any]) => {
+                            // Parse compressed info field: "change|change_percent|volume"
+                            const info = (stock.info || '0|0|0').split('|');
                             mapped[symbol] = {
                                 symbol,
                                 name: stock.name,
                                 price: stock.price,
-                                change: stock.change,
-                                changePercent: stock.change_percent,
-                                volume: stock.volume || 0,
+                                change: parseFloat(info[0] || '0'),
+                                changePercent: parseFloat(info[1] || '0'),
+                                volume: parseFloat(info[2] || '0'),
                                 market: market // Injecting market from the path
                             };
                         });
@@ -51,13 +53,15 @@ export function useStockSync() {
                 Object.entries(data).forEach(([market, stocks]: [string, any]) => {
                     if (typeof stocks === 'object') {
                         Object.entries(stocks).forEach(([symbol, stock]: [string, any]) => {
+                            // Parse compressed info field: "change|changePercent|volume"
+                            const info = (stock.info || '0|0|0').split('|');
                             mapped[symbol] = {
                                 symbol,
                                 name: stock.name,
                                 price: stock.price,
-                                change: stock.change,
-                                changePercent: stock.change_percent,
-                                volume: stock.volume || 0,
+                                change: parseFloat(info[0] || '0'),
+                                changePercent: parseFloat(info[1] || '0'),
+                                volume: parseFloat(info[2] || '0'),
                                 market: market // Injecting KOSDAQ
                             };
                         });

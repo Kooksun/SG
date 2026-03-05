@@ -21,3 +21,11 @@ class Stock:
             'change_percent': self.change_percent,
             'volume': self.volume
         }
+
+    def to_rtdb_dict(self):
+        """Returns a compressed dictionary for RTDB to save bandwidth."""
+        return {
+            'name': self.name,
+            'price': self.price,
+            'info': f"{self.change}|{self.change_percent}|{self.volume}"
+        }
