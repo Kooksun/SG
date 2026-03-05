@@ -101,7 +101,10 @@ class AIBotManager:
         def format_list(title, stocks):
             lines = [f"[{title}]"]
             for s in stocks:
-                lines.append(f"- {s.get('name')} ({s.get('symbol')}): {s.get('price'):,.0f}원 ({s.get('change_percent'):+.2f}%, 거래량: {s.get('volume'):,.0f})")
+                price = s.get('price') or 0
+                change = s.get('change_percent') or 0
+                volume = s.get('volume') or 0
+                lines.append(f"- {s.get('name')} ({s.get('symbol')}): {price:,.0f}원 ({change:+.2f}%, 거래량: {volume:,.0f})")
             return "\n".join(lines)
 
         context = format_list("상승 상위 종목", gainers) + "\n\n"
@@ -119,7 +122,7 @@ class AIBotManager:
         """Fetch current balance and holdings."""
         # Reload bot data to get latest balance
         self.bot_data = self._load_bot_data()
-        balance = self.bot_data.get('balance', 0)
+        balance = self.bot_data.get('balance') or 0
         
         portfolio_ref = main_firestore.collection('users').document(self.bot_uid).collection('portfolio')
         holdings = portfolio_ref.stream()
@@ -130,12 +133,12 @@ class AIBotManager:
         for h in holdings:
             d = h.to_dict()
             symbol = d.get('symbol')
-            qty = d.get('quantity', 0)
-            avg = d.get('averagePrice', 0)
+            qty = d.get('quantity') or 0
+            avg = d.get('averagePrice') or 0
             
             # Use current price from trade_engine logic
             price, _, _ = get_latest_price(symbol)
-            if price <= 0: price = avg # Fallback
+            if not price or price <= 0: price = avg # Fallback
             
             holding_list.append(f"- {d.get('name')} ({symbol}): {qty}주 (평단가: {avg:,.0f}원, 현재가: {price:,.0f}원)")
             self.current_holdings[symbol] = qty
@@ -350,10 +353,10 @@ class AIBotManager:
         
         # Check balance for BUY
         if tx_type == 'BUY':
-            balance = self.bot_data.get('balance', 0)
+            balance = self.bot_data.get('balance') or 0
             total_cost = price * quantity
             if balance < total_cost:
-                print(f"  !! Insufficient balance for BUY: {balance:,} < {total_cost:,}")
+                print(f"  !! Insufficient balance for BUY: {balance:,.0f} < {total_cost:,.0f}")
                 return False
 
         # Submit to RTDB
