@@ -8,6 +8,7 @@ import { StockItem } from '../components/StockList';
 import React, { useState } from 'react';
 import TradeModal from '../components/TradeModal';
 import { useAuth } from '../hooks/useAuth';
+import { usePendingOrders } from '../hooks/usePendingOrders';
 
 interface PortfolioPageProps {
     holdings: HoldingItem[];
@@ -17,6 +18,7 @@ interface PortfolioPageProps {
 const PortfolioPage: React.FC<PortfolioPageProps> = ({ holdings, stocks }) => {
     const { nickname, balance } = useUserStore();
     const { user } = useAuth();
+    const { pendingOrders } = usePendingOrders(user?.uid || null);
     const [selectedStock, setSelectedStock] = useState<StockItem | null>(null);
 
     const handleSelectHolding = (holding: HoldingItem) => {
@@ -35,7 +37,11 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({ holdings, stocks }) => {
 
             <div className="tab-content">
                 <Card title="보유 종목 내역" glow="blue">
-                    <PortfolioTable holdings={holdings} onSelect={handleSelectHolding} />
+                    <PortfolioTable
+                        holdings={holdings}
+                        onSelect={handleSelectHolding}
+                        pendingOrders={pendingOrders}
+                    />
                 </Card>
             </div>
 
