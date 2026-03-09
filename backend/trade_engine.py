@@ -379,7 +379,7 @@ def start_engine():
             if all_users_orders:
                 for uid, user_orders in all_users_orders.items():
                     for oid, odata in user_orders.items():
-                        if odata.get('status') == 'PENDING' and odata.get('orderType') == 'LIMIT':
+                        if odata.get('status') == 'PENDING':
                             process_order(uid, oid, odata)
         except Exception as e:
             print(f"Limit polling error: {e}")
