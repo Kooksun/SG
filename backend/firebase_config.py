@@ -102,7 +102,7 @@ def sync_user_to_rtdb(uid: str):
 
         # 3. Update RTDB Cache
         # We store it in ranking_cache/uid
-        main_db.child('ranking_cache').child(uid).set(sync_payload)
+        ranking_db.child('ranking_cache').child(uid).set(sync_payload)
         
         print(f"  [SYNC] {uid} synced to RTDB cache.")
     except Exception as e:

@@ -5,7 +5,7 @@ import urllib.parse
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from firebase_admin import firestore
-from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db, sync_user_to_rtdb
+from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db, ranking_db, sync_user_to_rtdb
 from .email_utils import EmailManager
 
 MARKET_TZ = ZoneInfo("Asia/Seoul")
@@ -235,9 +235,9 @@ def mark_request_failed(uid: str, msg: str, req_type: str = 'portfolioRequest'):
     })
 
 def broadcast_sabotage_ticker(attacker_name, target_name, symbol, name, tx_type, amount):
-    """Broadcasts sabotage event to Main RTDB system/tickers."""
+    """Broadcasts sabotage event to Ranking RTDB system/tickers."""
     try:
-        ticker_ref = main_db.child('system/tickers')
+        ticker_ref = ranking_db.child('system/tickers')
         current_tickers = ticker_ref.child('list').get() or []
         
         new_ticker = {

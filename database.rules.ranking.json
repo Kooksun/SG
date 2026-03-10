@@ -1,0 +1,30 @@
+{
+    "rules": {
+        "rankings": {
+            ".read": true,
+            ".write": false
+        },
+        "system": {
+            ".read": true,
+            ".write": false,
+            "tickers": {
+                ".read": true,
+                ".write": false
+            }
+        },
+        "users": {
+            "$uid": {
+                "live_stats": {
+                    ".read": "auth != null && auth.uid == $uid",
+                    ".write": false
+                }
+            }
+        },
+        "ranking_cache": {
+            ".read": false,
+            ".write": false
+        },
+        ".read": false,
+        ".write": false
+    }
+}

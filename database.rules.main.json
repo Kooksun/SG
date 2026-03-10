@@ -47,10 +47,6 @@
                 ".write": false
             }
         },
-        "rankings": {
-            ".read": true,
-            ".write": false
-        },
         "commands": {
             "updateLeaderboard": {
                 ".write": "auth != null"

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { doc, onSnapshot, collection } from 'firebase/firestore';
 import { ref, onValue } from 'firebase/database';
-import { db, rtdb } from '../lib/firebase';
+import { db, rtdb, rankingRtdb } from '../lib/firebase';
 import { useUserStore } from './useUserStore';
 
 export function useUserAsset(uid: string | null) {
@@ -35,7 +35,7 @@ export function useUserAsset(uid: string | null) {
 
         // 2. RTDB live_stats (Real-time Equity, PnL, etc.)
         // This reduces Firestore reads as we don't need to read the user doc purely for equity updates
-        const liveStatsRef = ref(rtdb, `users/${uid}/live_stats`);
+        const liveStatsRef = ref(rankingRtdb, `users/${uid}/live_stats`);
         const unsubscribeLiveStats = onValue(liveStatsRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {

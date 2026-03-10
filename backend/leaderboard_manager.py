@@ -30,7 +30,7 @@ def leaderboard_update_job():
     
     # 2. Get all users from RTDB Cache (Zero Firestore Reads!)
     try:
-        ranking_cache = main_db.child('ranking_cache').get() or {}
+        ranking_cache = ranking_db.child('ranking_cache').get() or {}
         
         rankings = []
         stock_yield_agg = {} # {symbol: {'sum_yield': 0, 'count': 0, 'name': ''}}
@@ -89,7 +89,7 @@ def leaderboard_update_job():
             rankings.append(user_rank_data)
             
             # Update RTDB live stats for Frontend instead of Firestore update
-            main_db.child(f'users/{uid}/live_stats').update({
+            ranking_db.child(f'users/{uid}/live_stats').update({
                 'totalStockValue': round(portfolio_value, 2),
                 'totalEquity': round(total_equity, 2),
                 'pnlRate': round(yield_percent, 2),
