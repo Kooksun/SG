@@ -202,6 +202,11 @@ def process_order(uid: str, order_id: str, order_data: dict):
     def execute_in_transaction(transaction):
         user_ref = main_firestore.collection('users').document(uid)
         portfolio_ref = user_ref.collection('portfolio').document(symbol)
+        history_ref = user_ref.collection('history').document(order_id)
+        
+        # [Idempotency Check] 중복 실행 방지
+        history_snap = history_ref.get(transaction=transaction)
+        if history_snap.exists: return "ALREADY_PROCESSED"
         
         user_snap = user_ref.get(transaction=transaction)
         portfolio_snap = portfolio_ref.get(transaction=transaction)
@@ -276,7 +281,7 @@ def process_order(uid: str, order_id: str, order_data: dict):
             stock_change = -req_quantity
         
         # Record Transaction to User History sub-collection
-        history_ref = user_ref.collection('history').document()
+        # Using order_id as document ID for idempotency (중복 방지)
         history_item = {
             'symbol': symbol, 'name': order_data.get('name', symbol),
             'type': side, 'price': curr_price, 'quantity': req_quantity,
@@ -310,6 +315,9 @@ def process_order(uid: str, order_id: str, order_data: dict):
     try:
         result = execute_in_transaction(transaction)
         if isinstance(result, str):
+            if result == "ALREADY_PROCESSED":
+                print(f"  -- SKIP: {uid}/{order_id} already processed.")
+                return
             main_db.child(f'orders/{uid}/{order_id}').update({
                 'status': 'FAILED', 'errorMessage': result
             })
