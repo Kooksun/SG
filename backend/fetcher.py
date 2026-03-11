@@ -6,75 +6,42 @@ from .models import Stock
 
 MARKET_TZ = ZoneInfo("Asia/Seoul")
 
-def fetch_kr_stocks(kospi_limit: int = 500, kosdaq_limit: int = 700) -> Dict[str, Stock]:
-    """Fetch top KOSPI and KOSDAQ stocks from Naver with large pageSize."""
+def fetch_kr_stocks() -> Dict[str, Stock]:
+    """Fetch all KR stocks (KOSPI, KOSDAQ, ETF, ETN) from Naver in one call."""
     snapshot: Dict[str, Stock] = {}
     headers = {"User-Agent": "Mozilla/5.0"}
 
-    # sosok=0 (KOSPI), sosok=1 (KOSDAQ)
-    configs = [
-        (0, kospi_limit, "KOSPI"),
-        (1, kosdaq_limit, "KOSDAQ")
-    ]
-
-    for sosok, limit, market_name in configs:
-        url = f"https://m.stock.naver.com/api/json/sise/siseListJson.nhn?menu=market_sum&sosok={sosok}&pageSize={limit}&page=1"
-        try:
-            resp = requests.get(url, headers=headers, timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                items = data.get('result', {}).get('itemList', [])
-                for item in items:
-                    # Skip ETFs here as they might appear in KOSPI/KOSDAQ lists
-                    if item.get('etf') is True:
-                        continue
-                    
-                    symbol = item.get('cd')
-                    snapshot[symbol] = Stock(
-                        symbol=symbol,
-                        name=item.get('nm'),
-                        price=float(item.get('nv', 0)),
-                        change=float(item.get('cv', 0)),
-                        change_percent=float(item.get('cr', 0)),
-                        volume=float(item.get('aq', 0)),
-                        updated_at=datetime.now(MARKET_TZ),
-                        currency='KRW',
-                        market=market_name
-                    )
-        except Exception as e:
-            print(f"Error fetching {market_name} listing: {e}")
-    
-    return snapshot
-
-def fetch_etf_stocks(limit: int = 200) -> Dict[str, Stock]:
-    """Fetch top ETF stocks using specialized Naver Finance API."""
-    snapshot: Dict[str, Stock] = {}
-    headers = {"User-Agent": "Mozilla/5.0"}
-    
-    # This endpoint returns a larger list of ETFs
-    url = "https://finance.naver.com/api/sise/etfItemList.nhn"
+    # No sosok field and large pageSize to fetch everything
+    url = "https://m.stock.naver.com/api/json/sise/siseListJson.nhn?menu=market_sum&pageSize=5000&page=1"
     try:
         resp = requests.get(url, headers=headers, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
-            items = data.get('result', {}).get('etfItemList', [])
-            # Sort by market value or just take top N (it's usually pre-sorted by something)
-            # For now, let's take up to limit
-            for item in items[:limit]:
-                symbol = item.get('itemcode')
+            items = data.get('result', {}).get('itemList', [])
+            for item in items:
+                symbol = item.get('cd')
+                
+                # Market Classification
+                if item.get('kosdaq') is True:
+                    market_name = 'KOSDAQ'
+                elif item.get('etf') is True or item.get('etn') is True:
+                    market_name = 'ETF'
+                else:
+                    market_name = 'KOSPI'
+                
                 snapshot[symbol] = Stock(
                     symbol=symbol,
-                    name=item.get('itemname'),
-                    price=float(item.get('nowVal', 0)),
-                    change=float(item.get('changeVal', 0)),
-                    change_percent=float(item.get('changeRate', 0)),
-                    volume=float(item.get('quant', 0)),
+                    name=item.get('nm'),
+                    price=float(item.get('nv', 0)),
+                    change=float(item.get('cv', 0)),
+                    change_percent=float(item.get('cr', 0)),
+                    volume=float(item.get('aq', 0)),
                     updated_at=datetime.now(MARKET_TZ),
                     currency='KRW',
-                    market='ETF'
+                    market=market_name
                 )
     except Exception as e:
-        print(f"Error fetching ETF listing: {e}")
+        print(f"Error fetching KR stock listing: {e}")
     
     return snapshot
 
@@ -129,40 +96,6 @@ def fetch_indices() -> Dict[str, Dict]:
         except: pass
     return results
 
-def fetch_custom_stocks(symbols: List[str]) -> Dict[str, Stock]:
-    """Fetch multiple KR stocks (KOSPI/KOSDAQ) using the modern polling API."""
-    if not symbols:
-        return {}
-        
-    snapshot: Dict[str, Stock] = {}
-    headers = {"User-Agent": "Mozilla/5.0"}
-    
-    # Naver polling API for domestic stocks
-    url = f"https://stock.naver.com/api/polling/domestic/stock?itemCodes={','.join(symbols)}"
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            items = data.get('datas', [])
-            for item in items:
-                symbol = item.get('itemCode')
-                exchange_info = item.get('stockExchangeType', {})
-                market_name = exchange_info.get('nameEng', 'KOSPI') # Fallback to KOSPI
-                
-                snapshot[symbol] = Stock(
-                    symbol=symbol,
-                    name=item.get('stockName'),
-                    price=float(item.get('closePriceRaw', 0)),
-                    change=float(item.get('compareToPreviousClosePriceRaw', 0)),
-                    change_percent=float(item.get('fluctuationsRatioRaw', 0)),
-                    volume=float(item.get('accumulatedTradingVolumeRaw', 0)),
-                    updated_at=datetime.now(MARKET_TZ),
-                    currency='KRW',
-                    market=market_name
-                )
-    except Exception as e:
-        print(f"Error fetching custom stocks: {e}")
-        
     return snapshot
 
 def fetch_stock_chart(symbol: str, page_size: int = 60, page: int = 1) -> List[List]:

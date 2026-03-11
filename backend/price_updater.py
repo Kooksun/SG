@@ -2,7 +2,7 @@ import schedule
 import time
 from datetime import datetime, time as dt_time
 from .firebase_config import main_db, kospi_db, kosdaq_db
-from .fetcher import fetch_kr_stocks, fetch_etf_stocks, fetch_exchange_rate, fetch_indices, fetch_custom_stocks, MARKET_TZ
+from .fetcher import fetch_kr_stocks, fetch_exchange_rate, fetch_indices, MARKET_TZ
 from .models import Stock
 import math
 
@@ -40,38 +40,10 @@ def price_update_job():
     
     # 1. Fetch Latest Data
     try:
-        kr_stocks = fetch_kr_stocks(kospi_limit=900, kosdaq_limit=1200)
-        etf_stocks = fetch_etf_stocks(limit=300)
+        kr_stocks = fetch_kr_stocks()
         
-        # 1-B. Fetch Custom Stocks from RTDB
-        custom_info = main_db.child('system/custom_stocks').get() or {}
-        custom_symbols = list(custom_info.keys())
-        
-        custom_stocks = {}
-        if custom_symbols:
-            # Chunk into batches of 50
-            for i in range(0, len(custom_symbols), 50):
-                batch = custom_symbols[i:i + 50]
-                batch_data = fetch_custom_stocks(batch)
-                
-                # Assign market from API (most reliable)
-                for sym, stock in batch_data.items():
-                    info = custom_info.get(sym, {})
-                    api_market = stock.market
-                    saved_market = info.get('market')
-                    
-                    if api_market != saved_market:
-                        # Update metadata in RTDB if it was wrong or missing
-                        main_db.child('system/custom_stocks').child(sym).update({
-                            'market': api_market
-                        })
-                        print(f"  [FIX] Market for {sym} corrected: {saved_market} -> {api_market}")
-                
-                custom_stocks.update(batch_data)
-            print(f"  -> Processed {len(custom_stocks)} custom stocks.")
-
         # Merge all
-        all_stocks = {**kr_stocks, **etf_stocks, **custom_stocks}
+        all_stocks = {**kr_stocks}
         
         exchange_rate = fetch_exchange_rate()
         indices = fetch_indices()

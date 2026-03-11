@@ -21,7 +21,7 @@ LOG_DIR="$BACKEND_DIR/logs"
 mkdir -p "$PID_DIR"
 mkdir -p "$LOG_DIR"
 
-APPS=("price_updater" "trade_engine" "leaderboard_manager" "chart_gateway" "minigame_manager" "lookup_gateway" "ai_daemon" "portfolio_manager")
+APPS=("price_updater" "trade_engine" "leaderboard_manager" "chart_gateway" "minigame_manager" "ai_daemon" "portfolio_manager")
 
 function usage() {
     echo "Usage: $0 {start|stop|restart|status|logs} [app_name]"
