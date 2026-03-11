@@ -7,6 +7,7 @@ import './TradeModal.css';
 import { tradeService } from '../lib/tradeService';
 import { StockItem } from './StockList';
 import StockChart from './StockChart';
+import StockIcon from './StockIcon';
 
 import { useStockStore } from '../hooks/useStockStore';
 
@@ -99,21 +100,24 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
                         {/* 좌측: 차트 섹션 */}
                         <div className="chart-section">
                             <header className="trade-header mobile-only">
-                                <div className="stock-info">
-                                    <div className="mobile-title-row">
-                                        <h3>{stock.name}</h3>
-                                        <a
-                                            href={`https://stock.naver.com/domestic/stock/${stock.symbol}/price`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="naver-link-icon"
-                                            title="네이버 증권에서 보기"
-                                        >
-                                            <span className="naver-n">N</span>
-                                            <ExternalLink size={12} />
-                                        </a>
+                                <div className="stock-info-wrapper flex items-center gap-3">
+                                    <StockIcon symbol={stock.symbol} name={stock.name} size={40} className="stock-icon-large" />
+                                    <div className="stock-info">
+                                        <div className="mobile-title-row">
+                                            <h3>{stock.name}</h3>
+                                            <a
+                                                href={`https://stock.naver.com/domestic/stock/${stock.symbol}/price`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="naver-link-icon"
+                                                title="네이버 증권에서 보기"
+                                            >
+                                                <span className="naver-n">N</span>
+                                                <ExternalLink size={12} />
+                                            </a>
+                                        </div>
+                                        <span className="symbol">{stock.symbol}</span>
                                     </div>
-                                    <span className="symbol">{stock.symbol}</span>
                                 </div>
                                 <button className="close-btn" onClick={onClose}><X size={20} /></button>
                             </header>
@@ -127,22 +131,25 @@ const TradeModal: React.FC<TradeModalProps> = ({ stock, onClose, userBalance, ui
                         {/* 우측: 매매 섹션 */}
                         <div className="control-section">
                             <header className="trade-header desktop-only">
-                                <div className="stock-info">
-                                    <div className="title-row">
-                                        <h3>{stock.name}</h3>
-                                        <span className={`market-badge ${stock.market.toLowerCase()}`}>{stock.market}</span>
-                                        <a
-                                            href={`https://stock.naver.com/domestic/stock/${stock.symbol}/price`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="naver-link-icon"
-                                            title="네이버 증권에서 보기"
-                                        >
-                                            <span className="naver-n">N</span>
-                                            <ExternalLink size={12} />
-                                        </a>
+                                <div className="stock-info-wrapper flex items-center gap-3">
+                                    <StockIcon symbol={stock.symbol} name={stock.name} size={48} className="stock-icon-large" />
+                                    <div className="stock-info">
+                                        <div className="title-row">
+                                            <h3>{stock.name}</h3>
+                                            <span className={`market-badge ${stock.market.toLowerCase()}`}>{stock.market}</span>
+                                            <a
+                                                href={`https://stock.naver.com/domestic/stock/${stock.symbol}/price`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="naver-link-icon"
+                                                title="네이버 증권에서 보기"
+                                            >
+                                                <span className="naver-n">N</span>
+                                                <ExternalLink size={12} />
+                                            </a>
+                                        </div>
+                                        <span className="symbol">{stock.symbol}</span>
                                     </div>
-                                    <span className="symbol">{stock.symbol}</span>
                                 </div>
                                 <button className="close-btn" onClick={onClose}><X size={20} /></button>
                             </header>

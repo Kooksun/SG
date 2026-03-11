@@ -1,6 +1,7 @@
 import React from 'react';
 import { TradeHistoryItem } from '../hooks/useTradeHistory';
 import './Table.css';
+import StockIcon from './StockIcon';
 
 interface TradeHistoryTableProps {
     history: TradeHistoryItem[];
@@ -47,8 +48,11 @@ const TradeHistoryTable: React.FC<TradeHistoryTableProps> = ({ history, hasMore,
                                     <td className="text-xs text-secondary">{formatDate(item.timestamp)}</td>
                                     <td>
                                         <div className="symbol-info">
-                                            <span className="name">{item.name}</span>
-                                            <span className="code">{item.symbol}</span>
+                                            <StockIcon symbol={item.symbol} name={item.name} size={24} className="mr-2" />
+                                            <div className="stock-details">
+                                                <span className="name">{item.name}</span>
+                                                <span className="code">{item.symbol}</span>
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="text-center">

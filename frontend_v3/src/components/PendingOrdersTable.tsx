@@ -3,6 +3,7 @@ import { PendingOrder } from '../hooks/usePendingOrders';
 import './Table.css';
 import { Trash2 } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
+import StockIcon from './StockIcon';
 
 interface PendingOrdersTableProps {
     orders: PendingOrder[];
@@ -43,8 +44,11 @@ const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, onCance
                                 <td className="text-xs text-secondary">{formatDate(order.createdAt)}</td>
                                 <td>
                                     <div className="symbol-info">
-                                        <span className="name">{order.name}</span>
-                                        <span className="code">{order.symbol}</span>
+                                        <StockIcon symbol={order.symbol} name={order.name} size={36} className="mr-3" />
+                                        <div className="stock-details">
+                                            <span className="name">{order.name}</span>
+                                            <span className="code">{order.symbol}</span>
+                                        </div>
                                     </div>
                                 </td>
                                 <td className="text-center">

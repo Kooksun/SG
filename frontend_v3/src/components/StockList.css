@@ -66,6 +66,18 @@
     flex-direction: column;
 }
 
+.stock-info-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.stock-name-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .stock-name {
     font-weight: 600;
     color: var(--text-primary);

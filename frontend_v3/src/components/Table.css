@@ -37,6 +37,12 @@
 /* Common Table Components */
 .symbol-info {
     display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.stock-details {
+    display: flex;
     flex-direction: column;
     gap: 2px;
 }

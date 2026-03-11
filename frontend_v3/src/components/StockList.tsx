@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import './StockList.css';
 import { TrendingUp, TrendingDown, Star } from 'lucide-react';
 import { useUserStore } from '../hooks/useUserStore';
+import StockIcon from './StockIcon';
 import { tradeService } from '../lib/tradeService';
 
 export interface StockItem {
@@ -55,9 +56,12 @@ const StockRow: React.FC<{ stock: StockItem; onSelect: (stock: StockItem) => voi
                             <Star size={16} fill={isWatched ? "var(--accent-amber)" : "none"} />
                         </button>
                     )}
-                    <div className="stock-info">
-                        <span className="stock-name">{stock.name}</span>
-                        <span className="stock-symbol">{stock.symbol} ∙ {stock.market}</span>
+                    <div className="stock-info-wrapper flex items-center gap-3">
+                        <StockIcon symbol={stock.symbol} name={stock.name} size={36} className="stock-icon-large" />
+                        <div className="stock-info">
+                            <span className="stock-name">{stock.name}</span>
+                            <span className="stock-symbol">{stock.symbol} ∙ {stock.market}</span>
+                        </div>
                     </div>
                 </div>
             </td>
