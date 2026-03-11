@@ -9,7 +9,7 @@ import google.generativeai as genai
 from groq import Groq
 
 from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db
-from .fetcher import fetch_kr_stocks, fetch_etf_stocks, MARKET_TZ
+from .fetcher import MARKET_TZ
 from .trade_engine import get_latest_price
 
 try:
