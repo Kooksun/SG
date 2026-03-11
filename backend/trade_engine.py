@@ -383,11 +383,15 @@ def start_engine():
     # Polling for LIMIT orders (since prices change externally)
     while True:
         try:
-            all_users_orders = main_db.child('orders').get()
-            if all_users_orders:
-                for uid, user_orders in all_users_orders.items():
-                    for oid, odata in user_orders.items():
-                        if odata.get('status') == 'PENDING':
+            # 1. Get ONLY the list of UIDs (shallow=True prevents downloading all orders)
+            users_with_orders = main_db.child('orders').get(shallow=True)
+            
+            if users_with_orders:
+                # 2. For each UID, ONLY fetch orders that are strictly PENDING
+                for uid in users_with_orders.keys():
+                    pending_orders = main_db.child(f'orders/{uid}').order_by_child('status').equal_to('PENDING').get()
+                    if pending_orders:
+                        for oid, odata in pending_orders.items():
                             process_order(uid, oid, odata)
         except Exception as e:
             print(f"Limit polling error: {e}")
