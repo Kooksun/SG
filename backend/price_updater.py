@@ -55,7 +55,8 @@ def price_update_job():
     updates_by_market = {
         'KOSPI': {},
         'KOSDAQ': {},
-        'ETF': {}
+        'ETF': {},
+        'ETN': {}
     }
     
     for symbol, stock in all_stocks.items():
@@ -80,18 +81,20 @@ def price_update_job():
             'market_open': is_open
         }))
         
-        # B. KOSPI Project: KOSPI + ETF
-        if updates_by_market['KOSPI'] or updates_by_market['ETF'] or is_open:
+        # B. KOSPI Project: KOSPI + ETF + ETN
+        if updates_by_market['KOSPI'] or updates_by_market['ETF'] or updates_by_market['ETN'] or is_open:
             if updates_by_market['KOSPI']:
                 kospi_db.child('stocks/KOSPI').update(sanitize_for_firebase(updates_by_market['KOSPI']))
             if updates_by_market['ETF']:
                 kospi_db.child('stocks/ETF').update(sanitize_for_firebase(updates_by_market['ETF']))
+            if updates_by_market['ETN']:
+                kospi_db.child('stocks/ETN').update(sanitize_for_firebase(updates_by_market['ETN']))
             
             kospi_db.child('system/updatedAt').set(now.isoformat())
             
-            total_kp = len(updates_by_market['KOSPI']) + len(updates_by_market['ETF'])
+            total_kp = len(updates_by_market['KOSPI']) + len(updates_by_market['ETF']) + len(updates_by_market['ETN'])
             if total_kp > 0:
-                print(f"  -> KOSPI Project: Synced {total_kp} stock changes (KOSPI+ETF).")
+                print(f"  -> KOSPI Project: Synced {total_kp} stock changes (KOSPI+ETF+ETN).")
 
         # C. KOSDAQ Project: KOSDAQ
         if updates_by_market['KOSDAQ'] or is_open:

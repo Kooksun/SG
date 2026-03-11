@@ -24,8 +24,10 @@ def fetch_kr_stocks() -> Dict[str, Stock]:
                 # Market Classification
                 if item.get('kosdaq') is True:
                     market_name = 'KOSDAQ'
-                elif item.get('etf') is True or item.get('etn') is True:
+                elif item.get('etf') is True:
                     market_name = 'ETF'
+                elif item.get('etn') is True:
+                    market_name = 'ETN'
                 else:
                     market_name = 'KOSPI'
                 

@@ -10,7 +10,7 @@ import { useRealtimeData } from '../hooks/useRealtimeData';
 import { useStockLookup } from '../hooks/useStockLookup';
 import TradeModal from '../components/TradeModal';
 
-type MarketFilter = 'ALL' | 'KOSPI' | 'KOSDAQ' | 'ETF' | 'WATCHLIST' | 'HOLDINGS';
+type MarketFilter = 'ALL' | 'KOSPI' | 'KOSDAQ' | 'ETF' | 'ETN' | 'WATCHLIST' | 'HOLDINGS';
 type SortField = 'NAME' | 'PRICE' | 'CHANGE' | 'VOLUME';
 type SortDirection = 'ASC' | 'DESC';
 
@@ -40,9 +40,7 @@ const MarketPage: React.FC = () => {
 
         // 1. Market Filter
         if (filter !== 'ALL') {
-            if (filter === 'ETF') {
-                result = result.filter(s => s.name.includes('KODEX') || s.name.includes('TIGER') || s.name.includes('RISE') || s.name.includes('ACE'));
-            } else if (filter === 'WATCHLIST') {
+            if (filter === 'WATCHLIST') {
                 result = result.filter(s => watchlist.includes(s.symbol));
             } else if (filter === 'HOLDINGS') {
                 result = result.filter(s => holdings.includes(s.symbol));
@@ -120,7 +118,7 @@ const MarketPage: React.FC = () => {
                         <div className="filter-section">
                             <span className="filter-label"><Layers size={14} /> 조회 범위</span>
                             <div className="filter-tabs-mini">
-                                {(['ALL', 'KOSPI', 'KOSDAQ', 'ETF', 'WATCHLIST', 'HOLDINGS'] as MarketFilter[]).map(f => (
+                                {(['ALL', 'KOSPI', 'KOSDAQ', 'ETF', 'ETN', 'WATCHLIST', 'HOLDINGS'] as MarketFilter[]).map(f => (
                                     <button
                                         key={f}
                                         className={`filter-btn-mini ${filter === f ? 'active' : ''}`}
