@@ -13,16 +13,15 @@ import sys
 import os
 
 # Add project root so we can import backend modules
+import sys
+import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from backend.firebase_config import main_firestore, main_db
 from firebase_admin import auth
 
 # Supabase
-try:
-    from backend.supabase_client import get_supabase
-except ImportError:
-    from data_engine.supabase_client import get_supabase
+from backend.supabase_client import get_supabase
 
 
 def delete_collection(coll_ref, batch_size=100, dry_run=False):

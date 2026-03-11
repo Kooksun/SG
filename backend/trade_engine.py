@@ -72,7 +72,8 @@ def record_to_supabase(uid, symbol, name, tx_type, price, quantity, amount, raw_
             "stock_change": stock_change,
             "profit": kwargs.get('profit', 0),
             "profit_ratio": kwargs.get('profit_ratio', 0),
-            "timestamp": datetime.now(MARKET_TZ).isoformat()
+            "timestamp": datetime.now(MARKET_TZ).isoformat(),
+            "order_id": kwargs.get('order_id')
         }
         supabase.table("trade_records").insert(data).execute()
     except Exception as e:
@@ -187,11 +188,9 @@ def process_order(uid: str, order_id: str, order_data: dict):
     def execute_in_transaction(transaction):
         user_ref = main_firestore.collection('users').document(uid)
         portfolio_ref = user_ref.collection('portfolio').document(symbol)
-        history_ref = user_ref.collection('history').document(order_id)
-        
         # [Idempotency Check] 중복 실행 방지
-        history_snap = history_ref.get(transaction=transaction)
-        if history_snap.exists: return "ALREADY_PROCESSED"
+        # Using the RTDB status instead of Firestore history_ref 
+        # Since history_ref is removed, we rely on RTDB status = 'PENDING' checked earlier.
         
         user_snap = user_ref.get(transaction=transaction)
         portfolio_snap = portfolio_ref.get(transaction=transaction)
@@ -266,27 +265,14 @@ def process_order(uid: str, order_id: str, order_data: dict):
             stock_change = -req_quantity
         
         # Record Transaction to User History sub-collection
-        # Using order_id as document ID for idempotency (중복 방지)
-        history_item = {
-            'symbol': symbol, 'name': order_data.get('name', symbol),
-            'type': side, 'price': curr_price, 'quantity': req_quantity,
-            'totalAmount': total_amount, 
-            'rawFee': raw_fee,
-            'discount': disc,
-            'fee': final_fee, 
-            'orderId': order_id,
-            'timestamp': firestore.SERVER_TIMESTAMP
-        }
+        # REMOVED: No longer writing to Firestore history
         
         profit = 0
-        kwargs_out = {}
+        kwargs_out = {"order_id": order_id}
         if side == 'SELL':
             profit = math.floor((curr_price - avg_price) * req_quantity)
-            history_item['profit'] = profit
-            history_item['profitRatio'] = profit_ratio
-            kwargs_out = {"profit": profit, "profit_ratio": profit_ratio}
-
-        transaction.set(history_ref, history_item)
+            profit_ratio = (curr_price - avg_price) / avg_price if avg_price > 0 else 0
+            kwargs_out.update({"profit": profit, "profit_ratio": profit_ratio})
 
         return {
             "uid": uid, "symbol": symbol, "name": order_data.get('name', symbol),
