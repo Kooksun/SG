@@ -15,12 +15,12 @@ const StockIcon: React.FC<StockIconProps> = ({ symbol, name, size = 20, classNam
 
   useEffect(() => {
     let initialUrl = defaultUrl;
-    
+
     if (name && name.includes(' ')) {
       const parts = name.split(' ');
       const firstWord = parts[0];
       let brand = firstWord.toUpperCase();
-      
+
       const brandMap: Record<string, string> = {
         '히어로즈': 'HEROES',
         '마이티': 'MIGHTY',
@@ -29,7 +29,7 @@ const StockIcon: React.FC<StockIconProps> = ({ symbol, name, size = 20, classNam
         '트렉스': 'TREX',
         '플러스': 'PLUS'
       };
-      
+
       if (brandMap[firstWord]) {
         brand = brandMap[firstWord];
       }
@@ -38,7 +38,7 @@ const StockIcon: React.FC<StockIconProps> = ({ symbol, name, size = 20, classNam
         initialUrl = `https://ssl.pstatic.net/imgstock/fn/real/logo/etf/StockKRETF${brand}.svg`;
       }
     }
-    
+
     setImgSrc(initialUrl);
     setErrorCount(0);
   }, [symbol, name]);
@@ -54,34 +54,34 @@ const StockIcon: React.FC<StockIconProps> = ({ symbol, name, size = 20, classNam
 
   if (errorCount >= 2 || !symbol || !imgSrc) {
     return (
-      <div 
+      <div
         className={`stock-icon-placeholder ${className}`}
-        style={{ 
-          width: size, 
-          height: size, 
-          borderRadius: '50%', 
-          backgroundColor: 'var(--bg-secondary)',
+        style={{
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          backgroundColor: '#e5e7eba6', // 연한 회색 배경
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: size * 0.5,
+          fontSize: size * 0.45,
           fontWeight: 'bold',
-          color: 'var(--text-secondary)',
+          color: '#1f2937', // 짙은 색 글자 (반전 느낌)
           flexShrink: 0
         }}
       >
-        {symbol?.charAt(0) || '?'}
+        {name ? name.charAt(0) : (symbol?.charAt(0) || '?')}
       </div>
     );
   }
 
   return (
-    <div 
+    <div
       className={`stock-icon-wrapper ${className}`}
-      style={{ 
-        width: size, 
-        height: size, 
-        borderRadius: '50%', 
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
         overflow: 'hidden',
         display: 'inline-flex',
         alignItems: 'center',
@@ -96,9 +96,9 @@ const StockIcon: React.FC<StockIconProps> = ({ symbol, name, size = 20, classNam
         height={size}
         className="stock-icon-img"
         onError={handleError}
-        style={{ 
-          width: '100%', 
-          height: '100%', 
+        style={{
+          width: '100%',
+          height: '100%',
           objectFit: 'cover'
         }}
       />
