@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { TableVirtuoso } from 'react-virtuoso';
 import './StockList.css';
 import { TrendingUp, TrendingDown, Star } from 'lucide-react';
 import { useUserStore } from '../hooks/useUserStore';
@@ -20,7 +21,13 @@ interface StockListProps {
     onSelect: (stock: StockItem) => void;
 }
 
-const StockRow: React.FC<{ stock: StockItem; onSelect: (stock: StockItem) => void }> = ({ stock, onSelect }) => {
+// Removing old StockRow in favor of virtualized cells
+
+
+const StockRowCells: React.FC<{ 
+    stock: StockItem; 
+    onSelect: (stock: StockItem) => void; 
+}> = ({ stock, onSelect }) => {
     const { uid, watchlist } = useUserStore();
     const isWatched = watchlist.includes(stock.symbol);
     const prevPriceRef = useRef<number>(stock.price);
@@ -41,15 +48,16 @@ const StockRow: React.FC<{ stock: StockItem; onSelect: (stock: StockItem) => voi
             const isUp = stock.price > prevPriceRef.current;
             setFlashClass(isUp ? 'flash-up' : 'flash-down');
             prevPriceRef.current = stock.price;
-
             const timer = setTimeout(() => setFlashClass(''), 1000);
             return () => clearTimeout(timer);
         }
     }, [stock.price]);
 
+    const handleClick = () => onSelect(stock);
+
     return (
-        <tr onClick={() => onSelect(stock)} className={`stock-row ${flashClass}`}>
-            <td>
+        <>
+            <td onClick={handleClick} className={`cell-name ${flashClass}`} style={{ cursor: 'pointer' }}>
                 <div className="stock-info-row">
                     {uid && (
                         <button className={`star-btn ${isWatched ? 'active' : ''}`} onClick={toggleWatch}>
@@ -65,10 +73,10 @@ const StockRow: React.FC<{ stock: StockItem; onSelect: (stock: StockItem) => voi
                     </div>
                 </div>
             </td>
-            <td className="text-right font-bold">
+            <td onClick={handleClick} className={`cell-price text-right font-bold ${flashClass}`} style={{ cursor: 'pointer' }}>
                 {stock.price.toLocaleString()}
             </td>
-            <td className={`text-right font-medium ${stock.change >= 0 ? 'up' : 'down'}`}>
+            <td onClick={handleClick} className={`cell-change text-right font-medium ${stock.change >= 0 ? 'up' : 'down'} ${flashClass}`} style={{ cursor: 'pointer' }}>
                 <div className="price-change-wrapper">
                     <div className="price-change-row">
                         <span className="change-icon">{stock.change > 0 ? '▲' : (stock.change < 0 ? '▼' : '')}</span>
@@ -79,41 +87,71 @@ const StockRow: React.FC<{ stock: StockItem; onSelect: (stock: StockItem) => voi
                     </div>
                 </div>
             </td>
-            <td className="text-right volume-cell">
+            <td onClick={handleClick} className={`cell-volume text-right volume-cell ${flashClass}`} style={{ cursor: 'pointer' }}>
                 {stock.volume > 1000000
                     ? `${(stock.volume / 1000000).toFixed(1)}M`
                     : stock.volume > 1000
                         ? `${(stock.volume / 1000).toFixed(1)}K`
                         : stock.volume.toLocaleString()}
             </td>
-        </tr>
+        </>
     );
 };
 
 const StockList: React.FC<StockListProps> = ({ stocks, onSelect }) => {
-    return (
-        <div className="stock-list-container">
-            <table className="stock-table">
-                <thead>
-                    <tr>
-                        <th>종목명</th>
-                        <th className="text-right">현재가</th>
-                        <th className="text-right">전일대비</th>
-                        <th className="text-right">거래량</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {stocks.length > 0 ? (
-                        stocks.map((stock) => (
-                            <StockRow key={stock.symbol} stock={stock} onSelect={onSelect} />
-                        ))
-                    ) : (
+    const virtuosoRef = useRef<any>(null);
+
+    // Reset scroll when stocks change (filter change)
+    useEffect(() => {
+        if (virtuosoRef.current) {
+            virtuosoRef.current.scrollToIndex({ index: 0, align: 'start', behavior: 'auto' });
+        }
+    }, [stocks]);
+
+    // Header for the virtual table
+    const TableHeader = () => (
+        <tr className="fixed-header-row">
+            <th className="cell-name">종목명</th>
+            <th className="cell-price text-right">현재가</th>
+            <th className="cell-change text-right">전일대비</th>
+            <th className="cell-volume text-right">거래량</th>
+        </tr>
+    );
+
+    // Custom Table component for Virtuoso to preserve our CSS classes
+    const TableContainer = (props: any) => (
+        <table {...props} className="stock-table virtual-table" />
+    );
+
+    if (stocks.length === 0) {
+        return (
+            <div className="stock-list-container">
+                <table className="stock-table">
+                    <thead><TableHeader /></thead>
+                    <tbody>
                         <tr>
                             <td colSpan={4} className="empty-message">검색 결과가 없습니다.</td>
                         </tr>
-                    )}
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
+        );
+    }
+
+    return (
+        <div className="stock-list-container virtual-container">
+            <TableVirtuoso
+                ref={virtuosoRef}
+                style={{ height: '100%' }}
+                data={stocks}
+                components={{
+                    Table: TableContainer,
+                }}
+                fixedHeaderContent={TableHeader}
+                itemContent={(_index, stock) => (
+                    <StockRowCells stock={stock} onSelect={onSelect} />
+                )}
+            />
         </div>
     );
 };

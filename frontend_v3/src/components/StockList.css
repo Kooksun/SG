@@ -1,22 +1,66 @@
+.stock-list-card {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 280px); /* Adjust based on your header height */
+    min-height: 600px;
+}
+
 .stock-list-container {
-    width: 100%;
-    overflow-x: auto;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    height: 100%;
 }
 
 .stock-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 
+.virtual-table {
+    border-collapse: collapse;
+}
+
+.stock-table thead {
+    z-index: 10;
+}
+
+.fixed-header-row {
+    background: #1a1b1e !important; /* Solid dark background */
+}
+
+/* Explicit width classes for alignment */
+.cell-name { width: 40%; }
+.cell-price { width: 20%; }
+.cell-change { width: 25%; }
+.cell-volume { width: 15%; }
+
 .stock-table th {
+    background: #1a1b1e;
+    padding: 16px;
     text-align: left;
-    padding: var(--spacing-md) var(--spacing-sm);
-    color: var(--text-secondary);
     font-size: 0.8rem;
+    color: var(--text-tertiary);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--card-border);
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stock-table td {
+    padding: 16px;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: var(--card-bg); /* Ensure solid background for flash effects */
+    transition: background-color 0.2s ease;
+}
+
+.stock-row:hover td {
+    background-color: rgba(255, 255, 255, 0.03);
 }
 
 .stock-table td {

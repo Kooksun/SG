@@ -73,7 +73,7 @@ const MarketPage: React.FC = () => {
             return sortDirection === 'ASC' ? comparison : -comparison;
         });
 
-        return result.slice(0, 100);
+        return result;
     }, [stocks, searchQuery, filter, sortField, sortDirection, watchlist, holdings]);
 
     const handleSelectStock = (stock: StockItem) => {
