@@ -33,6 +33,7 @@ export function useTradeHistory(uid: string | null) {
             const to = from + PAGE_SIZE - 1;
 
             console.log(`[TradeHistory] Fetching for UID: ${uid} (Page: ${page})`);
+            // @ts-ignore
             console.log(`[Supabase] URL: ${import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL}`);
 
             const { data, error } = await supabase
