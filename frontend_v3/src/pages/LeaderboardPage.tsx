@@ -429,7 +429,7 @@ const LeaderboardPage: React.FC = () => {
                                 <h3 style={{ color: '#8b5cf6' }}>동전주 매수 공격</h3>
                                 <p>
                                     코스피/코스닥 중 가장 저렴한 동전주를 <strong>{selectedUser.displayName}</strong>님 대신 강제 매수합니다!<br /><br />
-                                    대상자 현금의 <strong>5%</strong> (최대 500만원) 만큼 매수하며, <strong>50,000 P</strong>가 소모됩니다.
+                                    대상자 현금의 최대 <strong>500만원</strong>만큼 매수하며, <strong>50,000 P</strong>가 소모됩니다.
                                 </p>
 
                                 <div className={`portfolio-modal-points ${taxPoints < 50000 ? 'insufficient' : ''}`}>

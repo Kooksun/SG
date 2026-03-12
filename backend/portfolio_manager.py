@@ -532,10 +532,10 @@ def process_sabotage_request(uid: str, req: dict):
                 }
             else: # PENNY_STOCK_ATTACK
                 # PENNY STOCK ATTACK LOGIC
-                # Calculate buy amount: 5% of cash, max 5,000,000
+                # Buy as much as possible up to 5,000,000 KRW
                 target_cash = float(tgt_cash)
                 buy_limit = 5000000
-                buy_budget = min(buy_limit, target_cash * 0.05)
+                buy_budget = min(buy_limit, target_cash)
                 
                 penny_price = selected_penny['price']
                 buy_qty = math.floor(buy_budget / penny_price)
@@ -569,11 +569,6 @@ def process_sabotage_request(uid: str, req: dict):
                     
                 transaction.update(target_ref, {
                     'balance': target_cash - actual_cost
-                })
-                
-                # Requester deduction & history
-                transaction.update(requester_ref, {
-                    'taxPoints': req_pts - 50000
                 })
                 
                 # Requester deduction
