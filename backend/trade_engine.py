@@ -14,22 +14,42 @@ MAX_TICKERS = 50
 
 def get_latest_price(symbol: str) -> tuple[float, str, float]:
     """Fetch latest price and change_percent from nested RTDB structure."""
+    
+    def parse_stock_data(data):
+        if not data: return 0.0, 0.0
+        price = float(data.get('price', 0))
+        change_percent = float(data.get('change_percent', 0))
+        
+        # Parse from info string if available (compressed format)
+        info = data.get('info', '')
+        if info:
+            try:
+                parts = info.split('|')
+                if len(parts) >= 2:
+                    change_percent = float(parts[1])
+            except:
+                pass
+        return price, change_percent
+
     # 1. Try KOSPI
     stock_kp = kospi_db.child(f'stocks/KOSPI/{symbol}').get()
     if stock_kp:
-        return float(stock_kp.get('price', 0)), 'KOSPI', float(stock_kp.get('change_percent', 0))
+        p, cp = parse_stock_data(stock_kp)
+        return p, 'KOSPI', cp
     
     # 2. Try ETF (also in KOSPI DB)
     stock_etf = kospi_db.child(f'stocks/ETF/{symbol}').get()
     if stock_etf:
-        return float(stock_etf.get('price', 0)), 'ETF', float(stock_etf.get('change_percent', 0))
+        p, cp = parse_stock_data(stock_etf)
+        return p, 'ETF', cp
     
     # 3. Try KOSDAQ
     stock_kq = kosdaq_db.child(f'stocks/KOSDAQ/{symbol}').get()
     if stock_kq:
-        return float(stock_kq.get('price', 0)), 'KOSDAQ', float(stock_kq.get('change_percent', 0))
+        p, cp = parse_stock_data(stock_kq)
+        return p, 'KOSDAQ', cp
     
-    # 3. Fallback: Symbol not found in DB
+    # 4. Fallback: Symbol not found in DB
     return 0.0, None, 0.0
 
 def calculate_fee(side: str, market: str, amount: float, tax_points: float = 0) -> tuple[float, float, float]:
