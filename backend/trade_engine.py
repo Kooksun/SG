@@ -165,15 +165,12 @@ def process_order(uid: str, order_id: str, order_data: dict):
                 print(f"  .. Waiting for fresh price for {symbol} (Last Update: {last_update_str})")
                 return
 
-    # [Reality Engine] Market Limit Protection (±29.5%)
-    # Skip for Bots as requested
-    is_bot = order_data.get('isBot', False)
-    if not is_bot and abs(change_percent) >= 29.5:
-        main_db.child(f'orders/{uid}/{order_id}').update({
-            'status': 'FAILED',
-            'errorMessage': '상/하한가 도달 종목은 거래가 제한됩니다.'
-        })
-        print(f"  !! BLOCKED: {symbol} at {change_percent}% limit.")
+    # [Reality Engine] Market Limit Protection (±29.7%)
+    # System orders (Welcome/Sabotage etc.) bypass this to ensure execution.
+    # Bots follow the same limit as users now.
+    if not is_system and abs(change_percent) >= 29.7:
+        # Keep status as PENDING and retry in the next loop if the price moves.
+        print(f"  .. BLOCKED (Limit): {symbol} at {change_percent}% limit. Waiting for move.")
         return
 
     # 2. LIMIT Check
