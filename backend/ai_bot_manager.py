@@ -27,6 +27,10 @@ groq_client = None
 if GROQ_API_KEY:
     groq_client = Groq(api_key=GROQ_API_KEY)
 
+# Delay settings for LLM calls (to avoid rate limits)
+BOT_DELAY_MIN = 120
+BOT_DELAY_MAX = 240
+
 PERSONAS = {
     "value_investor": {
         "name": "워런 버핏 (AI)",
@@ -374,8 +378,10 @@ def run_all_bots():
         try:
             manager = AIBotManager(uid)
             manager.decide_and_act()
-            # Random delay
-            time.sleep(random.uniform(2, 5))
+            # Random delay to avoid hitting rate limits too fast (30~60s)
+            delay = random.uniform(BOT_DELAY_MIN, BOT_DELAY_MAX)
+            print(f"Waiting for {delay:.1f}s before next bot...")
+            time.sleep(delay)
         except Exception as e:
             print(f"Error running bot {uid}: {e}")
 
