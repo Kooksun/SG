@@ -16,10 +16,27 @@ def get_all_prices():
     """Fetch all prices from KOSPI/KOSDAQ RTDBs to use as a local cache."""
     prices = {}
     kp_raw = kospi_db.child('stocks').get() or {}
-    for market in ['KOSPI', 'ETF']:
-        prices.update(kp_raw.get(market, {}))
+    
+    # Process KOSPI Project (KOSPI, ETF, ETN)
+    for market in ['KOSPI', 'ETF', 'ETN']:
+        market_data = kp_raw.get(market, {})
+        for symbol, data in market_data.items():
+            prices[symbol] = {
+                'name': data.get('name', 'Unknown'),
+                'price': data.get('price', 0),
+                'market': market
+            }
+            
+    # Process KOSDAQ Project (KOSDAQ)
     kd_raw = kosdaq_db.child('stocks').get() or {}
-    prices.update(kd_raw.get('KOSDAQ', {}))
+    market_data = kd_raw.get('KOSDAQ', {})
+    for symbol, data in market_data.items():
+        prices[symbol] = {
+            'name': data.get('name', 'Unknown'),
+            'price': data.get('price', 0),
+            'market': 'KOSDAQ'
+        }
+        
     return prices
 
 def process_portfolio_request(uid: str, req: dict):
@@ -357,7 +374,10 @@ def process_sabotage_request(uid: str, req: dict):
         all_stocks = []
         for symbol, data in all_prices.items(): # Use all_prices
             price = data.get('price', 0)
-            if price > 0:
+            market = data.get('market', '')
+            
+            # Only include KOSPI and KOSDAQ (exclude ETF, ETN)
+            if price > 0 and market in ['KOSPI', 'KOSDAQ']:
                 all_stocks.append({
                     'symbol': symbol,
                     'name': data.get('name', 'Unknown'),
