@@ -65,9 +65,9 @@ export function useTradeHistory(uid: string | null) {
                 totalAmount: row.amount,
                 profit: row.profit,
                 profitRatio: row.profit_ratio,
-                fee: row.final_fee || 0,
-                rawFee: row.raw_fee,
-                discount: row.discount_amount,
+                fee: row.final_fee ?? row.fee ?? 0,
+                rawFee: row.raw_fee ?? row.rawFee ?? 0,
+                discount: row.discount_amount ?? row.discount ?? 0,
                 timestamp: row.timestamp
             }));
 
