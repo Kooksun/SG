@@ -95,6 +95,7 @@ const LeaderboardPage: React.FC = () => {
 
         let cost = 100000;
         if (type === 'FORCED_DONATION') cost = 200000;
+        if (type === 'PENNY_STOCK_ATTACK') cost = 50000;
 
         if (taxPoints < cost) {
             alert('포인트가 부족합니다.');
@@ -327,19 +328,19 @@ const LeaderboardPage: React.FC = () => {
                                     </button>
                                     <button
                                         className="action-select-btn"
-                                        onClick={() => setActionType('SABOTAGE')}
-                                    >
-                                        <Bomb size={28} />
-                                        <span className="action-title">강제 매각 타격</span>
-                                        <span className="action-cost">100,000 P 소모</span>
-                                    </button>
-
-                                    <button
-                                        className="action-select-btn"
                                         onClick={() => setActionType('PENNY_STOCK')}
                                     >
                                         <TrendingDown size={28} />
                                         <span className="action-title">동전주 매수 공격</span>
+                                        <span className="action-cost">50,000 P 소모</span>
+                                    </button>
+
+                                    <button
+                                        className="action-select-btn"
+                                        onClick={() => setActionType('SABOTAGE')}
+                                    >
+                                        <Bomb size={28} />
+                                        <span className="action-title">강제 매각 타격</span>
                                         <span className="action-cost">100,000 P 소모</span>
                                     </button>
 
@@ -428,14 +429,14 @@ const LeaderboardPage: React.FC = () => {
                                 <h3 style={{ color: '#8b5cf6' }}>동전주 매수 공격</h3>
                                 <p>
                                     코스피/코스닥 중 가장 저렴한 동전주를 <strong>{selectedUser.displayName}</strong>님 대신 강제 매수합니다!<br /><br />
-                                    대상자 현금의 <strong>5%</strong> (최대 500만원) 만큼 매수하며, <strong>100,000 P</strong>가 소모됩니다.
+                                    대상자 현금의 <strong>5%</strong> (최대 500만원) 만큼 매수하며, <strong>50,000 P</strong>가 소모됩니다.
                                 </p>
 
-                                <div className={`portfolio-modal-points ${taxPoints < 100000 ? 'insufficient' : ''}`}>
+                                <div className={`portfolio-modal-points ${taxPoints < 50000 ? 'insufficient' : ''}`}>
                                     <span>현재 포인트</span>
                                     <span>{taxPoints.toLocaleString()} P</span>
                                 </div>
-                                {taxPoints < 100000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
+                                {taxPoints < 50000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
 
                                 <div className="portfolio-modal-actions">
                                     <button
@@ -448,10 +449,10 @@ const LeaderboardPage: React.FC = () => {
                                     <button
                                         className="btn-confirm"
                                         onClick={() => requestSabotage('PENNY_STOCK_ATTACK')}
-                                        disabled={actionStatus === 'PENDING' || taxPoints < 100000}
+                                        disabled={actionStatus === 'PENDING' || taxPoints < 50000}
                                         style={{ background: '#8b5cf6' }}
                                     >
-                                        {actionStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 매수 중...</> : '100,000 P로 공격'}
+                                        {actionStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 매수 중...</> : '50,000 P로 공격'}
                                     </button>
                                 </div>
                             </>

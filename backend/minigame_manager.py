@@ -425,7 +425,7 @@ def handle_luckybox_request(uid: str):
             user_data = user_snap.to_dict()
             current_points = user_data.get('taxPoints', 0)
             
-            if current_points < 100000:
+            if current_points < 150000:
                 return False, "포인트가 부족합니다."
 
             # 1b. Pick stock (reads from RTDB implicitly, not Firestore, so it's safe here)
@@ -446,7 +446,7 @@ def handle_luckybox_request(uid: str):
             # --- 2. All Writes ---
             # 2a. Deduct points
             transaction.update(user_ref, {
-                'taxPoints': current_points - 100000
+                'taxPoints': current_points - 150000
             })
 
             # 2b. Add to history
@@ -456,10 +456,10 @@ def handle_luckybox_request(uid: str):
                 'type': 'LUCKY_BOX',
                 'price': 0,
                 'quantity': 1,
-                'totalAmount': -100000,
+                'totalAmount': -150000,
                 'fee': 0,
                 'timestamp': firestore.SERVER_TIMESTAMP,
-                'details': f"100,000 P 사용 ({name} 1주 획득)"
+                'details': f"150,000 P 사용 ({name} 1주 획득)"
             })
 
             # 2c. Update Portfolio

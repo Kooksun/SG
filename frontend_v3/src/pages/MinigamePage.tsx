@@ -471,7 +471,7 @@ const MinigamePage: React.FC = () => {
                             <h2>주식 럭키박스</h2>
 
                             <p className="rules-text" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                                <strong>100,000 P</strong>를 사용하여 행운의 주식을 뽑아보세요!<br /><br />
+                                <strong>150,000 P</strong>를 사용하여 행운의 주식을 뽑아보세요!<br /><br />
                                 <span style={{ fontSize: '0.85rem' }}>KOSPI / KOSDAQ의 무작위 우량주 <strong>1주</strong>가 즉시 포트폴리오(내 잔고)에 지급됩니다.</span>
                             </p>
 
@@ -480,9 +480,9 @@ const MinigamePage: React.FC = () => {
                                     className="luckybox-btn"
                                     onClick={() => setShowLuckyBoxModal(true)}
                                     // onClick={() => openLuckyBox()} // Will do this from modal
-                                    disabled={actionLoading || taxPoints < 100000}
+                                    disabled={actionLoading || taxPoints < 150000}
                                 >
-                                    {taxPoints < 100000 ? '포인트 부족' : '100,000 P로 뽑기'}
+                                    {taxPoints < 150000 ? '포인트 부족' : '150,000 P로 뽑기'}
                                 </button>
                             </div>
                         </div>
@@ -597,11 +597,11 @@ const MinigamePage: React.FC = () => {
                                     지급되는 주식은 무작위이며 반품은 불가능합니다!
                                 </p>
 
-                                <div className={`portfolio-modal-points ${taxPoints < 100000 ? 'insufficient' : ''}`}>
+                                <div className={`portfolio-modal-points ${taxPoints < 150000 ? 'insufficient' : ''}`}>
                                     <span>현재 보유 포인트</span>
                                     <span>{taxPoints.toLocaleString()} P</span>
                                 </div>
-                                {taxPoints < 100000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
+                                {taxPoints < 150000 && <p style={{ color: '#f43f5e', fontSize: '0.8rem' }}>포인트가 부족합니다.</p>}
 
                                 <div className="portfolio-modal-actions">
                                     <button
@@ -615,9 +615,9 @@ const MinigamePage: React.FC = () => {
                                         className="btn-confirm"
                                         style={{ background: '#f59e0b' }}
                                         onClick={openLuckyBox}
-                                        disabled={luckyBoxStatus === 'PENDING' || taxPoints < 100000}
+                                        disabled={luckyBoxStatus === 'PENDING' || taxPoints < 150000}
                                     >
-                                        {luckyBoxStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 개봉 중...</> : '열기 (10만 P)'}
+                                        {luckyBoxStatus === 'PENDING' ? <><Loader2 size={16} className="animate-spin" /> 개봉 중...</> : '열기 (15만 P)'}
                                     </button>
                                 </div>
                             </>
