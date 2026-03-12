@@ -28,10 +28,12 @@ export function useTradeHistory(uid: string | null) {
 
     const fetchHistory = async (page: number, append: boolean = false) => {
         if (!uid) return;
-        
         try {
             const from = page * PAGE_SIZE;
             const to = from + PAGE_SIZE - 1;
+
+            console.log(`[TradeHistory] Fetching for UID: ${uid} (Page: ${page})`);
+            console.log(`[Supabase] URL: ${import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL}`);
 
             const { data, error } = await supabase
                 .from('trade_records')
@@ -41,14 +43,19 @@ export function useTradeHistory(uid: string | null) {
                 .range(from, to);
 
             if (error) {
-                console.error("Error fetching trade history from Supabase:", error);
+                console.error("[TradeHistory] Supabase error:", error);
                 return;
             }
 
-            if (!data) return;
+            if (!data || data.length === 0) {
+                console.log("[TradeHistory] No data returned from Supabase.");
+                return;
+            }
+
+            console.log(`[TradeHistory] Retrieved ${data.length} records. Sample order_id: ${data[0]?.order_id}`);
 
             const historyData: TradeHistoryItem[] = data.map((row: any) => ({
-                id: row.id || row.order_id || Math.random().toString(), // fallback if missing
+                id: row.id?.toString() || row.order_id || Math.random().toString(),
                 symbol: row.symbol,
                 name: row.stock_name || row.name, // Support older schemas if needed
                 type: row.type,
