@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from firebase_admin import firestore
 from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db, ranking_db, sync_user_to_rtdb
 from .email_utils import EmailManager
+from .supabase_client import get_supabase
 
 MARKET_TZ = ZoneInfo("Asia/Seoul")
 MAX_TICKERS = 50
@@ -59,23 +60,35 @@ def process_portfolio_request(uid: str, req: dict):
             transaction.update(requester_ref, {
                 'taxPoints': firestore.Increment(-10000)
             })
-            
-            # Add History Log
-            hist_ref = requester_ref.collection('history').document()
-            transaction.set(hist_ref, {
-                'symbol': 'VIEW',
-                'name': '포트폴리오 열람',
-                'type': 'TAX', # Or FEE
-                'price': 0,
-                'quantity': 1,
-                'totalAmount': -10000,
-                'fee': 0,
-                'timestamp': firestore.SERVER_TIMESTAMP,
-                'details': f"{target_name}님의 포트폴리오 열람 비용"
+            transaction.update(requester_ref, {
+                'taxPoints': firestore.Increment(-10000)
             })
             
         transaction = main_firestore.transaction()
         deduct_points_and_log(transaction)
+        
+        # Add History Log to Supabase
+        try:
+            supabase = get_supabase()
+            if supabase:
+                supabase.table('trade_records').insert({
+                    'uid': uid,
+                    'symbol': 'VIEW',
+                    'stock_name': '포트폴리오 열람',
+                    'type': 'TAX',
+                    'price': 0,
+                    'quantity': 1,
+                    'amount': -10000,
+                    'raw_fee': 0,
+                    'discount_amount': 0,
+                    'final_fee': 0,
+                    'balance_change': 0,
+                    'stock_change': 0,
+                    'timestamp': datetime.now(MARKET_TZ).isoformat()
+                }).execute()
+        except Exception as e:
+            print(f"  !! Failed to log portfolio view to Supabase for {uid}: {e}")
+
     except Exception as e:
         print(f"  !! Transaction failed for {uid}: {e}")
         mark_request_failed(uid, "결제 처리 중 오류가 발생했습니다.")
@@ -422,32 +435,9 @@ def process_sabotage_request(uid: str, req: dict):
                     'taxPoints': req_pts - 100000
                 })
                 
-                transaction.set(hist_req_ref, {
-                    'symbol': 'SABOTAGE',
-                    'name': '강제 매각 타격',
-                    'type': 'TAX',
-                    'price': 0,
-                    'quantity': 1,
-                    'totalAmount': -100000,
-                    'fee': 0,
-                    'timestamp': firestore.SERVER_TIMESTAMP,
-                    'details': f"{target_name}님의 {largest_stock['name']} 타격"
-                })
-
-                # Target history
-                transaction.set(hist_tgt_ref, {
-                    'symbol': largest_stock['symbol'],
-                    'name': largest_stock['name'],
-                    'type': 'SELL',
-                    'price': largest_stock['live_price'],
-                    'quantity': sell_qty,
-                    'totalAmount': sell_amount,
-                    'fee': 0,
-                    'profit': profit,
-                    'profitRatio': profitRatio,
-                    'isSystemOrder': True,
-                    'timestamp': firestore.SERVER_TIMESTAMP,
-                    'details': f"{requester_name}에 의한 강제 매각"
+                # Requester deduction
+                transaction.update(requester_ref, {
+                    'taxPoints': req_pts - 100000
                 })
                 
                 return True, {
@@ -512,22 +502,8 @@ def process_sabotage_request(uid: str, req: dict):
                             transaction.update(tgt_stock_doc, {
                                 'quantity': new_qty
                             })
-                            
-                        transaction.set(hist_sys_ref, {
-                            'symbol': largest_stock['symbol'],
-                            'name': largest_stock['name'],
-                            'type': 'SELL',
-                            'price': live_price,
-                            'quantity': sell_qty,
-                            'totalAmount': sell_amount,
-                            'fee': 0,
-                            'profit': p_profit,
-                            'profitRatio': profitRatio,
-                            'isSystemOrder': True,
-                            'timestamp': firestore.SERVER_TIMESTAMP,
-                            'details': "기부금 충당을 위한 강제 매각"
-                        })
                 
+
                 donation_amount = min(donation_amount, new_tgt_cash) 
                 new_tgt_cash -= donation_amount
                 
@@ -541,29 +517,9 @@ def process_sabotage_request(uid: str, req: dict):
                     'taxPoints': req_pts - required_points
                 })
                 
-                transaction.set(hist_req_ref, {
-                    'symbol': 'SABOTAGE',
-                    'name': '사회 환원 공격',
-                    'type': 'TAX',
-                    'price': 0,
-                    'quantity': 1,
-                    'totalAmount': -required_points,
-                    'fee': 0,
-                    'timestamp': firestore.SERVER_TIMESTAMP,
-                    'details': f"{target_name}님을 자선가로 만듦"
-                })
-                
-                transaction.set(hist_tgt_ref, {
-                    'symbol': 'DONATION',
-                    'name': '강제 기부',
-                    'type': 'TAX',
-                    'price': 0,
-                    'quantity': 1,
-                    'totalAmount': -donation_amount,
-                    'fee': 0,
-                    'isSystemOrder': True,
-                    'timestamp': firestore.SERVER_TIMESTAMP,
-                    'details': "익명의 기부천사에 의한 강제 기부 (10만 P 보상)"
+                # Only deduct point if success
+                transaction.update(requester_ref, {
+                    'taxPoints': req_pts - required_points
                 })
                 
                 return True, {
@@ -620,30 +576,9 @@ def process_sabotage_request(uid: str, req: dict):
                     'taxPoints': req_pts - 50000
                 })
                 
-                transaction.set(hist_req_ref, {
-                    'symbol': 'SABOTAGE',
-                    'name': '동전주 매수 공격',
-                    'type': 'TAX',
-                    'price': 0,
-                    'quantity': 1,
-                    'totalAmount': -50000,
-                    'fee': 0,
-                    'timestamp': firestore.SERVER_TIMESTAMP,
-                    'details': f"{target_name}님에게 {selected_penny['name']} 강제 매수"
-                })
-                
-                # Target history
-                transaction.set(hist_tgt_ref, {
-                    'symbol': selected_penny['symbol'],
-                    'name': selected_penny['name'],
-                    'type': 'BUY',
-                    'price': penny_price,
-                    'quantity': buy_qty,
-                    'totalAmount': actual_cost,
-                    'fee': 0,
-                    'isSystemOrder': True,
-                    'timestamp': firestore.SERVER_TIMESTAMP,
-                    'details': f"{requester_name}에 의한 동전주 강제 매수"
+                # Requester deduction
+                transaction.update(requester_ref, {
+                    'taxPoints': req_pts - 50000
                 })
                 
                 return True, {
@@ -672,6 +607,123 @@ def process_sabotage_request(uid: str, req: dict):
     main_db.child(f'user_activities/{uid}/sabotageRequest').update({
         'status': 'SUCCESS'
     })
+
+    # Record to Supabase
+    try:
+        supabase = get_supabase()
+        if supabase:
+            now_iso = datetime.now(MARKET_TZ).isoformat()
+            records_to_insert = []
+            
+            if result['type'] == 'FORCED_SALE':
+                # Attacker Tax
+                records_to_insert.append({
+                    'uid': uid,
+                    'symbol': 'SABOTAGE',
+                    'stock_name': '강제 매각 타격',
+                    'type': 'TAX',
+                    'price': 0,
+                    'quantity': 1,
+                    'amount': -100000,
+                    'raw_fee': 0,
+                    'discount_amount': 0,
+                    'final_fee': 0,
+                    'balance_change': 0,
+                    'stock_change': 0,
+                    'timestamp': now_iso
+                })
+                # Victim Sell
+                records_to_insert.append({
+                    'uid': target_uid,
+                    'symbol': largest_stock['symbol'],
+                    'stock_name': largest_stock['name'],
+                    'type': 'SELL',
+                    'price': largest_stock['live_price'],
+                    'quantity': result['qty'],
+                    'amount': result['amount'],
+                    'raw_fee': 0,
+                    'discount_amount': 0,
+                    'final_fee': 0,
+                    'balance_change': result['amount'],
+                    'stock_change': -result['qty'],
+                    'timestamp': now_iso
+                })
+                
+            elif result['type'] == 'FORCED_DONATION':
+                # Attacker Tax
+                records_to_insert.append({
+                    'uid': uid,
+                    'symbol': 'SABOTAGE',
+                    'stock_name': '사회 환원 공격',
+                    'type': 'TAX',
+                    'price': 0,
+                    'quantity': 1,
+                    'amount': -200000,
+                    'raw_fee': 0,
+                    'discount_amount': 0,
+                    'final_fee': 0,
+                    'balance_change': 0,
+                    'stock_change': 0,
+                    'timestamp': now_iso
+                })
+                # Victim Donation
+                records_to_insert.append({
+                    'uid': target_uid,
+                    'symbol': 'DONATION',
+                    'stock_name': '강제 기부',
+                    'type': 'TAX',
+                    'price': 0,
+                    'quantity': 1,
+                    'amount': -result['donation_amount'],
+                    'raw_fee': 0,
+                    'discount_amount': 0,
+                    'final_fee': 0,
+                    'balance_change': -result['donation_amount'],
+                    'stock_change': 0,
+                    'timestamp': now_iso
+                })
+                
+            elif result['type'] == 'PENNY_STOCK_ATTACK':
+                # Attacker Tax
+                records_to_insert.append({
+                    'uid': uid,
+                    'symbol': 'SABOTAGE',
+                    'stock_name': '동전주 매수 공격',
+                    'type': 'TAX',
+                    'price': 0,
+                    'quantity': 1,
+                    'amount': -50000,
+                    'raw_fee': 0,
+                    'discount_amount': 0,
+                    'final_fee': 0,
+                    'balance_change': 0,
+                    'stock_change': 0,
+                    'timestamp': now_iso
+                })
+                # Victim Buy
+                records_to_insert.append({
+                    'uid': target_uid,
+                    'symbol': selected_penny['symbol'],
+                    'stock_name': selected_penny['name'],
+                    'type': 'BUY',
+                    'price': selected_penny['price'],
+                    'quantity': result['qty'],
+                    'amount': -result['amount'],
+                    'raw_fee': 0,
+                    'discount_amount': 0,
+                    'final_fee': 0,
+                    'balance_change': -result['amount'],
+                    'stock_change': result['qty'],
+                    'timestamp': now_iso
+                })
+            
+            if records_to_insert:
+                supabase.table('trade_records').insert(records_to_insert).execute()
+                print(f"  -> Sabotage logs successfully saved to Supabase.")
+                
+    except Exception as e:
+        print(f"  !! Failed to log sabotage logs to Supabase: {e}")
+
 
     # Sync both parties to RTDB Cache
     sync_user_to_rtdb(uid)

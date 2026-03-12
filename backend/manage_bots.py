@@ -64,40 +64,55 @@ def show_bot_info(index: int, limit: int = 10):
     if not has_holdings:
         print("  - 보유 종목 없음")
 
-    # 3. Trade History from Firestore
+    # 3. Trade History from Supabase
     print(f"\n [Recent Trade Records (Last {limit})]")
     try:
-        history_ref = user_ref.collection('history').order_by('timestamp', direction='DESCENDING').limit(limit)
-        records = history_ref.stream()
-        
-        count = 0
-        for r in records:
-            count += 1
-            d = r.to_dict()
-            ts_obj = d.get('timestamp')
-            # Firestore timestamp (UTC) to KST
-            if hasattr(ts_obj, 'astimezone'):
-                ts_kst = ts_obj.astimezone(MARKET_TZ)
-                ts = ts_kst.strftime('%Y-%m-%d %H:%M:%S')
-            else:
-                ts = str(ts_obj)[:19]
+        supabase = get_supabase()
+        if not supabase:
+            print("  - Error: Supabase client initialization failed.")
+            return
 
-            side = d.get('type')
-            name = d.get('name', 'Unknown')
-            symbol = d.get('symbol')
-            price = d.get('price', 0)
-            qty = d.get('quantity', 0)
-            profit = d.get('profit', 0)
-            
-            p_str = f" | 수익: {profit:+,.0f}" if side == 'SELL' else ""
-            print(f"  [{ts}] {side} {name}({symbol}) | {qty}주 @ {price:,.0f}원{p_str}")
+        response = supabase.table('trade_records') \
+                           .select('*') \
+                           .eq('uid', uid) \
+                           .order('timestamp', desc=True) \
+                           .limit(limit) \
+                           .execute()
         
-        if count == 0:
+        records = response.data
+        if not records:
             print("  - 거래 기록 없음")
+        else:
+            for d in records:
+                ts_str = d.get('timestamp')
+                # Parse ISO format and convert to KST
+                if ts_str:
+                    try:
+                        # Handle potential timezone strings from Supabase (usually UTC)
+                        ts_obj = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                        ts_kst = ts_obj.astimezone(MARKET_TZ)
+                        ts = ts_kst.strftime('%Y-%m-%d %H:%M:%S')
+                    except Exception:
+                        ts = str(ts_str)[:19]
+                else:
+                    ts = "Unknown"
+
+                side = d.get('type')
+                # Use stock_name explicitly, fall back to name or symbol
+                name = d.get('stock_name') or d.get('name') or d.get('symbol') or 'Unknown'
+                symbol = d.get('symbol')
+                price = float(d.get('price', 0))
+                qty = float(d.get('quantity', 0))
+                profit = float(d.get('profit') or 0)
+                
+                p_str = f" | 수익: {profit:+,.0f}" if side == 'SELL' else ""
+                print(f"  [{ts}] {side} {name}({symbol}) | {qty}주 @ {price:,.0f}원{p_str}")
+
     except Exception as e:
-        print(f"  - Error fetching Firestore records: {e}")
+        print(f"  - Error fetching Supabase records: {e}")
             
     print("=" * 60)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="StockGame AI Bot Manager Tool")

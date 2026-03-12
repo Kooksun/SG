@@ -94,6 +94,46 @@ export function useTradeHistory(uid: string | null) {
         setPageNumber(0);
         setHasMore(true);
         fetchHistory(0).finally(() => setLoading(false));
+
+        // Supabase Realtime Subscription for trade_records
+        const channel = supabase.channel('trade_records_changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'trade_records',
+                    filter: `uid=eq.${uid}`
+                },
+                (payload) => {
+                    console.log('[TradeHistory] Realtime INSERT received:', payload.new);
+                    const row = payload.new;
+                    const newItem: TradeHistoryItem = {
+                        id: row.id?.toString() || row.order_id || Math.random().toString(),
+                        symbol: row.symbol,
+                        name: row.stock_name || row.name,
+                        type: row.type,
+                        price: row.price,
+                        quantity: row.quantity,
+                        totalAmount: row.amount,
+                        profit: row.profit,
+                        profitRatio: row.profit_ratio,
+                        fee: row.final_fee ?? row.fee ?? 0,
+                        rawFee: row.raw_fee ?? row.rawFee ?? 0,
+                        discount: row.discount_amount ?? row.discount ?? 0,
+                        timestamp: row.timestamp
+                    };
+                    
+                    setHistory(prev => [newItem, ...prev]);
+                }
+            )
+            .subscribe((status) => {
+                console.log('[TradeHistory] Supabase Realtime status:', status);
+            });
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [uid]);
 
     const loadMore = async () => {

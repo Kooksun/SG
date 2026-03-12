@@ -4,6 +4,7 @@ from datetime import datetime
 from firebase_admin import firestore
 from .firebase_config import main_db, main_firestore, kospi_db, kosdaq_db, sync_user_to_rtdb
 from .fetcher import fetch_stock_chart, MARKET_TZ
+from .supabase_client import get_supabase
 
 # Reward Table
 REWARDS = {
@@ -308,28 +309,37 @@ def finalize_game(uid: str, wins: int, reward: int, success: bool, answer: dict 
     # 1. Update Firestore (Points)
     user_ref = main_firestore.collection('users').document(uid)
     
-    # Record to history
+    # Record to history (Points only)
     @firestore.transactional
     def update_points(transaction):
         transaction.update(user_ref, {
             'taxPoints': firestore.Increment(reward)
         })
-        # Add to history
-        hist_ref = user_ref.collection('history').document()
-        transaction.set(hist_ref, {
-            'symbol': 'MINIGAME',
-            'name': '미니게임 보상',
-            'type': 'REWARD',
-            'price': 0,
-            'quantity': 1,
-            'totalAmount': reward,
-            'fee': 0,
-            'timestamp': firestore.SERVER_TIMESTAMP,
-            'details': f"{wins}연승 보상"
-        })
 
     transaction = main_firestore.transaction()
     update_points(transaction)
+    
+    # Supabase Record
+    try:
+        supabase = get_supabase()
+        if supabase:
+            supabase.table('trade_records').insert({
+                'uid': uid,
+                'symbol': 'MINIGAME',
+                'stock_name': '미니게임 보상',
+                'type': 'REWARD',
+                'price': 0,
+                'quantity': 1,
+                'amount': reward,
+                'raw_fee': 0,
+                'discount_amount': 0,
+                'final_fee': 0,
+                'balance_change': 0,
+                'stock_change': 0,
+                'timestamp': datetime.now(MARKET_TZ).isoformat()
+            }).execute()
+    except Exception as e:
+        print(f"  !! Failed to log minigame reward to Supabase for {uid}: {e}")
     
     # Sync to RTDB Cache
     sync_user_to_rtdb(uid)
@@ -443,23 +453,15 @@ def handle_luckybox_request(uid: str):
             stock_doc_ref = port_ref.document(symbol)
             stock_snap = stock_doc_ref.get(transaction=transaction)
             
+            # Extract market if available
+            market = selected.get('market', '')
+            if not market:
+                market = 'KOSPI' if symbol in kospi_db.child('stocks/KOSPI').get(shallow=True) or [] else 'KOSDAQ'
+            
             # --- 2. All Writes ---
             # 2a. Deduct points
             transaction.update(user_ref, {
                 'taxPoints': current_points - 150000
-            })
-
-            # 2b. Add to history
-            transaction.set(hist_ref, {
-                'symbol': 'LUCKY_BOX',
-                'name': '럭키박스 구매',
-                'type': 'LUCKY_BOX',
-                'price': 0,
-                'quantity': 1,
-                'totalAmount': -150000,
-                'fee': 0,
-                'timestamp': firestore.SERVER_TIMESTAMP,
-                'details': f"150,000 P 사용 ({name} 1주 획득)"
             })
 
             # 2c. Update Portfolio
@@ -472,23 +474,32 @@ def handle_luckybox_request(uid: str):
                 transaction.update(stock_doc_ref, {
                     'quantity': new_qty,
                     'averagePrice': new_avg,
-                    'name': name
+                    'name': name,
+                    'market': market,
+                    'updatedAt': firestore.SERVER_TIMESTAMP
                 })
             else:
                 transaction.set(stock_doc_ref, {
                     'symbol': symbol,
                     'name': name,
                     'quantity': 1,
-                    'averagePrice': current_price
+                    'averagePrice': current_price,
+                    'market': market,
+                    'updatedAt': firestore.SERVER_TIMESTAMP
                 })
 
             return True, selected
 
-        transaction = main_firestore.transaction()
-        success, result = deduct_points_and_get_stock(transaction)
+        try:
+            transaction = main_firestore.transaction()
+            success, result = deduct_points_and_get_stock(transaction)
 
-        if not success:
-            mark_failed(result)
+            if not success:
+                mark_failed(result)
+                return
+        except Exception as e:
+            print(f"  !! LuckyBox Transaction failed for {uid}: {e}")
+            mark_failed("결제 처리 중 오류가 발생했습니다.")
             return
 
         # Success!
@@ -499,6 +510,29 @@ def handle_luckybox_request(uid: str):
             'rewardSymbol': selected_stock['symbol'],
             'rewardName': selected_stock['name']
         })
+        
+        # Log to Supabase
+        try:
+            supabase = get_supabase()
+            if supabase:
+                supabase.table('trade_records').insert({
+                    'uid': uid,
+                    'symbol': 'LUCKY_BOX',
+                    'stock_name': '럭키박스 구매',
+                    'type': 'LUCKY_BOX',
+                    'price': 0,
+                    'quantity': 1,
+                    'amount': -150000,
+                    'raw_fee': 0,
+                    'discount_amount': 0,
+                    'final_fee': 0,
+                    'balance_change': 0,
+                    'stock_change': 0,
+                    'timestamp': datetime.now(MARKET_TZ).isoformat()
+                }).execute()
+        except Exception as e:
+            print(f"  !! Failed to log LUCKY_BOX to Supabase for {uid}: {e}")
+
         # Sync to RTDB Cache
         sync_user_to_rtdb(uid)
 

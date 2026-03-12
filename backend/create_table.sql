@@ -22,3 +22,7 @@ CREATE TABLE IF NOT EXISTS trade_records (
 CREATE INDEX IF NOT EXISTS idx_trade_records_uid ON trade_records(uid);
 CREATE INDEX IF NOT EXISTS idx_trade_records_symbol ON trade_records(symbol);
 CREATE INDEX IF NOT EXISTS idx_trade_records_timestamp ON trade_records(timestamp);
+
+-- Enable Realtime for trade_records
+alter publication supabase_realtime add table trade_records;
+
