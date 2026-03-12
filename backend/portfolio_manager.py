@@ -300,7 +300,12 @@ def process_sabotage_request(uid: str, req: dict):
     tax_points = req_data.get('taxPoints', 0)
     
     attack_type = req.get('type', 'FORCED_SALE')
-    required_points = 200000 if attack_type == 'FORCED_DONATION' else 100000
+    if attack_type == 'FORCED_DONATION':
+        required_points = 200000
+    elif attack_type == 'PENNY_STOCK_ATTACK':
+        required_points = 50000
+    else:
+        required_points = 100000
     
     if tax_points < required_points:
         mark_request_failed(uid, f"포인트가 부족합니다 ({required_points:,} P 필요).", 'sabotageRequest')
